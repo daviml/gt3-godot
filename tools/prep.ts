@@ -15,6 +15,7 @@
 //
 // uso (de REPOS/gt3-godot/tools): npx vite-node prep.ts            tudo
 //                                 npx vite-node prep.ts -- dados   só JSON (rápido, sem modelos/texturas/sons)
+//                                 npx vite-node prep.ts -- carros  JSON + os 13 GLB (sem texturas da pista/sons)
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Track } from '../../gt3-time-attack/src/track/track';
@@ -25,6 +26,7 @@ import { ALL_EXTENSIONS, EXTMeshoptCompression, EXTTextureWebP, KHRMeshQuantizat
 import { dequantize, textureCompress } from '@gltf-transform/functions';
 import { MeshoptDecoder } from 'meshoptimizer';
 import sharp from 'sharp';
+import { fixNormals, splitWheels } from './car_fix';
 
 const WEB = new URL('../../gt3-time-attack/', import.meta.url);
 const OUT = new URL('../', import.meta.url);
@@ -39,6 +41,7 @@ const r2 = (x: number) => Math.round(x * 100) / 100;
 const r4 = (x: number) => Math.round(x * 10000) / 10000;
 const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
 const onlyData = process.argv.includes('dados');
+const onlyCars = process.argv.includes('carros'); // só os modelos (com as correções do car_fix.ts)
 
 // ---------- pista
 const data = JSON.parse(readFileSync(web('data/tracks/interlagos.json'), 'utf8'));
@@ -156,10 +159,10 @@ if (onlyData) {
   process.exit(0);
 }
 
-for (const b of Object.keys(banks)) for (const f of readdirSync(web(`public/sounds/engines/${b}`))) {
+if (!onlyCars) for (const b of Object.keys(banks)) for (const f of readdirSync(web(`public/sounds/engines/${b}`))) {
   if (f.endsWith('.wav')) copyFileSync(web(`public/sounds/engines/${b}/${f}`), out(`assets/sounds/engines/${b}/${f}`));
 }
-for (const f of readdirSync(web('public/sounds/fx'))) if (f.endsWith('.wav')) copyFileSync(web(`public/sounds/fx/${f}`), out(`assets/sounds/fx/${f}`));
+if (!onlyCars) for (const f of readdirSync(web('public/sounds/fx'))) if (f.endsWith('.wav')) copyFileSync(web(`public/sounds/fx/${f}`), out(`assets/sounds/fx/${f}`));
 const creditos = web('public/sounds/CREDITOS.md');
 if (existsSync(creditos)) copyFileSync(creditos, out('assets/sounds/CREDITOS.md'));
 
@@ -171,10 +174,15 @@ for (const c of CARS) {
   const doc = await io.read(web(`public/models/${c.id}.glb`));
   await doc.transform(dequantize(), textureCompress({ encoder: sharp, targetFormat: 'png' }));
   for (const ext of doc.getRoot().listExtensionsUsed()) if (DROP.includes(ext.extensionName)) ext.dispose();
+  // correções da etapa 6 (car_fix.ts): normais invertidas e pinça separada da roda
+  const flipped = fixNormals(doc);
+  const wheels = splitWheels(doc, modelMeta(c.id)!.wheels.map(w => w.r));
   await io.write(out(`assets/cars/${c.id}/${c.id}.glb`), doc);
-  console.log('  carro', c.id);
+  console.log('  carro', c.id, flipped.length ? `normais invertidas: ${flipped.join(', ')}` : '');
+  for (const w of wheels) console.log('    ', w);
 }
 copyFileSync(web('data/models/creditos.json'), out('assets/cars/creditos.json'));
+if (onlyCars) process.exit(0);
 
 // ---------- texturas, céu e árvores
 for (const n of ['asphalt_track', 'concrete_wall_008', 'leafy_grass', 'sparse_grass']) {

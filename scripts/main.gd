@@ -1,11 +1,12 @@
 # Protótipo: Interlagos + os GT3 do jogo web em Godot 4, com a física e a pista do web.
 # Controles (iguais ao web): setas/WASD ou controle (gatilhos + analógico). E/Shift ou RB/A sobe marcha,
-# Q/Ctrl ou LB/X reduz. 1 = ABS, 2 = TC, G = câmbio automático. R ou Back = volta para a pista.
-# P = piloto automático. Etapa 3: curva e suavização da direção do web, vibração no controle; no celular
-# (ou -- --touch no PC) botões de toque, câmbio automático e ☰ = pausa.
+# Q/Ctrl ou LB/X reduz. 1 = ABS, 2 = TC, G = câmbio automático. C/Y = câmera (perseguição, capô, longe).
+# R ou Back = volta para a pista. P = piloto automático. Etapa 3: curva e suavização da direção do web,
+# vibração no controle; no celular (ou -- --touch no PC) botões de toque, câmbio automático e ☰ = pausa.
 # F1 = alterna qualidade (Alto/Celular). F12 = salva print. Esc = sai.
 # Linha de comando (depois de --): --car=<id> escolhe o carro (data/cars.json), --auto liga o piloto,
-# --shot=<pasta> tira prints sozinho.
+# --nick=<nome> define o nick, --shot=<pasta> tira prints sozinho.
+# Cronometragem (etapa 4): R volta para o grid e zera a volta; N = nick (recordes por nick e carro).
 extends Node3D
 
 const SUN_U := 0.5947
@@ -13,16 +14,14 @@ const SUN_ELEV := deg_to_rad(48.0)
 
 var track: Track
 var car: Car
-var car_root: Node3D
-var model: Node3D
-var wheel_nodes: Array[Node3D] = []
-var wheel_scale: Array[Vector3] = []
-var model_offset := Vector3.ZERO
+var car_view: CarView
 var cam: Camera3D
 var env: Environment
 var sun: DirectionalLight3D
 var hud: Label
 var hud_big: Label
+var panel: RichTextLabel
+var nick_edit: LineEdit
 
 # entrada (etapa 3, scripts/input/): curva e suavização do web, vibração e botões de toque no celular
 var input := InputReader.new()
@@ -30,16 +29,17 @@ var rumble := Rumble.new()
 var touch: TouchControls
 ## ☰ ou voltar do Android: pausa (o menu da etapa 9 entra no lugar)
 var paused := false
-var cam_yaw := 0.0
-var cam_ready := false
-var lap_start := 0.0
-var last_lap := -1.0
-var best_lap := -1.0
-var last_idx := 0
+var chase: ChaseCamera
+var timer: LapTimer
+var nick := ""
+## melhores setores da sessão, de todas as voltas válidas (roxo no painel)
+var best_sectors: Array[float] = []
+## recordes deste PC (Records.top), atualizados a cada volta
+var top_records: Array = []
 var time := 0.0
 var autopilot := false
 var bot: RefCounted
-var car_id := "porsche-992-gt3r"
+var car_id := Game.car_id  # escolhido na garagem (scenes/garagem.tscn)
 var car_data: Dictionary
 var high := true
 var toast := ""
@@ -47,8 +47,6 @@ var toast_t := 0.0
 # referência do iRacing de cada carro que tem uma: o piloto automático segue a volta real
 const REFS := {"porsche-992-gt3r": "interlagos-porsche", "audi-r8-lms-gt3": "interlagos-r8", "ford-mustang-gt3": "interlagos-mustang"}
 
-# terreno (grade de alturas) para plantar árvores
-var ter: Dictionary
 
 
 func _ready() -> void:
@@ -60,18 +58,30 @@ func _ready() -> void:
 			autopilot = true
 		if a.begins_with("--car="):
 			car_id = a.substr(6)
+		if a.begins_with("--nick="):
+			nick = a.substr(7)
+			Records.save_nick(nick)
+	if nick == "":
+		nick = Records.load_nick()
 	# --touch mostra os botões de toque no PC (o mouse vira dedo)
 	input.touch = OS.has_feature("mobile") or "--touch" in args
 	track = Track.new("res://data/track/track.json")
 	_build_env()
-	_build_track()
-	_build_terrain()
-	_build_trees()
+	# pista e arredores exportados do jogo web (etapa 7): scripts/track/track_view.gd
+	add_child(TrackView.new())
 	_build_car()
 	_build_hud()
-	car.reset_at((track.n - 20) % track.n)
+	timer = LapTimer.new(track)
+	timer.on_lap = _on_lap
+	top_records = Records.top(8)
+	_spawn()
 	if REFS.has(car_id):
-		bot = RefBot.new(track, car, RefBot.load_ref(REFS[car_id]), {"line_gain": 0.8, "hold_line": 0.02, "edge": [-0.3, 0.5]})
+		# malha de giro: segue o traçado real do iRacing sem passar da zebra (Porsche 1:35,9 e Mustang 1:33,6 válidas).
+		# A volta do R8 passa 2,3 m além da zebra na Descida do Lago: ele continua com o traçado contido.
+		var opts := {"yaw_p": 2.0, "hold_line": 0.02}
+		if car_id == "audi-r8-lms-gt3":
+			opts = {"yaw_p": 2.0, "line_gain": 0.4, "hold_line": 0.02, "edge": [-0.3, 0.5]}
+		bot = RefBot.new(track, car, RefBot.load_ref(REFS[car_id]), opts)
 	else:
 		bot = Bot.new(track, car)
 	# no celular o câmbio é automático, como no web
@@ -155,281 +165,21 @@ func _build_env() -> void:
 	sun.look_at_from_position(sun_dir * 100.0, Vector3.ZERO, Vector3.UP)
 
 
-func _tex_mat(name: String, tint := Color.WHITE, rough_mul := 1.0) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_texture = load("res://assets/textures/%s_diff.png" % name)
-	m.albedo_color = tint
-	m.normal_enabled = true
-	m.normal_texture = load("res://assets/textures/%s_nor_gl.png" % name)
-	m.orm_texture = load("res://assets/textures/%s_arm.png" % name)
-	m.roughness = rough_mul
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return m
-
-
-func _orm(name: String, tint := Color.WHITE) -> ORMMaterial3D:
-	var m := ORMMaterial3D.new()
-	m.albedo_texture = load("res://assets/textures/%s_diff.png" % name)
-	m.albedo_color = tint
-	m.normal_enabled = true
-	m.normal_texture = load("res://assets/textures/%s_nor_gl.png" % name)
-	m.orm_texture = load("res://assets/textures/%s_arm.png" % name)
-	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return m
-
-
-func _flat(c: Color, rough := 0.8) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = c
-	m.roughness = rough
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return m
-
-
-# ------------------------------------------------------------------ pista
-
-func _build_track() -> void:
-	var t := track
-	var asphalt := ShaderMaterial.new()
-	asphalt.shader = load("res://shaders/asphalt.gdshader")
-	asphalt.set_shader_parameter("albedo_tex", load("res://assets/textures/asphalt_track_diff.png"))
-	asphalt.set_shader_parameter("normal_tex", load("res://assets/textures/asphalt_track_nor_gl.png"))
-	asphalt.set_shader_parameter("arm_tex", load("res://assets/textures/asphalt_track_arm.png"))
-	add_child(t.ribbon(func(i): return -t.wl[i], func(i): return t.wr[i], 0.0, asphalt, 5.0, 5.0))
-
-	var white := _flat(Color(0.92, 0.92, 0.9), 0.6)
-	add_child(t.ribbon(func(i): return -t.wl[i] + 0.05, func(i): return -t.wl[i] + 0.25, 0.006, white))
-	add_child(t.ribbon(func(i): return t.wr[i] - 0.25, func(i): return t.wr[i] - 0.05, 0.006, white))
-
-	# zebras estilo LMU (verde/amarelo/branco), listras de 1,5 m
-	var kerb := ShaderMaterial.new()
-	kerb.shader = load("res://shaders/kerb.gdshader")
-	add_child(t.ribbon(func(i): return -t.wl[i] - t.kerb_l[i], func(i): return -t.wl[i], Track.KERB_H, kerb, 1.0, 1.0, true))
-	add_child(t.ribbon(func(i): return t.wr[i], func(i): return t.wr[i] + t.kerb_r[i], Track.KERB_H, kerb, 1.0, 1.0, true))
-
-	# escapes pintados (verde)
-	var run := _orm("asphalt_track", Color(0.3, 0.72, 0.45))
-	add_child(t.ribbon(func(i): return -t.wl[i] - t.kerb_l[i] - t.run_l[i], func(i): return -t.wl[i] - t.kerb_l[i], 0.004, run, 4, 4, true))
-	add_child(t.ribbon(func(i): return t.wr[i] + t.kerb_r[i], func(i): return t.wr[i] + t.kerb_r[i] + t.run_r[i], 0.004, run, 4, 4, true))
-
-	# grama entre a pista e o muro
-	var grass := ShaderMaterial.new()
-	grass.shader = load("res://shaders/terrain.gdshader")
-	_grass_params(grass)
-	add_child(t.ribbon(func(i): return -t.wall_l[i], func(i): return -t.wl[i] - t.kerb_l[i] - t.run_l[i], -0.02, grass))
-	add_child(t.ribbon(func(i): return t.wr[i] + t.kerb_r[i] + t.run_r[i], func(i): return t.wall_r[i], -0.02, grass))
-
-	# muros de concreto + guard-rail
-	var concrete := _orm("concrete_wall_008", Color(0.95, 0.95, 0.95))
-	add_child(t.wall(func(i): return -t.wall_l[i], -0.8, 1.05, concrete))
-	add_child(t.wall(func(i): return t.wall_r[i], -0.8, 1.05, concrete))
-	var rail := _flat(Color(0.75, 0.77, 0.8), 0.35)
-	rail.metallic = 0.9
-	add_child(t.wall(func(i): return -t.wall_l[i] + 0.08, 0.55, 0.85, rail))
-	add_child(t.wall(func(i): return t.wall_r[i] - 0.08, 0.55, 0.85, rail))
-
-	# linha de chegada
-	var line := _flat(Color(0.95, 0.95, 0.95), 0.6)
-	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(t.wl[0] + t.wr[0], 0.01, 0.6)
-	mi.mesh = bm
-	mi.material_override = line
-	add_child(mi)
-	mi.global_transform = Transform3D(Basis(t.R[0], t.R[0].cross(t.T[0]), -t.T[0]), t.P[0] + t.R[0] * (t.wr[0] - t.wl[0]) / 2.0 + Vector3.UP * 0.008)
-
-
-func _grass_params(m: ShaderMaterial) -> void:
-	m.set_shader_parameter("grass_a", load("res://assets/textures/leafy_grass_diff.png"))
-	m.set_shader_parameter("grass_a_n", load("res://assets/textures/leafy_grass_nor_gl.png"))
-	m.set_shader_parameter("grass_b", load("res://assets/textures/sparse_grass_diff.png"))
-	m.set_shader_parameter("grass_b_n", load("res://assets/textures/sparse_grass_nor_gl.png"))
-	var noise := NoiseTexture2D.new()
-	noise.width = 512
-	noise.height = 512
-	noise.seamless = true
-	var fn := FastNoiseLite.new()
-	fn.frequency = 0.012
-	noise.noise = fn
-	m.set_shader_parameter("mix_noise", noise)
-
-
-# ------------------------------------------------------------------ relevo
-
-func _build_terrain() -> void:
-	ter = JSON.parse_string(FileAccess.get_file_as_string("res://data/track/terrain.json"))
-	var nx := int(ter.nx)
-	var nz := int(ter.nz)
-	var c: float = ter.cell
-	var x0: float = ter.x0
-	var z0: float = ter.z0
-	var h: Array = ter.h
-	var verts := PackedVector3Array()
-	var norms := PackedVector3Array()
-	var uvs := PackedVector2Array()
-	verts.resize(nx * nz)
-	norms.resize(nx * nz)
-	uvs.resize(nx * nz)
-	for j in nz:
-		for i in nx:
-			var k := j * nx + i
-			verts[k] = Vector3(x0 + i * c, h[k], z0 + j * c)
-			uvs[k] = Vector2(verts[k].x, verts[k].z) / 6.0
-			var hl: float = h[j * nx + maxi(i - 1, 0)]
-			var hr: float = h[j * nx + mini(i + 1, nx - 1)]
-			var hd: float = h[maxi(j - 1, 0) * nx + i]
-			var hu: float = h[mini(j + 1, nz - 1) * nx + i]
-			norms[k] = Vector3(hl - hr, 2.0 * c, hd - hu).normalized()
-	var idx := PackedInt32Array()
-	for j in nz - 1:
-		for i in nx - 1:
-			var a := j * nx + i
-			idx.append_array([a, a + 1, a + nx, a + 1, a + nx + 1, a + nx])
-	var arr := []
-	arr.resize(Mesh.ARRAY_MAX)
-	arr[Mesh.ARRAY_VERTEX] = verts
-	arr[Mesh.ARRAY_NORMAL] = norms
-	arr[Mesh.ARRAY_TEX_UV] = uvs
-	arr[Mesh.ARRAY_INDEX] = idx
-	var am := ArrayMesh.new()
-	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://shaders/terrain.gdshader")
-	_grass_params(mat)
-	var mi := MeshInstance3D.new()
-	mi.mesh = am
-	mi.material_override = mat
-	add_child(mi)
-
-
-func terrain_h(x: float, z: float) -> float:
-	var fx := clampf((x - ter.x0) / ter.cell, 0, ter.nx - 1.001)
-	var fz := clampf((z - ter.z0) / ter.cell, 0, ter.nz - 1.001)
-	var i := int(fx)
-	var j := int(fz)
-	var u := fx - i
-	var v := fz - j
-	var h: Array = ter.h
-	var nx: int = ter.nx
-	return lerpf(lerpf(h[j * nx + i], h[j * nx + i + 1], u), lerpf(h[(j + 1) * nx + i], h[(j + 1) * nx + i + 1], u), v)
-
-
-# ------------------------------------------------------------------ árvores (impostores do jogo web)
-
-func _build_trees() -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = 7
-	var xs: Array[Transform3D] = []
-	var custom: Array[Color] = []
-	var tries := 0
-	while tries < 30000 and xs.size() < 4500:
-		tries += 1
-		var i := rng.randi_range(0, track.n - 1)
-		var side := -1.0 if rng.randf() < 0.5 else 1.0
-		var wall: float = track.wall_l[i] if side < 0 else track.wall_r[i]
-		var off := wall + 5.0 + pow(rng.randf(), 1.6) * 260.0
-		var p := track.P[i] + track.R[i] * side * off
-		track.locate(p, -1)
-		var lim := track.lwalll if track.ld < 0 else track.lwallr
-		if absf(track.ld) < lim + 4.0 and absf(track.lcenter.y - p.y) < 8.0:
-			continue
-		p.y = terrain_h(p.x, p.z) - 0.1
-		var sc := rng.randf_range(1.6, 3.0)
-		xs.append(Transform3D(Basis.from_scale(Vector3.ONE * sc), p))
-		custom.append(Color(rng.randi_range(0, 2), rng.randf() * TAU, rng.randf_range(0.8, 1.15), 0))
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_custom_data = true
-	var st := SurfaceTool.new()
-	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for v in [Vector3(-0.5, 0, 0), Vector3(-0.5, 1, 0), Vector3(0.5, 1, 0), Vector3(-0.5, 0, 0), Vector3(0.5, 1, 0), Vector3(0.5, 0, 0)]:
-		st.set_normal(Vector3.BACK)
-		st.add_vertex(v)
-	var quad := st.commit()
-	mm.mesh = quad
-	mm.instance_count = xs.size()
-	for k in xs.size():
-		mm.set_instance_transform(k, xs[k])
-		mm.set_instance_custom_data(k, custom[k])
-	var mat := ShaderMaterial.new()
-	mat.shader = load("res://shaders/impostor.gdshader")
-	mat.set_shader_parameter("color_atlas", load("res://assets/trees/arvores_cor.png"))
-	mat.set_shader_parameter("normal_atlas", load("res://assets/trees/arvores_normal.png"))
-	var mmi := MultiMeshInstance3D.new()
-	mmi.multimesh = mm
-	mmi.material_override = mat
-	mmi.custom_aabb = AABB(Vector3(-3000, -200, -3000), Vector3(6000, 600, 6000))
-	add_child(mmi)
-
-
 # ------------------------------------------------------------------ carro
 
 func _build_car() -> void:
 	if not FileAccess.file_exists("res://data/cars/%s.json" % car_id):
 		push_warning("carro desconhecido: %s" % car_id)
 		car_id = "porsche-992-gt3r"
-	car_data = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars/%s.json" % car_id))
+	# visual do carro (modelo, materiais, rodas com pinça parada e desfoque): scripts/render/car_view.gd
+	car_view = CarView.new(car_id)
+	add_child(car_view)
+	car_data = car_view.data
 	car = Car.new(track, car_data.params)
-	car_root = Node3D.new()
-	add_child(car_root)
-	var scene: PackedScene = load(car_data.model.glb)
-	model = scene.instantiate()
-	car_root.add_child(model)
-	# alinha o eixo dianteiro do modelo com o da física e o chão do modelo com o chão em repouso (carView.ts)
-	var mw: Array = car_data.model.wheels
-	var front: float = (mw[0].z + mw[1].z) / 2.0
-	var a: float = car.p.wheelbase * (1.0 - car.p.wf)
-	model_offset = Vector3(0, -car.p.cg, -a - front)
-	model.position = model_offset
-	for w in mw:
-		var wn: Node3D = model.find_child(w.name, true, false)
-		wheel_nodes.append(wn)
-		# o nó da roda vem com escala = raio (malha unitária): guardar para não perder ao girar
-		wheel_scale.append(wn.scale if wn else Vector3.ONE)
-	_fix_materials(model)
-
-
-const PAINT := ["carpaint", "paint"]
-const METAL := ["chrome", "disc", "disk", "rim", "wheel", "hub", "exhaust", "exalt", "mirror", "metal", "screw", "welding", "tamp", "caliper", "brake"]
-
-func _fix_materials(n: Node) -> void:
-	if n is MeshInstance3D:
-		var mi := n as MeshInstance3D
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		for s in mi.mesh.get_surface_count():
-			var m := mi.mesh.surface_get_material(s)
-			if not (m is BaseMaterial3D):
-				continue
-			var bm := (m as BaseMaterial3D).duplicate() as BaseMaterial3D
-			var nm := String(bm.resource_name).to_lower()
-			var is_metal := METAL.any(func(k): return k in nm)
-			if PAINT.any(func(k): return k in nm):
-				bm.metallic = minf(bm.metallic, 0.15)
-				bm.metallic_texture = null
-				bm.roughness = clampf(bm.roughness, 0.25, 0.4)
-				bm.clearcoat_enabled = true
-				bm.clearcoat = 1.0
-				bm.clearcoat_roughness = 0.06
-			elif not is_metal and bm.metallic_texture == null:
-				bm.metallic = 0.0
-			mi.set_surface_override_material(s, bm)
-	for c in n.get_children():
-		_fix_materials(c)
 
 
 func _update_car_view() -> void:
-	car_root.global_transform = Transform3D(Basis(car.rot), car.pos)
-	for k in 4:
-		var node := wheel_nodes[k]
-		if node == null:
-			continue
-		var w: Car.Wheel = car.wheels[k]
-		var p := w.mount
-		p.y -= w.susp.rest - w.comp
-		node.position = p - model_offset
-		node.basis = Basis.from_euler(Vector3(-w.spin, -w.steer, 0), EULER_ORDER_YXZ).scaled_local(wheel_scale[k])
+	car_view.update_from(car)
 
 
 # ------------------------------------------------------------------ HUD
@@ -440,6 +190,7 @@ func _build_hud() -> void:
 	cam.near = 0.1
 	cam.far = 6000.0
 	add_child(cam)
+	chase = ChaseCamera.new(cam, car)
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	hud = Label.new()
@@ -462,6 +213,7 @@ func _build_hud() -> void:
 	hud_big.add_theme_color_override("font_outline_color", Color.BLACK)
 	hud_big.add_theme_constant_override("outline_size", 10)
 	layer.add_child(hud_big)
+	_build_timing_hud(layer)
 	if input.touch:
 		touch = TouchControls.new()
 		touch.keys = input.touch_keys
@@ -470,18 +222,143 @@ func _build_hud() -> void:
 
 
 func _fmt(t: float) -> String:
-	if t < 0.0:
-		return "--:--.---"
-	return "%d:%06.3f" % [int(t / 60.0), fmod(t, 60.0)]
+	return LapTimer.format_time(t)
+
+
+# ------------------------------------------------------------------ cronometragem (etapa 4)
+
+func _build_timing_hud(layer: CanvasLayer) -> void:
+	# painel de tempos (canto superior direito); o painel LMU completo vem na etapa 9
+	panel = RichTextLabel.new()
+	panel.bbcode_enabled = true
+	panel.fit_content = true
+	panel.scroll_active = false
+	panel.anchor_left = 1.0
+	panel.anchor_right = 1.0
+	panel.offset_left = -420
+	panel.offset_right = -24
+	panel.offset_top = 18
+	panel.add_theme_font_size_override("normal_font_size", 22)
+	panel.add_theme_font_size_override("bold_font_size", 22)
+	panel.add_theme_color_override("font_outline_color", Color.BLACK)
+	panel.add_theme_constant_override("outline_size", 6)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(panel)
+	# nick (tecla N): os recordes ficam guardados por nick e carro
+	nick_edit = LineEdit.new()
+	nick_edit.placeholder_text = "Seu nick (Enter grava, Esc cancela)"
+	nick_edit.max_length = 16
+	nick_edit.anchor_left = 0.5
+	nick_edit.anchor_right = 0.5
+	nick_edit.anchor_top = 0.4
+	nick_edit.anchor_bottom = 0.4
+	nick_edit.offset_left = -200
+	nick_edit.offset_right = 200
+	nick_edit.add_theme_font_size_override("font_size", 26)
+	nick_edit.visible = false
+	nick_edit.text_submitted.connect(_on_nick)
+	layer.add_child(nick_edit)
+
+
+## Largada na reta dos boxes, 120 m antes da linha, com a volta zerada (como o spawn do web).
+func _spawn() -> void:
+	car.reset_at(track.index_at(-120.0))
+	timer.reset()
+
+
+## Volta fechada por você (não pelo piloto automático): vira recorde se for a melhor desse nick nesse carro.
+func _on_lap(lap: LapTimer.Lap) -> void:
+	if lap.valid:
+		for i in 3:
+			if i >= best_sectors.size():
+				best_sectors.append(lap.sectors[i])
+			else:
+				best_sectors[i] = minf(best_sectors[i], lap.sectors[i])
+	if autopilot:
+		return
+	if Records.save_lap(nick, car_id, lap):
+		_toast("Recorde pessoal: " + _fmt(lap.time))
+		top_records = Records.top(8)
+	elif not lap.valid:
+		_toast("Volta inválida (4 rodas fora)")
+	elif nick == "":
+		_toast("Sem nick: aperte N para gravar seus recordes")
+
+
+func _open_nick() -> void:
+	nick_edit.text = nick
+	nick_edit.visible = true
+	nick_edit.grab_focus.call_deferred()
+
+
+func _on_nick(t: String) -> void:
+	nick = t.strip_edges()
+	Records.save_nick(nick)
+	nick_edit.visible = false
+	nick_edit.release_focus()
+	_toast("Nick: " + (nick if nick != "" else "(nenhum)"))
+
+
+## cor do setor como no web: roxo = melhor da sessão, verde = melhor que a melhor volta, amarelo = mais lento
+func _sector_color(i: int, v: float) -> String:
+	if i >= best_sectors.size() or v <= best_sectors[i]:
+		return "#b26cff"
+	if timer.best == null or v <= timer.best.sectors[i]:
+		return "#3ddc6a"
+	return "#ffd23f"
+
+
+func _panel_text() -> String:
+	var t := timer
+	var red := "#ff5a5a"
+	var cur := _fmt(t.current)
+	if t.current >= 0.0 and not t.valid:
+		cur = "[color=%s]%s  inválida[/color]" % [red, cur]
+	var last := _fmt(t.last.time if t.last else -1.0)
+	if t.last and not t.last.valid:
+		last = "[color=%s]%s[/color]" % [red, last]
+	var lines := [
+		"[right][b]%s[/b]" % track.section_at(t.s),
+		"Melhor  %s" % _fmt(t.best.time if t.best else -1.0),
+		"Última  %s" % last,
+		"Atual   %s" % cur,
+	]
+	var secs := []
+	for i in 3:
+		if i < t.sectors.size():
+			secs.append("[color=%s]%.2f[/color]" % [_sector_color(i, t.sectors[i]), t.sectors[i]])
+		else:
+			secs.append("--.--")
+	lines.append("S1 %s   S2 %s   S3 %s" % secs)
+	if not is_nan(t.delta):
+		var d := t.delta
+		lines.append("[font_size=34][color=%s]%s%.2f[/color][/font_size]" % ["#3ddc6a" if d < 0.0 else red, "−" if d < 0.0 else "+", absf(d)])
+	lines.append("")
+	lines.append("[b]Recordes[/b]  ·  " + (nick if nick != "" else "sem nick (N)"))
+	for k in top_records.size():
+		var r: Dictionary = top_records[k]
+		lines.append("%d. %s  %s  %s" % [k + 1, r.nick, _car_short(r.carId), _fmt(float(r.time))])
+	return "\n".join(lines) + "[/right]"
+
+
+var _shorts := {}
+
+func _car_short(id: String) -> String:
+	if _shorts.is_empty():
+		var list = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars.json"))
+		for c in list:
+			_shorts[c.id] = c.get("short", c.get("name", c.id))
+	return _shorts.get(id, id)
 
 
 # ------------------------------------------------------------------ laço
 
 func _input_axes(dt: float) -> Array:
 	input.update(dt, car.speed())
-	# Back/Select do controle = R (volta para a pista)
+	# Back/Select do controle = R (volta para o grid)
 	if input.reset:
-		car.reset_at(track.nearest(car.pos, -1))
+		_spawn()
+		chase.snap()
 	if autopilot:
 		var b: Array = bot.drive()
 		return [b[0], b[1], b[2], false, false]
@@ -489,19 +366,12 @@ func _input_axes(dt: float) -> Array:
 
 
 func _physics_process(dt: float) -> void:
-	if paused:
+	if paused or nick_edit.visible:
 		return
 	var inp := _input_axes(dt)
 	car.step(dt, inp[0], inp[1], inp[2], inp[3], inp[4])
 	time += dt
-	var idx := car.hint
-	if last_idx > track.n - 40 and idx < 40:
-		if lap_start > 0.0:
-			last_lap = time - lap_start
-			if best_lap < 0.0 or last_lap < best_lap:
-				best_lap = last_lap
-		lap_start = time
-	last_idx = idx
+	timer.update(dt, car)
 
 
 func _process(dt: float) -> void:
@@ -510,24 +380,11 @@ func _process(dt: float) -> void:
 		rumble.update(car, dt)
 	if shot_dir != "":
 		_shot_tick(dt)
-	# câmera de perseguição (estilo LMU): 6,8 m atrás, 1,85 m de altura, rumo com atraso e no máx. 6°
-	var fwd := -car.basis().z
-	var yaw := atan2(-fwd.x, -fwd.z)
-	if not cam_ready:
-		cam_yaw = yaw
-		cam_ready = true
-	var diff := wrapf(yaw - cam_yaw, -PI, PI)
-	cam_yaw += diff * minf(1.0, dt / 0.15)
-	diff = wrapf(yaw - cam_yaw, -PI, PI)
-	cam_yaw = yaw - clampf(diff, -deg_to_rad(6), deg_to_rad(6))
-	var back := Vector3(sin(cam_yaw), 0, cos(cam_yaw))
-	var target := car.pos + Vector3.UP * 0.75
-	var cp := car.pos + back * 6.8 + Vector3.UP * 1.85
-	cam.global_position = cp
-	cam.look_at(target - back * 4.0 + Vector3.UP * 0.2, Vector3.UP)
+	chase.update(dt)
 	if shot_dir != "" and shot_k % 3 == 0:
 		# prints de vitrine: 3/4 de frente, perto do carro
 		var r := car.basis().x
+		var fwd := -car.basis().z
 		cam.global_position = car.pos + fwd * 5.2 + r * 3.2 + Vector3.UP * 0.6
 		cam.look_at(car.pos + Vector3.UP * 0.1, Vector3.UP)
 
@@ -539,22 +396,36 @@ func _process(dt: float) -> void:
 	for w in car.wheels:
 		abs_on = abs_on or w.abs_active
 	toast_t -= dt
-	hud.text = "%s\nAtual  %s\nÚltima %s\nMelhor %s\n%d rpm   %.1f g lat  %+.1f g long\n%s  %s  %s%s%s\n%s\n%d fps   %s   %s%s\n%s\n%s" % [
-		car.name, _fmt(time - lap_start if lap_start > 0.0 else -1.0), _fmt(last_lap), _fmt(best_lap), int(car.rpm),
+	panel.text = _panel_text()
+	hud.text = "%s\n%d rpm   %.1f g lat  %+.1f g long\n%s  %s  %s%s%s\n%s\n%d fps   %s   %s%s\n%s\n%s" % [
+		car.name, int(car.rpm),
 		absf(car.g_lat), car.g_long,
 		"ABS" if car.assists.abs else "abs off", "TC" if car.assists.tc else "tc off",
 		"câmbio auto" if car.assists.auto else "câmbio manual",
 		"   [ABS atuando]" if abs_on else "", "   [TC atuando]" if car.tc_cut > 0.05 else "",
 		_surfaces(), Engine.get_frames_per_second(), "Alto" if high else "Celular", input.source,
 		"  · piloto automático" if autopilot else "", toast if toast_t > 0.0 else "",
-		"[E/Q] marcha  [1] ABS  [2] TC  [G] câmbio  [R] pista  [P] piloto  [F1] qualidade  [F12] print"]
+		"[E/Q] marcha  [1] ABS  [2] TC  [G] câmbio  [R] grid  [N] nick  [C] câmera  [P] piloto  [F1] qualidade  [F12] print"]
 
 
 func _unhandled_input(e: InputEvent) -> void:
+	# digitando o nick: as teclas não comandam o carro
+	if nick_edit.visible:
+		if e is InputEventKey and e.pressed and e.keycode == KEY_ESCAPE:
+			nick_edit.visible = false
+			nick_edit.release_focus()
+			get_viewport().set_input_as_handled()
+		return
 	if e is InputEventKey and e.pressed and not e.echo:
 		match e.keycode:
+			KEY_N:
+				_open_nick()
 			KEY_R:
-				car.reset_at(track.nearest(car.pos, -1))
+				_spawn()
+				chase.snap()
+			KEY_C:
+				chase.next()
+				_toast("Câmera: " + chase.mode_name())
 			KEY_P:
 				autopilot = not autopilot
 				if autopilot:
@@ -573,7 +444,17 @@ func _unhandled_input(e: InputEvent) -> void:
 			KEY_F12:
 				_screenshot()
 			KEY_ESCAPE:
-				get_tree().quit()
+				# volta para a garagem (sem garagem, quando aberto direto com --car/--shot, sai)
+				if Game.from_garage:
+					get_tree().change_scene_to_file("res://scenes/garagem.tscn")
+				else:
+					get_tree().quit()
+
+
+	# câmera também no controle (Y, como no web)
+	if e is InputEventJoypadButton and e.pressed and e.button_index == JOY_BUTTON_Y:
+		chase.next()
+		_toast("Câmera: " + chase.mode_name())
 
 
 func _notification(what: int) -> void:

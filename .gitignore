@@ -9,3 +9,6 @@ assets/cars/*/*.png.import
 *.aab
 *.avi
 *.mp4
+# texturas extraídas do cenário da pista ao importar
+assets/track/*.png
+assets/track/*.png.import

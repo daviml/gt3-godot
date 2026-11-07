@@ -1,0 +1,31 @@
+{
+  "hash": "dd9cd574",
+  "configHash": "65169f15",
+  "lockfileHash": "e3b0c442",
+  "browserHash": "52656094",
+  "optimized": {
+    "three": {
+      "src": "../../../../../gt3-time-attack/node_modules/three/build/three.module.js",
+      "file": "three.js",
+      "fileHash": "d1b48742",
+      "needsInterop": false
+    },
+    "three/examples/jsm/exporters/GLTFExporter.js": {
+      "src": "../../../../../gt3-time-attack/node_modules/three/examples/jsm/exporters/GLTFExporter.js",
+      "file": "three_examples_jsm_exporters_GLTFExporter__js.js",
+      "fileHash": "4fb686df",
+      "needsInterop": false
+    },
+    "three/examples/jsm/utils/BufferGeometryUtils.js": {
+      "src": "../../../../../gt3-time-attack/node_modules/three/examples/jsm/utils/BufferGeometryUtils.js",
+      "file": "three_examples_jsm_utils_BufferGeometryUtils__js.js",
+      "fileHash": "b3dd7747",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "chunk-CUKLZU2L": {
+      "file": "chunk-CUKLZU2L.js"
+    }
+  }
+}

@@ -24,6 +24,11 @@ var throttle := 0.0
 var brake := 0.0
 var hold_line := 0.0
 var line_gain := 0.0
+## malha fechada pela taxa de giro: compara a curvatura pedida pelo pure pursuit com a que o carro faz de verdade
+## (giro / velocidade) e esterça mais quando ele sai de frente, como um piloto. 0 = desligado (paridade antiga).
+var yaw_p := 0.0
+var yaw_i := 0.0
+var _yaw_int := 0.0
 var _rv: PackedFloat32Array
 var _rthr: PackedFloat32Array
 var _rbrk: PackedFloat32Array
@@ -51,6 +56,8 @@ func _init(t: Track, c: Car, reference: Dictionary, opts := {}) -> void:
 	_rbrk = PackedFloat32Array(ref.brake)
 	hold_line = opts.get("hold_line", 0.0)
 	line_gain = opts.get("line_gain", 0.0)
+	yaw_p = opts.get("yaw_p", 0.0)
+	yaw_i = opts.get("yaw_i", 0.0)
 	var n := t.n
 	var raw := PackedFloat32Array()
 	raw.resize(n)
@@ -149,7 +156,14 @@ func drive() -> Array:
 		target += track.R[posmod(int(floorf((s + look) / Track.STEP)), track.n)] * (-line_error * line_gain)
 	var to := target - car.pos
 	var alpha := atan2(to.dot(right), to.dot(fwd)) - beta
-	var delta := atan(2.0 * car.p.wheelbase * sin(alpha) / maxf(to.length(), 1.0)) + beta
+	var k_want := 2.0 * sin(alpha) / maxf(to.length(), 1.0)
+	var delta := atan(car.p.wheelbase * k_want) + beta
+	if (yaw_p > 0.0 or yaw_i > 0.0) and v > 8.0:
+		# curvatura real do caminho (+ = direita, como o esterço)
+		var k_real := -car.ang_vel.dot(car.basis().y) / v
+		var k_err := k_want - k_real
+		_yaw_int = clampf(_yaw_int + k_err * yaw_i / Car.HZ, -0.06, 0.06)
+		delta += car.p.wheelbase * k_err * yaw_p + _yaw_int
 	var steer := clampf(delta / car.max_steer, -1.0, 1.0)
 
 	# velocidade: alvo um pouco à frente (reação), pedais da referência + correção
