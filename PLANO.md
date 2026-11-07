@@ -45,14 +45,19 @@ Protótipo em `REPOS/gt3-godot` (Godot 4.7.2, `Jogar.bat`):
 - [x] Criar o repositório `daviml/gt3-godot` (privado) e o submodule. (07/11)
 
 ### 2. Física com paridade
-- [ ] `car.gd` lendo o acerto do JSON (hoje está fixo no código, só o Porsche).
-- [ ] Câmbio manual (borboletas) e auxílios ligáveis (ABS, TC, câmbio automático), como no web.
-- [ ] Superfícies: asfalto, zebra, escape, grama e brita, com zebra "pulando" (altura e vibração).
-- [ ] Teste de paridade web × Godot com os mesmos números do `vitest`: 0–100 em 3,0 s, máxima de 282 km/h,
-      200–0 em 80 m, g lateral de 1,7–2,1 a 72 km/h e o envelope por velocidade (`scripts/envelope.ts`).
-      Script headless no Godot que imprime os mesmos valores.
-- [ ] `RefBot` (segue a volta real do iRacing) e `Bot` portados. Meta: o bot de referência do Porsche perto de
-      1:36,0 nos dois jogos.
+- [x] `car.gd` lendo o acerto do JSON (`Car.load_car(ground, id)`; `--car=<id>` escolhe o carro no jogo). (07/11)
+- [x] Câmbio manual (E/Shift e Q/Ctrl, RB/A e LB/X no controle) e auxílios ligáveis (1 = ABS, 2 = TC,
+      G = câmbio automático), como no web. Teste: `scripts/tests/cambio_superficies.gd`. (07/11)
+- [x] Superfícies: asfalto, zebra, escape e grama (iguais ao web; brita fica para quando o web tiver), com zebra
+      "pulando" só no Godot (ondulação de 3 mm por listra) e superfície sob cada roda no HUD. (07/11)
+- [x] Teste de paridade web × Godot: `tools/paridade.ts` roda a física do web e grava
+      `data/tests/paridade-web.json`; `scripts/tests/paridade.gd` roda os mesmos ensaios no Godot e compara
+      (0–100, máxima, 200–0, g lateral a 72 e 216 km/h, envelope por velocidade, volta do Bot e do RefBot) nos 13
+      carros + GT3 base. Tudo bate: física no plano idêntica e voltas a ≤ 0,04%. (07/11)
+  - Achado: o `prep.ts` arredondava a pista em cm, o que deixava degraus de até 5 mm a cada 2 m e fazia o carro
+    quicar (Audi 0,7% mais lento). Agora exporta em 0,1 mm.
+- [x] `RefBot` e `Bot` portados (`scripts/track/`); o piloto automático (P) segue a volta real do iRacing nos
+      carros com referência. Bot de referência do Porsche: 1:36,36 nos dois jogos. (07/11)
 
 ### 3. Controles
 - [ ] Teclado e controle com a mesma curva e suavização da direção do web (commits 1177412 e 2fd40d5).

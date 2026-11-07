@@ -1,6 +1,9 @@
-# Protótipo: Interlagos + Porsche 992 GT3 R em Godot 4, com a física e a pista do jogo web.
-# Controles: setas/WASD ou controle (gatilhos + analógico). R = volta para a pista. P = piloto automático.
+# Protótipo: Interlagos + os GT3 do jogo web em Godot 4, com a física e a pista do web.
+# Controles (iguais ao web): setas/WASD ou controle (gatilhos + analógico). E/Shift ou RB/A sobe marcha,
+# Q/Ctrl ou LB/X reduz. 1 = ABS, 2 = TC, G = câmbio automático. R = volta para a pista. P = piloto automático.
 # F1 = alterna qualidade (Alto/Celular). F12 = salva print. Esc = sai.
+# Linha de comando (depois de --): --car=<id> escolhe o carro (data/cars.json), --auto liga o piloto,
+# --shot=<pasta> tira prints sozinho.
 extends Node3D
 
 const SUN_U := 0.5947
@@ -28,13 +31,28 @@ var best_lap := -1.0
 var last_idx := 0
 var time := 0.0
 var autopilot := false
+var bot: RefCounted
+var car_id := "porsche-992-gt3r"
+var car_data: Dictionary
 var high := true
+var toast := ""
+var toast_t := 0.0
+# referência do iRacing de cada carro que tem uma: o piloto automático segue a volta real
+const REFS := {"porsche-992-gt3r": "interlagos-porsche", "audi-r8-lms-gt3": "interlagos-r8", "ford-mustang-gt3": "interlagos-mustang"}
 
 # terreno (grade de alturas) para plantar árvores
 var ter: Dictionary
 
 
 func _ready() -> void:
+	var args := OS.get_cmdline_user_args()
+	autopilot = "--auto" in args
+	for a in args:
+		if a.begins_with("--shot="):
+			shot_dir = a.substr(7)
+			autopilot = true
+		if a.begins_with("--car="):
+			car_id = a.substr(6)
 	track = Track.new("res://data/track/track.json")
 	_build_env()
 	_build_track()
@@ -42,13 +60,13 @@ func _ready() -> void:
 	_build_trees()
 	_build_car()
 	_build_hud()
-	var args := OS.get_cmdline_user_args()
-	autopilot = "--auto" in args
-	for a in args:
-		if a.begins_with("--shot="):
-			shot_dir = a.substr(7)
-			autopilot = true
 	car.reset_at((track.n - 20) % track.n)
+	if REFS.has(car_id):
+		bot = RefBot.new(track, car, RefBot.load_ref(REFS[car_id]), {"line_gain": 0.8, "hold_line": 0.02, "edge": [-0.3, 0.5]})
+	else:
+		bot = Bot.new(track, car)
+	if autopilot:
+		car.assists.auto = true
 
 
 # modo de teste: --shot=<pasta> pilota sozinho, salva prints em alguns tempos e sai
@@ -339,19 +357,24 @@ func _build_trees() -> void:
 # ------------------------------------------------------------------ carro
 
 func _build_car() -> void:
-	car = Car.new(track)
+	if not FileAccess.file_exists("res://data/cars/%s.json" % car_id):
+		push_warning("carro desconhecido: %s" % car_id)
+		car_id = "porsche-992-gt3r"
+	car_data = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars/%s.json" % car_id))
+	car = Car.new(track, car_data.params)
 	car_root = Node3D.new()
 	add_child(car_root)
-	var scene: PackedScene = load("res://assets/cars/porsche-992-gt3r/porsche-992-gt3r.glb")
+	var scene: PackedScene = load(car_data.model.glb)
 	model = scene.instantiate()
 	car_root.add_child(model)
 	# alinha o eixo dianteiro do modelo com o da física e o chão do modelo com o chão em repouso (carView.ts)
-	var front := -1.261
+	var mw: Array = car_data.model.wheels
+	var front: float = (mw[0].z + mw[1].z) / 2.0
 	var a: float = car.p.wheelbase * (1.0 - car.p.wf)
 	model_offset = Vector3(0, -car.p.cg, -a - front)
 	model.position = model_offset
-	for nm in ["wheel_FL", "wheel_FR", "wheel_RL", "wheel_RR"]:
-		var wn: Node3D = model.find_child(nm, true, false)
+	for w in mw:
+		var wn: Node3D = model.find_child(w.name, true, false)
 		wheel_nodes.append(wn)
 		# o nó da roda vem com escala = raio (malha unitária): guardar para não perder ao girar
 		wheel_scale.append(wn.scale if wn else Vector3.ONE)
@@ -455,42 +478,26 @@ func _input_axes(dt: float) -> Array:
 		var ax := Input.get_joy_axis(d, JOY_AXIS_LEFT_X)
 		if absf(ax) > 0.06:
 			st_target = signf(ax) * pow((absf(ax) - 0.06) / 0.94, 1.6)
+	# câmbio (como no web): E/Shift ou RB/A sobe, Q/Ctrl ou LB/X reduz
+	var up := Input.is_key_pressed(KEY_E) or Input.is_key_pressed(KEY_SHIFT)
+	var down := Input.is_key_pressed(KEY_Q) or Input.is_key_pressed(KEY_CTRL)
+	if joy.size() > 0:
+		var d: int = joy[0]
+		up = up or Input.is_joy_button_pressed(d, JOY_BUTTON_RIGHT_SHOULDER) or Input.is_joy_button_pressed(d, JOY_BUTTON_A)
+		down = down or Input.is_joy_button_pressed(d, JOY_BUTTON_LEFT_SHOULDER) or Input.is_joy_button_pressed(d, JOY_BUTTON_X)
 	if autopilot:
-		return _autopilot()
-	# volante: menos esterço com velocidade, rampa suave no teclado
+		var b: Array = bot.drive()
+		return [b[0], b[1], b[2], false, false]
+	# volante: menos esterço com velocidade, rampa suave no teclado (a curva do web entra na etapa 3)
 	var v := absf(car.fwd_speed())
 	var lim := clampf(1.0 - v / 90.0, 0.35, 1.0)
 	steer = move_toward(steer, st_target * lim, dt * 3.5)
-	return [steer, thr, brk]
-
-
-## Piloto simples: mira um ponto à frente no centro da pista e freia pela curvatura adiante.
-func _autopilot() -> Array:
-	var i := car.hint
-	var v := car.vel.length()
-	var look := int(clampf(4.0 + v * 0.45, 6.0, 30.0) / Track.STEP)
-	var target := track.P[(i + look) % track.n]
-	var fwd := -car.basis().z
-	var right := car.basis().x
-	var to := (target - car.pos).normalized()
-	var st := clampf(atan2(to.dot(right), to.dot(fwd)) * 2.6, -1.0, 1.0)
-	# velocidade alvo pela menor curvatura nos próximos 140 m
-	var vmax := 80.0
-	for k in range(2, 70, 2):
-		var a := track.T[(i + k) % track.n]
-		var b := track.T[(i + k + 6) % track.n]
-		var curv := absf(a.cross(b).y) / 12.0
-		var vc := sqrt(1.75 * 9.81 / maxf(curv, 1e-4)) if curv > 1e-4 else 90.0
-		vc = sqrt(vc * vc + 2.0 * 20.0 * k * Track.STEP)
-		vmax = minf(vmax, vc)
-	var thr := 1.0 if v < vmax - 1.0 else 0.0
-	var brk := clampf((v - vmax) / 6.0, 0.0, 1.0)
-	return [st, thr, brk]
+	return [steer, thr, brk, up, down]
 
 
 func _physics_process(dt: float) -> void:
 	var inp := _input_axes(dt)
-	car.step(dt, inp[0], inp[1], inp[2])
+	car.step(dt, inp[0], inp[1], inp[2], inp[3], inp[4])
 	time += dt
 	var idx := car.hint
 	if last_idx > track.n - 40 and idx < 40:
@@ -529,9 +536,19 @@ func _process(dt: float) -> void:
 
 	var kmh := car.vel.length() * 3.6
 	hud_big.text = "%d km/h   %s" % [int(kmh), "N" if car.gear == 0 else ("R" if car.gear < 0 else str(car.gear))]
-	hud.text = "Atual  %s\nÚltima %s\nMelhor %s\n%d rpm\n%d fps   %s%s\n[R] pista  [P] piloto  [F1] qualidade  [F12] print" % [
-		_fmt(time - lap_start if lap_start > 0.0 else -1.0), _fmt(last_lap), _fmt(best_lap), int(car.rpm),
-		Engine.get_frames_per_second(), "Alto" if high else "Celular", "  · piloto automático" if autopilot else ""]
+	var abs_on := false
+	for w in car.wheels:
+		abs_on = abs_on or w.abs_active
+	toast_t -= dt
+	hud.text = "%s\nAtual  %s\nÚltima %s\nMelhor %s\n%d rpm   %.1f g lat  %+.1f g long\n%s  %s  %s%s%s\n%s\n%d fps   %s%s\n%s\n%s" % [
+		car.name, _fmt(time - lap_start if lap_start > 0.0 else -1.0), _fmt(last_lap), _fmt(best_lap), int(car.rpm),
+		absf(car.g_lat), car.g_long,
+		"ABS" if car.assists.abs else "abs off", "TC" if car.assists.tc else "tc off",
+		"câmbio auto" if car.assists.auto else "câmbio manual",
+		"   [ABS atuando]" if abs_on else "", "   [TC atuando]" if car.tc_cut > 0.05 else "",
+		_surfaces(), Engine.get_frames_per_second(), "Alto" if high else "Celular",
+		"  · piloto automático" if autopilot else "", toast if toast_t > 0.0 else "",
+		"[E/Q] marcha  [1] ABS  [2] TC  [G] câmbio  [R] pista  [P] piloto  [F1] qualidade  [F12] print"]
 
 
 func _unhandled_input(e: InputEvent) -> void:
@@ -541,12 +558,38 @@ func _unhandled_input(e: InputEvent) -> void:
 				car.reset_at(track.nearest(car.pos, -1))
 			KEY_P:
 				autopilot = not autopilot
+				if autopilot:
+					car.assists.auto = true
+			KEY_1:
+				car.assists.abs = not car.assists.abs
+				_toast("ABS " + ("ligado" if car.assists.abs else "desligado"))
+			KEY_2:
+				car.assists.tc = not car.assists.tc
+				_toast("Controle de tração " + ("ligado" if car.assists.tc else "desligado"))
+			KEY_G:
+				car.assists.auto = not car.assists.auto
+				_toast("Câmbio " + ("automático" if car.assists.auto else "manual"))
 			KEY_F1:
 				_set_quality(not high)
 			KEY_F12:
 				_screenshot()
 			KEY_ESCAPE:
 				get_tree().quit()
+
+
+func _toast(t: String) -> void:
+	toast = t
+	toast_t = 2.0
+
+
+## superfície sob cada roda (DE DD / TE TD), quando alguma sai do asfalto
+func _surfaces() -> String:
+	var out := []
+	var any := false
+	for w in car.wheels:
+		out.append(Ground.NAMES[w.surface] if w.contact else "ar")
+		any = any or w.surface != Ground.ASPHALT or not w.contact
+	return "%s %s / %s %s" % out if any else ""
 
 
 ## "Celular": desliga o que o renderizador Mobile do Godot não tem ou é caro em celular, para ter uma ideia.

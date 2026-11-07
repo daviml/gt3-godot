@@ -1,29 +1,20 @@
 # Física do carro portada do jogo web (src/physics/car.ts, tire.ts, rigidbody.ts): chassi rígido, 4 rodas
-# com suspensão por raio, pneu Pacejka com slip combinado, motor, câmbio automático, autoblocante, ABS e TC.
-# Eixos locais: +X direita, +Y cima, -Z frente (igual ao Three.js e ao Godot).
+# com suspensão por raio, pneu Pacejka com slip combinado, motor, câmbio (manual ou automático), autoblocante,
+# ABS e TC ligáveis. Eixos locais: +X direita, +Y cima, -Z frente (igual ao Three.js e ao Godot).
+# O acerto vem de data/cars/<id>.json ("params"), gerado pelo carParams() do web no tools/prep.ts.
 class_name Car
 extends RefCounted
 
+const HZ := 500
 const G := 9.81
 const AIR := 1.225
 const V_LOW := 3.0
 const RPM_TO_RAD := TAU / 60.0
 
-# Porsche 992 GT3 R = GT3 base + acerto de motor traseiro + calibração com telemetria (data/cars/*.json)
-var p := {
-	"mass": 1300.0, "inertia": Vector3(2400, 2700, 600), "cg": 0.37, "wheelbase": 2.439, "wf": 0.39,
-	"track_f": 1.628, "track_r": 1.6, "radius": 0.336, "wheel_inertia": 1.2,
-	"front": {"k": 150000.0, "bump": 7000.0, "rebound": 9000.0, "arb": 80000.0, "rest": 0.08, "travel": 0.07, "rc": 0.05},
-	"rear": {"k": 170000.0, "bump": 7500.0, "rebound": 9500.0, "arb": 25000.0, "rest": 0.08, "travel": 0.07, "rc": 0.08},
-	"mu": 2.2, "mu_long": 0.6, "load_sens": 0.12, "fz0": 4000.0, "b_lat": 12.0, "c_lat": 1.55, "e_lat": 0.3,
-	"b_long": 15.0, "c_long": 1.65, "e_long": 0.2, "relax": 0.15, "roll_res": 0.012, "rear_grip": 1.0,
-	"clA": 2.2, "cdA": 0.9, "aero_front": 0.38,
-	"torque": [[1000, 200], [3000, 320], [5000, 360], [6500, 385], [7500, 380], [8500, 350], [9400, 320], [9800, 300]],
-	"idle": 1200.0, "limiter": 9400.0, "launch": 3500.0, "eng_inertia": 0.15, "fric_base": 20.0, "fric_rpm": 0.012,
-	"ratios": [2.574, 1.994, 1.609, 1.336, 1.156, 1.0], "final": 4.02, "reverse": 3.0, "shift_time": 0.06, "eff": 0.92,
-	"preload": 120.0, "ramp_power": 0.35, "ramp_coast": 0.2, "viscous": 150.0,
-	"brake_max": 10000.0, "brake_bias": 0.57, "steer_deg": 18.0,
-}
+## acerto em nomes curtos (ver from_params)
+var p: Dictionary
+var id := ""
+var name := ""
 
 class Wheel:
 	var mount := Vector3.ZERO
@@ -46,8 +37,13 @@ class Wheel:
 	var brake := 0.0
 	var cpoint := Vector3.ZERO
 	var cnormal := Vector3.UP
+	## relevo da zebra sob a roda (m), para vibração
+	var bump := 0.0
+	## ABS segurando o freio desta roda neste passo (HUD e vibração)
+	var abs_active := false
 
-var track: Track
+var ground: Ground
+var assists := {"abs": true, "tc": true, "auto": false}
 var pos := Vector3.ZERO
 var rot := Quaternion.IDENTITY
 var vel := Vector3.ZERO
@@ -65,13 +61,68 @@ var hint := -1
 var kappa_peak := 0.0
 var alpha_peak := 0.0
 var max_steer := 0.0
+## trocas de marcha feitas (o som detecta a mudança)
+var shift_count := 0
+## aceleração no referencial do carro, em g (filtrada), para HUD e testes
+var g_lat := 0.0
+var g_long := 0.0
+var _last_vel := Vector3.ZERO
+var _last_up := false
+var _last_down := false
+var _right := Vector3.RIGHT
+var _fwd := Vector3.FORWARD
 
 
-func _init(t: Track) -> void:
-	track = t
+## Converte o "params" do JSON (CarParams do web) para os nomes curtos usados aqui.
+static func from_params(j: Dictionary) -> Dictionary:
+	var susp := func(s: Dictionary) -> Dictionary:
+		return {"k": float(s.k), "bump": float(s.bump), "rebound": float(s.rebound), "arb": float(s.arb),
+			"rest": float(s.restLength), "travel": float(s.travel), "rc": float(s.rollCenter)}
+	var t: Dictionary = j.tire
+	var e: Dictionary = j.engine
+	var gb: Dictionary = j.gearbox
+	var ratios: Array = []
+	for r in gb.ratios:
+		ratios.append(float(r))
+	var torque: Array = []
+	for pt in e.torque:
+		torque.append([float(pt[0]), float(pt[1])])
+	return {
+		"mass": float(j.mass), "inertia": Vector3(j.inertia[0], j.inertia[1], j.inertia[2]), "cg": float(j.cgHeight),
+		"wheelbase": float(j.wheelbase), "wf": float(j.weightFront), "track_f": float(j.trackFront),
+		"track_r": float(j.trackRear), "radius": float(j.wheelRadius), "wheel_inertia": float(j.wheelInertia),
+		"front": susp.call(j.suspension.front), "rear": susp.call(j.suspension.rear),
+		"mu": float(t.mu), "mu_long": float(t.get("muLong", 1.0)), "load_sens": float(t.loadSens), "fz0": float(t.fz0),
+		"b_lat": float(t.bLat), "c_lat": float(t.cLat), "e_lat": float(t.eLat),
+		"b_long": float(t.bLong), "c_long": float(t.cLong), "e_long": float(t.eLong),
+		"relax": float(t.relaxLen), "roll_res": float(t.rollingResistance), "rear_grip": float(j.get("rearGrip", 1.0)),
+		"clA": float(j.aero.clA), "cdA": float(j.aero.cdA), "aero_front": float(j.aero.balanceFront),
+		"torque": torque, "idle": float(e.idle), "limiter": float(e.limiter), "launch": float(e.launchRpm),
+		"eng_inertia": float(e.inertia), "fric_base": float(e.frictionBase), "fric_rpm": float(e.frictionPerRpm),
+		"ratios": ratios, "final": float(gb.final), "reverse": float(gb.reverse), "shift_time": float(gb.shiftTime),
+		"eff": float(gb.efficiency),
+		"preload": float(j.diff.preload), "ramp_power": float(j.diff.rampPower), "ramp_coast": float(j.diff.rampCoast),
+		"viscous": float(j.diff.viscous),
+		"brake_max": float(j.brakes.maxTorque), "brake_bias": float(j.brakes.bias),
+		"steer_deg": float(j.steering.maxAngleDeg),
+	}
+
+
+## Carro a partir de data/cars/<id>.json (o arquivo inteiro, com "params", ou só o CarParams).
+static func load_car(g: Ground, car_id: String) -> Car:
+	var d: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars/%s.json" % car_id))
+	return Car.new(g, d.get("params", d))
+
+
+func _init(g: Ground, params: Dictionary) -> void:
+	ground = g
+	id = params.get("id", "")
+	name = params.get("name", "")
+	p = from_params(params)
 	kappa_peak = _peak_slip(p.b_long, p.c_long, p.e_long)
 	alpha_peak = _peak_slip(p.b_lat, p.c_lat, p.e_lat)
 	max_steer = deg_to_rad(p.steer_deg)
+	rpm = p.idle
 	var a: float = p.wheelbase * (1.0 - p.wf)
 	var b: float = p.wheelbase * p.wf
 	for k in 4:
@@ -121,25 +172,42 @@ func tire(fz: float, kappa: float, alpha: float, grip: float) -> Vector2:
 		-D * magic(s * alpha_peak, p.b_lat, p.c_lat, p.e_lat) * (sa / s))
 
 
-func reset_at(i: int) -> void:
-	var t := track.T[i]
-	var r := track.R[i]
-	var up := r.cross(t).normalized()
-	pos = track.P[i] + up * (p.cg + 0.05)
-	rot = Basis(r, up, -t).orthonormalized().get_rotation_quaternion()
+## Coloca o carro parado em pos, com a frente apontando para heading (rad, 0 = -Z), como o reset do web.
+func reset(at: Vector3, heading: float) -> void:
+	reset_basis(at, Basis(Vector3.UP, heading))
+
+
+func reset_basis(at: Vector3, b: Basis) -> void:
+	pos = at
+	rot = b.orthonormalized().get_rotation_quaternion()
 	vel = Vector3.ZERO
 	ang_vel = Vector3.ZERO
+	_last_vel = Vector3.ZERO
 	for w in wheels:
 		w.omega = 0; w.comp = 0; w.comp_vel = 0; w.fy = 0
 	gear = 1
 	rpm = p.idle
 	shift_timer = 0
 	tc_cut = 0
+	hint = -1
+
+
+## Parado na amostra i da pista, inclinado com ela.
+func reset_at(i: int) -> void:
+	var track := ground as Track
+	var t := track.T[i]
+	var r := track.R[i]
+	var up := r.cross(t).normalized()
+	reset_basis(track.P[i] + up * (p.cg + 0.05), Basis(r, up, -t))
 	hint = i
 
 
 func basis() -> Basis:
 	return Basis(rot)
+
+
+func speed() -> float:
+	return vel.length()
 
 
 func fwd_speed() -> float:
@@ -161,28 +229,47 @@ func engine_torque(r: float) -> float:
 	return t[t.size() - 1][1]
 
 
+## Giro que o motor teria nessa marcha pela velocidade do carro (não pelas rodas, que quase travam na freada).
 func road_rpm(g: int) -> float:
 	var om := maxf((wheels[2].omega + wheels[3].omega) / 2.0, fwd_speed() / p.radius)
 	return om * gear_ratio(g) / RPM_TO_RAD
 
 
-func _shift(throttle: float, brake: float, dt: float) -> void:
+func _shift(throttle: float, brake: float, up_in: bool, down_in: bool, dt: float) -> void:
+	var up := up_in and not _last_up
+	var down := down_in and not _last_down
+	_last_up = up_in
+	_last_down = down_in
 	if shift_timer > 0.0:
 		shift_timer -= dt
 		return
-	var target := gear
+	var max_gear: int = p.ratios.size()
 	var lim: float = p.limiter
-	if gear >= 1:
-		if rpm > lim - 250.0 and gear < p.ratios.size() and throttle > 0.1:
+	var target := gear
+	if up and gear < max_gear: target = gear + 1
+	if down and gear > -1: target = gear - 1
+	if assists.auto and gear >= 1:
+		if rpm > lim - 250.0 and gear < max_gear and throttle > 0.1:
 			target = gear + 1
+		# reduz assim que a marcha de baixo cabe; acelerando exige mais folga; aliviando só se o motor morre
 		elif gear > 1:
 			var lower := road_rpm(gear - 1)
-			if (brake > 0.05 and lower < lim - 550.0) or (brake <= 0.05 and throttle > 0.5 and lower < lim - 1200.0) \
-					or (brake <= 0.05 and throttle <= 0.5 and rpm < lim * 0.45):
-				target = gear - 1
-	if target != gear:
-		gear = target
-		shift_timer = p.shift_time
+			var go := false
+			if brake > 0.05: go = lower < lim - 550.0
+			elif throttle > 0.5: go = lower < lim - 1200.0
+			else: go = rpm < lim * 0.45
+			if go: target = gear - 1
+	if target == gear:
+		return
+	# proteção contra redução que estoura o motor (como nos GT3 reais)
+	if target > 0 and target < gear and road_rpm(target) > lim + 300.0:
+		return
+	# ré/neutro só quase parado
+	if target <= 0 and gear >= 1 and absf(fwd_speed()) > 2.0:
+		return
+	gear = target
+	shift_timer = p.shift_time
+	shift_count += 1
 
 
 func _drivetrain(throttle: float, dt: float) -> float:
@@ -219,17 +306,23 @@ func _point_vel(at: Vector3) -> Vector3:
 	return ang_vel.cross(at - pos) + vel
 
 
+# cantos e meios da carroceria (local) para bater no muro
 const CORNERS := [Vector3(-1, 0, -2.35), Vector3(1, 0, -2.35), Vector3(-1, 0, 2.25), Vector3(1, 0, 2.25), Vector3(-1, 0, 0), Vector3(1, 0, 0)]
+const WALL_K := 2e6
+const WALL_C := 4e4
+const WALL_FRICTION := 0.35
 
-func step(dt: float, steer_in: float, throttle_in: float, brake_in: float) -> void:
+func step(dt: float, steer_in: float, throttle_in: float, brake_in: float, shift_up := false, shift_down := false) -> void:
 	var B := basis()
 	force = Vector3(0, -p.mass * G, 0)
 	torque = Vector3.ZERO
 	var up := B.y
 	var fwd := -B.z
+	_fwd = fwd
+	_right = B.x
 	var down := -up
 	var vf := vel.dot(fwd)
-	hint = track.nearest(pos, hint)
+	hint = ground.nearest(pos, hint)
 
 	# aerodinâmica
 	var dn: float = 0.5 * AIR * vf * vf * p.clA
@@ -239,14 +332,14 @@ func step(dt: float, steer_in: float, throttle_in: float, brake_in: float) -> vo
 	_force_at(down * dn * (1.0 - p.aero_front), pos + B * Vector3(0, 0, b))
 	force += -vel * (0.5 * AIR * p.cdA * vel.length())
 
-	# câmbio, motor, TC
-	_shift(throttle_in, brake_in, dt)
+	# câmbio, motor, TC: corta quando uma traseira, acelerando, passa do pico no slip combinado
+	_shift(throttle_in, brake_in, shift_up, shift_down, dt)
 	var fz_r := wheels[2].fz + wheels[3].fz
 	var rear_over := false
 	for w in [wheels[2], wheels[3]]:
 		if w.fz > 0.15 * fz_r and w.kappa > 0.3 * kappa_peak and Vector2(w.kappa / kappa_peak, w.alpha / alpha_peak).length() > 1.0:
 			rear_over = true
-	tc_cut = minf(0.9, tc_cut + dt * 15.0) if rear_over else maxf(0.0, tc_cut - dt * 3.0)
+	tc_cut = minf(0.9, tc_cut + dt * 15.0) if assists.tc and rear_over else maxf(0.0, tc_cut - dt * 3.0)
 	var throttle := throttle_in * (1.0 - tc_cut)
 	throttle_out = throttle
 	var diff_in := _drivetrain(throttle, dt)
@@ -273,14 +366,15 @@ func step(dt: float, steer_in: float, throttle_in: float, brake_in: float) -> vo
 	for w in wheels:
 		var m := pos + B * w.mount
 		var l: float = w.susp.rest + p.radius
-		var dist := track.probe(m, down, l, hint)
+		var dist := ground.probe(m, down, l, hint)
 		var c := 0.0
 		w.contact = dist >= 0.0
 		if w.contact:
 			c = l - dist
-			w.cpoint = track.hit_point
-			w.cnormal = track.hit_normal
-			w.surface = track.hit_surface
+			w.cpoint = ground.hit_point
+			w.cnormal = ground.hit_normal
+			w.surface = ground.hit_surface
+			w.bump = ground.hit_bump
 		w.comp_vel = (c - w.comp) / dt
 		w.comp = c
 
@@ -290,8 +384,9 @@ func step(dt: float, steer_in: float, throttle_in: float, brake_in: float) -> vo
 		var s: Dictionary = w.susp
 		var other := wheels[i ^ 1]
 		var iw: float = p.wheel_inertia + (0.0 if w.front else reflected)
+		w.abs_active = false
 		if not w.contact:
-			w.fz = 0; w.fx = 0; w.fy = 0; w.kappa = 0; w.alpha = 0
+			w.fz = 0; w.fx = 0; w.fy = 0; w.kappa = 0; w.alpha = 0; w.bump = 0
 			w.omega += w.drive * dt / iw
 			var bd0 := w.brake * dt / iw
 			w.omega = maxf(0.0, w.omega - bd0) if w.omega > 0.0 else minf(0.0, w.omega + bd0)
@@ -317,8 +412,9 @@ func step(dt: float, steer_in: float, throttle_in: float, brake_in: float) -> vo
 		var vy := vc.dot(wr)
 		var denom := maxf(absf(vx), V_LOW)
 		var alpha := atan2(vy, denom)
-		var grip: float = Track.GRIP[w.surface] * (1.0 if w.front else p.rear_grip)
+		var grip: float = Ground.GRIP[w.surface] * (1.0 if w.front else p.rear_grip)
 
+		# rotação da roda: integração semi-implícita (o termo Fx·r é rígido)
 		var k0 := (w.omega * r - vx) / denom
 		var f0 := tire(w.fz, k0, alpha, grip)
 		var f1 := tire(w.fz, k0 + 1e-4, alpha, grip)
@@ -327,11 +423,14 @@ func step(dt: float, steer_in: float, throttle_in: float, brake_in: float) -> vo
 		var om := w.omega + dt * (w.drive - r * f0.x) / den
 		var bd := w.brake * dt / den
 		# ABS: limita o freio para o escorregamento não passar do pico (descontando o que o pneu usa para virar)
-		if vx > 2.0 and bd > 0.0:
+		if assists.abs and vx > 2.0 and bd > 0.0:
 			var side := alpha / alpha_peak
 			var kT := kappa_peak * sqrt(maxf(0.04, 0.92 * 0.92 - side * side))
 			var om_min := (vx - kT * denom) / r
-			bd = minf(bd, maxf(0.0, om - om_min))
+			var max_bd := maxf(0.0, om - om_min)
+			if bd > max_bd:
+				w.abs_active = true
+				bd = max_bd
 		om = maxf(0.0, om - bd) if om > 0.0 else minf(0.0, om + bd)
 		w.omega = om
 		w.spin += om * dt
@@ -339,32 +438,40 @@ func step(dt: float, steer_in: float, throttle_in: float, brake_in: float) -> vo
 		w.kappa = (om * r - vx) / denom
 		w.alpha = alpha
 		var ff := tire(w.fz, w.kappa, alpha, grip)
+		# comprimento de relaxação: a força lateral demora a se formar, sem passar do que o pneu aguenta agora
 		var relax: float = minf(1.0, maxf(absf(vx), 8.0) * dt / p.relax)
 		w.fy += (ff.y - w.fy) * relax
 		var pk := peak_force(w.fz, grip)
 		var fy_max := sqrt(maxf(0.0, pk * pk - ff.x * ff.x))
 		w.fy = clampf(w.fy, -fy_max, fy_max)
-		w.fx = ff.x - (p.roll_res + Track.DRAG[w.surface]) * w.fz * tanh(vx)
+		w.fx = ff.x - (p.roll_res + Ground.DRAG[w.surface]) * w.fz * tanh(vx)
 		_force_at(wf * w.fx + wr * w.fy, w.cpoint + up * s.rc)
 
 	# muros: mola-amortecedor nos cantos da carroceria + atrito
 	for c: Vector3 in CORNERS:
 		var m := pos + B * c
-		var pen := track.wall_penetration(m, hint)
+		var pen := ground.wall_penetration(m, hint)
 		if pen <= 0.0:
 			continue
-		var wn := track.wall_normal
+		var wn := ground.wall_normal
 		var v := _point_vel(m)
 		var vn := v.dot(wn)
-		var fn := maxf(0.0, 2e6 * pen - 4e4 * vn)
+		var fn := maxf(0.0, WALL_K * pen - WALL_C * vn)
 		var f := wn * fn
 		var vt := v - wn * vn
 		vt.y = 0
 		if vt.length() > 0.01:
-			f += vt * (-0.35 * fn / vt.length())
+			f += vt * (-WALL_FRICTION * fn / vt.length())
 		_force_at(f, m)
 
 	_integrate(dt)
+
+	# aceleração no referencial do carro (filtrada) para HUD e testes
+	var acc := (vel - _last_vel) / dt
+	_last_vel = vel
+	var kf := minf(1.0, dt * 20.0)
+	g_lat += (acc.dot(_right) / G - g_lat) * kf
+	g_long += (acc.dot(_fwd) / G - g_long) * kf
 
 
 func _integrate(dt: float) -> void:
@@ -379,3 +486,4 @@ func _integrate(dt: float) -> void:
 	pos += vel * dt
 	var dq := Quaternion(ang_vel.x * dt * 0.5, ang_vel.y * dt * 0.5, ang_vel.z * dt * 0.5, 0) * rot
 	rot = Quaternion(rot.x + dq.x, rot.y + dq.y, rot.z + dq.z, rot.w + dq.w).normalized()
+

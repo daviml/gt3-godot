@@ -37,6 +37,7 @@ const out = (p: string) => {
 const json = (p: string, v: unknown) => writeFileSync(out(p), JSON.stringify(v));
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const r4 = (x: number) => Math.round(x * 10000) / 10000;
+const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
 const onlyData = process.argv.includes('dados');
 
 // ---------- pista
@@ -47,7 +48,8 @@ track.sections = trackSections(osm, track); // como no buildOsmScenery: nomes da
 const S = track.samples;
 const flat: number[] = [];
 for (const s of S) {
-  flat.push(r2(s.p.x), r2(s.p.y), r2(s.p.z), r4(s.t.x), r4(s.t.y), r4(s.t.z), r4(s.r.x), r4(s.r.z),
+  // posição em 0,1 mm: arredondar em cm deixava degraus de até 5 mm a cada 2 m, que faziam o carro quicar
+  flat.push(r4(s.p.x), r4(s.p.y), r4(s.p.z), r6(s.t.x), r6(s.t.y), r6(s.t.z), r6(s.r.x), r6(s.r.z),
     r2(s.wl), r2(s.wr), r2(s.kerbL), r2(s.kerbR), r2(s.runL), r2(s.runR), r2(s.wallL), r2(s.wallR));
 }
 json('data/track/track.json', {
