@@ -60,10 +60,16 @@ Protótipo em `REPOS/gt3-godot` (Godot 4.7.2, `Jogar.bat`):
       carros com referência. Bot de referência do Porsche: 1:36,36 nos dois jogos. (07/11)
 
 ### 3. Controles
-- [ ] Teclado e controle com a mesma curva e suavização da direção do web (commits 1177412 e 2fd40d5).
-- [ ] Vibração do controle (`rumble.ts`): zebra, ABS, batida.
-- [ ] Toque no Android igual ao web: ◀ ▶ à esquerda, freio e acelerador à direita, câmbio automático, ☰ para o
-      menu, sem inclinar o celular.
+- [x] Teclado e controle com a mesma curva e suavização da direção do web (commits 1177412 e 2fd40d5):
+      `scripts/input/input_reader.gd` (limite 14/v, rampa progressiva no teclado, zona morta 0,08 + curva 1,6 e
+      ~0,2 s até o batente no controle, direção antiga no toque). Back do controle = R. (07/11)
+- [x] Vibração do controle (`scripts/input/rumble.gd`): zebra, grama, ABS e batida no motor forte; pneu
+      escorregando e limitador no fraco. (07/11)
+- [x] Toque igual ao web (`scripts/input/touch_controls.gd`): ◀ ▶ à esquerda, freio e acelerador à direita,
+      multitoque, área de toque maior que o desenho, câmbio automático, sem inclinar o celular. No PC:
+      `-- --touch` (o mouse vira dedo). ☰ e o voltar do Android **pausam** até o menu da etapa 9 existir. (07/11)
+  - Teste: `scripts/tests/controles.gd` (36 verificações contra os números do web).
+  - Falta conferir no celular de verdade (etapa 13) e no controle do Davi.
 
 ### 4. Cronometragem e regras
 - [ ] Volta lançada, 3 setores e delta ao vivo contra a melhor volta.

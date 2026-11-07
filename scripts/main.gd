@@ -1,6 +1,8 @@
 # Protótipo: Interlagos + os GT3 do jogo web em Godot 4, com a física e a pista do web.
 # Controles (iguais ao web): setas/WASD ou controle (gatilhos + analógico). E/Shift ou RB/A sobe marcha,
-# Q/Ctrl ou LB/X reduz. 1 = ABS, 2 = TC, G = câmbio automático. R = volta para a pista. P = piloto automático.
+# Q/Ctrl ou LB/X reduz. 1 = ABS, 2 = TC, G = câmbio automático. R ou Back = volta para a pista.
+# P = piloto automático. Etapa 3: curva e suavização da direção do web, vibração no controle; no celular
+# (ou -- --touch no PC) botões de toque, câmbio automático e ☰ = pausa.
 # F1 = alterna qualidade (Alto/Celular). F12 = salva print. Esc = sai.
 # Linha de comando (depois de --): --car=<id> escolhe o carro (data/cars.json), --auto liga o piloto,
 # --shot=<pasta> tira prints sozinho.
@@ -22,7 +24,12 @@ var sun: DirectionalLight3D
 var hud: Label
 var hud_big: Label
 
-var steer := 0.0
+# entrada (etapa 3, scripts/input/): curva e suavização do web, vibração e botões de toque no celular
+var input := InputReader.new()
+var rumble := Rumble.new()
+var touch: TouchControls
+## ☰ ou voltar do Android: pausa (o menu da etapa 9 entra no lugar)
+var paused := false
 var cam_yaw := 0.0
 var cam_ready := false
 var lap_start := 0.0
@@ -53,6 +60,8 @@ func _ready() -> void:
 			autopilot = true
 		if a.begins_with("--car="):
 			car_id = a.substr(6)
+	# --touch mostra os botões de toque no PC (o mouse vira dedo)
+	input.touch = OS.has_feature("mobile") or "--touch" in args
 	track = Track.new("res://data/track/track.json")
 	_build_env()
 	_build_track()
@@ -65,7 +74,8 @@ func _ready() -> void:
 		bot = RefBot.new(track, car, RefBot.load_ref(REFS[car_id]), {"line_gain": 0.8, "hold_line": 0.02, "edge": [-0.3, 0.5]})
 	else:
 		bot = Bot.new(track, car)
-	if autopilot:
+	# no celular o câmbio é automático, como no web
+	if autopilot or input.touch:
 		car.assists.auto = true
 
 
@@ -452,6 +462,11 @@ func _build_hud() -> void:
 	hud_big.add_theme_color_override("font_outline_color", Color.BLACK)
 	hud_big.add_theme_constant_override("outline_size", 10)
 	layer.add_child(hud_big)
+	if input.touch:
+		touch = TouchControls.new()
+		touch.keys = input.touch_keys
+		touch.menu_pressed.connect(_toggle_pause)
+		layer.add_child(touch)
 
 
 func _fmt(t: float) -> String:
@@ -463,39 +478,19 @@ func _fmt(t: float) -> String:
 # ------------------------------------------------------------------ laço
 
 func _input_axes(dt: float) -> Array:
-	var thr := 0.0
-	var brk := 0.0
-	var st_target := 0.0
-	if Input.is_key_pressed(KEY_UP) or Input.is_key_pressed(KEY_W): thr = 1.0
-	if Input.is_key_pressed(KEY_DOWN) or Input.is_key_pressed(KEY_S): brk = 1.0
-	if Input.is_key_pressed(KEY_LEFT) or Input.is_key_pressed(KEY_A): st_target -= 1.0
-	if Input.is_key_pressed(KEY_RIGHT) or Input.is_key_pressed(KEY_D): st_target += 1.0
-	var joy := Input.get_connected_joypads()
-	if joy.size() > 0:
-		var d: int = joy[0]
-		thr = maxf(thr, Input.get_joy_axis(d, JOY_AXIS_TRIGGER_RIGHT))
-		brk = maxf(brk, Input.get_joy_axis(d, JOY_AXIS_TRIGGER_LEFT))
-		var ax := Input.get_joy_axis(d, JOY_AXIS_LEFT_X)
-		if absf(ax) > 0.06:
-			st_target = signf(ax) * pow((absf(ax) - 0.06) / 0.94, 1.6)
-	# câmbio (como no web): E/Shift ou RB/A sobe, Q/Ctrl ou LB/X reduz
-	var up := Input.is_key_pressed(KEY_E) or Input.is_key_pressed(KEY_SHIFT)
-	var down := Input.is_key_pressed(KEY_Q) or Input.is_key_pressed(KEY_CTRL)
-	if joy.size() > 0:
-		var d: int = joy[0]
-		up = up or Input.is_joy_button_pressed(d, JOY_BUTTON_RIGHT_SHOULDER) or Input.is_joy_button_pressed(d, JOY_BUTTON_A)
-		down = down or Input.is_joy_button_pressed(d, JOY_BUTTON_LEFT_SHOULDER) or Input.is_joy_button_pressed(d, JOY_BUTTON_X)
+	input.update(dt, car.speed())
+	# Back/Select do controle = R (volta para a pista)
+	if input.reset:
+		car.reset_at(track.nearest(car.pos, -1))
 	if autopilot:
 		var b: Array = bot.drive()
 		return [b[0], b[1], b[2], false, false]
-	# volante: menos esterço com velocidade, rampa suave no teclado (a curva do web entra na etapa 3)
-	var v := absf(car.fwd_speed())
-	var lim := clampf(1.0 - v / 90.0, 0.35, 1.0)
-	steer = move_toward(steer, st_target * lim, dt * 3.5)
-	return [steer, thr, brk, up, down]
+	return [input.steer, input.throttle, input.brake, input.shift_up, input.shift_down]
 
 
 func _physics_process(dt: float) -> void:
+	if paused:
+		return
 	var inp := _input_axes(dt)
 	car.step(dt, inp[0], inp[1], inp[2], inp[3], inp[4])
 	time += dt
@@ -511,6 +506,8 @@ func _physics_process(dt: float) -> void:
 
 func _process(dt: float) -> void:
 	_update_car_view()
+	if not paused:
+		rumble.update(car, dt)
 	if shot_dir != "":
 		_shot_tick(dt)
 	# câmera de perseguição (estilo LMU): 6,8 m atrás, 1,85 m de altura, rumo com atraso e no máx. 6°
@@ -536,17 +533,19 @@ func _process(dt: float) -> void:
 
 	var kmh := car.vel.length() * 3.6
 	hud_big.text = "%d km/h   %s" % [int(kmh), "N" if car.gear == 0 else ("R" if car.gear < 0 else str(car.gear))]
+	if paused:
+		hud_big.text = "PAUSA"
 	var abs_on := false
 	for w in car.wheels:
 		abs_on = abs_on or w.abs_active
 	toast_t -= dt
-	hud.text = "%s\nAtual  %s\nÚltima %s\nMelhor %s\n%d rpm   %.1f g lat  %+.1f g long\n%s  %s  %s%s%s\n%s\n%d fps   %s%s\n%s\n%s" % [
+	hud.text = "%s\nAtual  %s\nÚltima %s\nMelhor %s\n%d rpm   %.1f g lat  %+.1f g long\n%s  %s  %s%s%s\n%s\n%d fps   %s   %s%s\n%s\n%s" % [
 		car.name, _fmt(time - lap_start if lap_start > 0.0 else -1.0), _fmt(last_lap), _fmt(best_lap), int(car.rpm),
 		absf(car.g_lat), car.g_long,
 		"ABS" if car.assists.abs else "abs off", "TC" if car.assists.tc else "tc off",
 		"câmbio auto" if car.assists.auto else "câmbio manual",
 		"   [ABS atuando]" if abs_on else "", "   [TC atuando]" if car.tc_cut > 0.05 else "",
-		_surfaces(), Engine.get_frames_per_second(), "Alto" if high else "Celular",
+		_surfaces(), Engine.get_frames_per_second(), "Alto" if high else "Celular", input.source,
 		"  · piloto automático" if autopilot else "", toast if toast_t > 0.0 else "",
 		"[E/Q] marcha  [1] ABS  [2] TC  [G] câmbio  [R] pista  [P] piloto  [F1] qualidade  [F12] print"]
 
@@ -575,6 +574,16 @@ func _unhandled_input(e: InputEvent) -> void:
 				_screenshot()
 			KEY_ESCAPE:
 				get_tree().quit()
+
+
+func _notification(what: int) -> void:
+	# botão voltar do Android: pausa (o menu entra na etapa 9)
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		_toggle_pause()
+
+
+func _toggle_pause() -> void:
+	paused = not paused
 
 
 func _toast(t: String) -> void:
