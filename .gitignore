@@ -1,0 +1,11 @@
+.godot/
+tools/node_modules
+# texturas que o Godot extrai dos GLB ao importar (refeitas sozinhas a partir do .glb)
+assets/cars/*/*.png
+assets/cars/*/*.png.import
+# builds e vídeos
+*.exe
+*.apk
+*.aab
+*.avi
+*.mp4
