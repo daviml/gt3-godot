@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "base_data_url": "https://github.com/daviml/gt3-godot/releases/download/v1.0/base_data.pck",
+  "patch_url": "",
+  "changelog": "Versão inicial com suporte a hot-update e carregamento dinâmico."
+}

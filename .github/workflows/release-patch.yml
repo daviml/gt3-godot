@@ -1,0 +1,98 @@
+name: Publicar Atualizacao (Release Patch)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Numero da versao (ex: 2)'
+        required: true
+        default: '2'
+      tag_name:
+        description: 'Nome da Tag da Release (ex: v1.1)'
+        required: true
+        default: 'v1.1'
+      changelog:
+        description: 'Descricao das novidades / correcoes'
+        required: false
+        default: 'Atualizacao de correcoes, fisica e melhorias gerais.'
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do Repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Godot 4.3 Headless
+        run: |
+          GODOT_VERSION="4.3"
+          wget -q https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          unzip -q Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip
+          mv Godot_v${GODOT_VERSION}-stable_linux.x86_64 godot
+          chmod +x godot
+          sudo mv godot /usr/local/bin/
+
+      - name: Exportar Patch PCK
+        run: |
+          mkdir -p build/packs
+          godot --headless --path . --export-pack "Windows" "build/packs/patch.pck"
+
+      - name: Determinar Versao e Tag
+        id: vars
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VER=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "TAG=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+            echo "NOTES=${{ github.event.inputs.changelog }}" >> $GITHUB_OUTPUT
+          else
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+            echo "VER=2" >> $GITHUB_OUTPUT
+            echo "TAG=${TAG_NAME}" >> $GITHUB_OUTPUT
+            echo "NOTES=Lancamento automatico de atualizacao ${TAG_NAME}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Criar Release no GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.TAG }}
+          name: "GT3 Time Attack ${{ steps.vars.outputs.TAG }}"
+          body: ${{ steps.vars.outputs.NOTES }}
+          files: build/packs/patch.pck
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Atualizar version.json no repositorio
+        run: |
+          REPO="${{ github.repository }}"
+          TAG="${{ steps.vars.outputs.TAG }}"
+          VER="${{ steps.vars.outputs.VER }}"
+          NOTES="${{ steps.vars.outputs.NOTES }}"
+          
+          PATCH_URL="https://github.com/${REPO}/releases/download/${TAG}/patch.pck"
+          BASE_URL="https://github.com/${REPO}/releases/download/v1.0/base_data.pck"
+          
+          cat <<EOF > version.json
+          {
+            "version": ${VER},
+            "base_data_url": "${BASE_URL}",
+            "patch_url": "${PATCH_URL}",
+            "changelog": "${NOTES}"
+          }
+          EOF
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          git commit -m "chore: atualizar version.json para ${TAG} (v${VER}) [skip ci]" || echo "Sem alteracoes no version.json"
+          git push origin HEAD:${{ github.ref_name }} || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

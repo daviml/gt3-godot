@@ -4,7 +4,7 @@ config_version=5
 [application]
 
 config/name="GT3 Time Attack"
-run/main_scene="res://scenes/garagem.tscn"
+run/main_scene="res://scenes/updater.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.png"
 

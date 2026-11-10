@@ -202,10 +202,22 @@ Ao analisar os commits mais recentes do repositório web (`gt3-time-attack`), id
   - Testar sensibilidade e ergonomia dos 4 esquemas de toque.
   - Monitorar consumo de bateria e dissipação térmica após 10 minutos contínuos de pilotagem.
 
-### 14. Distribuição e Atualização
+### 14. Distribuição, APK Leve e Hot-Update Automático (GitHub Releases)
 - [x] Pacote Windows `.exe` pronto para exportação. (08/11)
 - [x] APK Android assinado gerado em `build/android/`. (10/11)
-- [ ] Verificador leve de atualizações online (checagem de versão via JSON para avisar se há APK novo disponível).
+- [x] **Arquitetura de APK Leve (~35 MB) + Asset Streaming (`.pck`):** (10/11)
+  - Filtro de exclusão configurado no `export_presets.cfg` para Android excluindo `assets/cars/*`, `assets/tracks/*`, `assets/sounds/*`, `assets/textures/*`, `assets/trees/*`.
+  - Script `Build-Packs.bat` criado para exportar `base_data.pck` e `patch.pck` em 1 clique.
+  - Preset `[preset.3]` ("DataPack") adicionado ao `export_presets.cfg`.
+- [x] **Cena de Splash / Updater no Godot (`res://scenes/updater.tscn` e `res://scripts/ui/updater.gd`):** (10/11)
+  - Configurada como `run/main_scene` no `project.godot`.
+  - Detecção automática de modo editor (pula download durante desenvolvimento).
+  - Download inicial de `base_data.pck` no primeiro boot no Android.
+  - Hot-updates de `patch.pck` via `ProjectSettings.load_resource_pack()`.
+  - Barra de progresso com porcentagem e MB baixados, fallback offline e botão de pular.
+- [x] **Configuração da Release Inicial no GitHub:**
+  - Gerar o primeiro `base_data.pck` rodando `Build-Packs.bat` e anexar na release `v1.0`.
+  - Workflow do GitHub Actions configurado em `.github/workflows/release-patch.yml` para lançar patches futuros em 1 clique (com compilação do `patch.pck`, criação da release e commit automático do `version.json`).
 
 ---
 
