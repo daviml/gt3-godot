@@ -23,6 +23,97 @@ func _init() -> void:
 func _ready() -> void:
 	_build_towers()
 	_build_horizon()
+	if get_parent():
+		var t0 := Time.get_ticks_msec()
+		_split_crowd(get_parent())
+		print("arredores: %d torres, torcida em %d blocos (%d ms)" % [towers, crowd_blocks, Time.get_ticks_msec() - t0])
+
+
+# ------------------------------------------------------------------ torcida em blocos
+
+const CROWD_CELL := 120.0
+var crowd_blocks := 0
+
+
+static func _is_crowd(mi: MeshInstance3D) -> bool:
+	for s in mi.get_surface_override_material_count():
+		var mat := mi.get_surface_override_material(s)
+		if mat == null and mi.mesh:
+			mat = mi.mesh.surface_get_material(s)
+		if mat and mat.resource_name == "torcida":
+			return true
+	return false
+
+
+## A torcida chega do cenario.glb numa malha só de ~1 km (as arquibancadas da reta inteira): corta em blocos de
+## 120 m pelo centro de cada triângulo, para a câmera descartar os blocos fora da tela e o preset Leve poder
+## limitar a distância de desenho por bloco.
+func _split_crowd(n: Node) -> void:
+	for c in n.get_children():
+		_split_crowd(c)
+	if not (n is MeshInstance3D and _is_crowd(n)):
+		return
+	var mi := n as MeshInstance3D
+	var xf := mi.global_transform
+	var cells := {}  # Vector2i -> ArrayMesh
+	for s in mi.mesh.get_surface_count():
+		var arr := mi.mesh.surface_get_arrays(s)
+		var v: PackedVector3Array = arr[Mesh.ARRAY_VERTEX]
+		var idx: PackedInt32Array = arr[Mesh.ARRAY_INDEX] if arr[Mesh.ARRAY_INDEX] != null else PackedInt32Array(range(v.size()))
+		var groups := {}  # Vector2i -> PackedInt32Array de índices
+		for t in range(0, idx.size(), 3):
+			var p := xf * ((v[idx[t]] + v[idx[t + 1]] + v[idx[t + 2]]) / 3.0)
+			var key := Vector2i(floori(p.x / CROWD_CELL), floori(p.z / CROWD_CELL))
+			if not groups.has(key):
+				groups[key] = PackedInt32Array()
+			groups[key].append_array([idx[t], idx[t + 1], idx[t + 2]])
+		for key in groups:
+			var sub := _sub_arrays(arr, groups[key])
+			if not cells.has(key):
+				cells[key] = ArrayMesh.new()
+			var am: ArrayMesh = cells[key]
+			am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, sub)
+			am.surface_set_material(am.get_surface_count() - 1, mi.get_surface_override_material(s))
+	for key in cells:
+		var b := MeshInstance3D.new()
+		b.name = "Torcida_%d_%d" % [key.x, key.y]
+		b.mesh = cells[key]
+		b.transform = mi.transform
+		b.cast_shadow = mi.cast_shadow
+		mi.get_parent().add_child(b)
+		crowd_blocks += 1
+	mi.get_parent().remove_child(mi)
+	mi.queue_free()
+
+
+## só os vértices usados pelos índices `tri`, renumerados
+static func _sub_arrays(arr: Array, tri: PackedInt32Array) -> Array:
+	var remap := {}
+	var order := PackedInt32Array()
+	var out_idx := PackedInt32Array()
+	out_idx.resize(tri.size())
+	for i in tri.size():
+		var o := tri[i]
+		if not remap.has(o):
+			remap[o] = order.size()
+			order.append(o)
+		out_idx[i] = remap[o]
+	var out := []
+	out.resize(Mesh.ARRAY_MAX)
+	var per := {Mesh.ARRAY_TANGENT: 4}
+	for slot in [Mesh.ARRAY_VERTEX, Mesh.ARRAY_NORMAL, Mesh.ARRAY_TANGENT, Mesh.ARRAY_COLOR, Mesh.ARRAY_TEX_UV, Mesh.ARRAY_TEX_UV2]:
+		var src = arr[slot]
+		if src == null:
+			continue
+		var k: int = per.get(slot, 1)
+		var dst = src.duplicate()
+		dst.resize(order.size() * k)
+		for j in order.size():
+			for e in k:
+				dst[j * k + e] = src[order[j] * k + e]
+		out[slot] = dst
+	out[Mesh.ARRAY_INDEX] = out_idx
+	return out
 
 
 # Orçamento dos arredores por preset (para a etapa 8 chamar ao trocar a qualidade): 0 = Leve, 1 = Médio,
@@ -42,17 +133,18 @@ func set_detail(level: int) -> void:
 
 
 func _apply_detail(n: Node, d: Dictionary) -> void:
-	if n is MultiMeshInstance3D and n.name.begins_with("Arvores"):
+	if n is MultiMeshInstance3D and _is_tree(n):
 		_range(n, d.trees)
-	elif n is MeshInstance3D:
-		var mi := n as MeshInstance3D
-		for s in mi.get_surface_override_material_count():
-			var mat := mi.get_surface_override_material(s)
-			if mat and mat.resource_name == "torcida":
-				_range(mi, d.crowd)
-				break
+	elif n is MeshInstance3D and _is_crowd(n):
+		_range(n, d.crowd)
 	for c in n.get_children():
 		_apply_detail(c, d)
+
+
+## blocos de mata do TrackView (o nome "Arvores" só fica no primeiro; os outros viram @MultiMeshInstance3D@n)
+static func _is_tree(n: Node) -> bool:
+	var m := (n as MultiMeshInstance3D).material_override as ShaderMaterial
+	return m != null and m.shader != null and m.shader.resource_path.ends_with("impostor.gdshader")
 
 
 func _range(g: GeometryInstance3D, end: float) -> void:

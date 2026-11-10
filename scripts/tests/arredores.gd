@@ -21,18 +21,17 @@ func _find(n: Node, pred: Callable, out: Array) -> Array:
 
 
 func _is_crowd(n: Node) -> bool:
-	if not n is MeshInstance3D:
-		return false
-	for s in n.get_surface_override_material_count():
-		var m: Material = n.get_surface_override_material(s)
-		if m and m.resource_name == "torcida":
-			return true
-	return false
+	return n is MeshInstance3D and SurroundingsView._is_crowd(n)
 
 
 func _initialize() -> void:
+	_run.call_deferred()
+
+
+func _run() -> void:
 	var tv := TrackView.new()
 	root.add_child(tv)
+	await process_frame
 	var sv: SurroundingsView = tv.get_node("Arredores")
 	check(sv != null, "arredores montados pela pista")
 
@@ -40,20 +39,22 @@ func _initialize() -> void:
 	var mmi: MultiMeshInstance3D = sv.get_node("Torres")
 	var mm := mmi.multimesh
 	check(mm.instance_count > 1000, "anel com %d torres (> 1.000)" % mm.instance_count)
+	# (no modo headless o MultiMesh não guarda as transformações: confere pelos dados exportados)
+	var a: Array = JSON.parse_string(FileAccess.get_file_as_string(SurroundingsView.TOWERS))
+	var hz_data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SurroundingsView.HORIZON))
 	var hmin := INF
 	var hmax := 0.0
+	var rmin := INF
 	var rmax := 0.0
-	var center: Vector3 = Vector3.ZERO
-	for k in mm.instance_count:
-		center += mm.get_instance_transform(k).origin / mm.instance_count
-	for k in mm.instance_count:
-		var t := mm.get_instance_transform(k)
-		var h := t.basis.y.length()
-		hmin = minf(hmin, h)
-		hmax = maxf(hmax, h)
-		rmax = maxf(rmax, Vector2(t.origin.x - center.x, t.origin.z - center.z).length())
-	check(hmin > 30.0 and hmax < 110.0, "altura das torres entre %.0f e %.0f m" % [hmin, hmax])
-	check(rmax < 3900.0, "torres dentro do horizonte (até %.0f m do centro)" % rmax)
+	for k in a.size() / 8:
+		var o := k * 8
+		hmin = minf(hmin, a[o + 5])
+		hmax = maxf(hmax, a[o + 5])
+		var r := Vector2(a[o] - hz_data.x, a[o + 2] - hz_data.z).length()
+		rmin = minf(rmin, r)
+		rmax = maxf(rmax, r)
+	check(hmin > 30.0 and hmax < 200.0, "altura das torres (com o desnível do chão) entre %.0f e %.0f m" % [hmin, hmax])
+	check(rmin > 300.0 and rmax < 3900.0, "torres entre %.0f e %.0f m do centro (dentro do horizonte)" % [rmin, rmax])
 	check(mmi.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "torres sem sombra")
 
 	# horizonte: cilindro aberto de 3,9 km com a textura
@@ -65,8 +66,13 @@ func _initialize() -> void:
 
 	# torcida e mata (vêm do cenario.glb e do arvores_pos.json)
 	var crowd := _find(tv, _is_crowd, [])
-	check(crowd.size() > 0, "torcida em cartões: %d blocos" % crowd.size())
-	var trees := _find(tv, func(n): return n is MultiMeshInstance3D and n.name.begins_with("Arvores"), [])
+	check(crowd.size() > 10, "torcida em cartões: %d blocos de até 120 m" % crowd.size())
+	var big := 0.0
+	for c in crowd:
+		var b: AABB = c.global_transform * c.get_aabb()
+		big = maxf(big, maxf(b.size.x, b.size.z))
+	check(big < 200.0, "maior bloco da torcida: %.0f m" % big)
+	var trees := _find(tv, func(n): return n is MultiMeshInstance3D and SurroundingsView._is_tree(n), [])
 	check(tv.trees > 5000, "mata com %d árvores em %d blocos" % [tv.trees, trees.size()])
 
 	# presets
