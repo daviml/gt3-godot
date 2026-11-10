@@ -58,6 +58,7 @@ var _tyre_use := [0.0, 0.0, 0.0, 0.0]
 var _fps_frames := 0
 var _fps_since := 0.0
 var _time := 0.0
+var _redraw_t := 0.0
 var _k := 1.0
 var _kp := 1.0
 var _shorts := {}
@@ -167,7 +168,11 @@ func update(dt: float, thr: float, brk: float) -> void:
 		_fps_since = 0.0
 	toast_t -= dt
 	section = track.section_at(timer.s)
-	queue_redraw()
+	# celular: redesenha o HUD a 30 Hz (são ~100 textos por quadro na CPU, que esquenta e derruba o clock)
+	_redraw_t += dt
+	if not touch or _redraw_t >= 1.0 / 30.0:
+		_redraw_t = 0.0
+		queue_redraw()
 
 
 # ------------------------------------------------------------------ desenho

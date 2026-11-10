@@ -28,6 +28,8 @@ var spins: Array[Node3D] = []       # gira com a roda
 var ghosts: Array = []              # por roda: cópias translúcidas do miolo para o desfoque
 var _scale: Array[Vector3] = []
 var _rest: Array[Vector3] = []      # centro da roda no modelo (garagem)
+## desfoque das rodas (6 cópias translúcidas por roda): desligado no preset Leve
+var blur_enabled := true
 
 
 func _init(car_id := "") -> void:
@@ -141,7 +143,7 @@ func set_wheel(k: int, center: Vector3, steer: float, spin: float, omega := 0.0)
 	spins[k].basis = Basis(Vector3.RIGHT, -spin).scaled_local(_scale[k])
 	var arc := clampf(absf(omega) * SHUTTER, 0.0, 1.2)
 	var list: Array = ghosts[k]
-	var on := arc > 0.06
+	var on := blur_enabled and arc > 0.06
 	for g in list.size():
 		var mi: MeshInstance3D = list[g]
 		mi.visible = on

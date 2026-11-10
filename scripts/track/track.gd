@@ -93,6 +93,14 @@ func index_at(s: float) -> int:
 
 
 func nearest(p: Vector3, hint: int) -> int:
+	return _nearest(p, hint, 12)
+
+
+## nearest com janela de busca ±win em torno do hint. Rodas e cantos da carroceria ficam a menos de 3 m do
+## centro do carro (o hint), então ±WIN_NEAR amostras (8 m) bastam e a física fica ~2x mais barata no celular.
+const WIN_NEAR := 4
+
+func _nearest(p: Vector3, hint: int, win: int) -> int:
 	var best := -1
 	var bd := INF
 	if hint < 0:
@@ -102,7 +110,7 @@ func nearest(p: Vector3, hint: int) -> int:
 			if dd < bd:
 				bd = dd; best = i
 		return best
-	for k in range(-12, 13):
+	for k in range(-win, win + 1):
 		var i := (hint + k + n) % n
 		var q := P[i]
 		var dd := (q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z)
@@ -113,8 +121,8 @@ func nearest(p: Vector3, hint: int) -> int:
 
 ## Posição na pista: preenche li, ls, lcenter, lr, ln, ld (lateral, + direita) e larguras interpoladas.
 ## Projeção no plano horizontal, como o locate do web.
-func locate(p: Vector3, hint: int) -> void:
-	var i := nearest(p, hint)
+func locate(p: Vector3, hint: int, win := 12) -> void:
+	var i := _nearest(p, hint, win)
 	if (p - P[i]).dot(T[i]) < 0.0:
 		i = (i - 1 + n) % n
 	var j := (i + 1) % n
@@ -147,7 +155,7 @@ func surface_at(d: float) -> int:
 
 
 func probe(origin: Vector3, dir: Vector3, max_dist: float, hint: int) -> float:
-	locate(origin, hint)
+	locate(origin, hint, WIN_NEAR)
 	var d := ld
 	var ad := absf(d)
 	# além do muro não há chão desta pista (evita "achar" o chão de outro trecho)
@@ -176,7 +184,7 @@ func probe(origin: Vector3, dir: Vector3, max_dist: float, hint: int) -> float:
 
 
 func wall_penetration(p: Vector3, hint: int) -> float:
-	locate(p, hint)
+	locate(p, hint, WIN_NEAR)
 	if ld > lwallr:
 		wall_normal = -lr
 		return ld - lwallr

@@ -349,7 +349,8 @@ func _single_step(dt: float, steer_in: float, throttle_in: float, brake_in: floa
 	_shift(throttle_in, brake_in, shift_up, shift_down, dt)
 	var fz_r := wheels[2].fz + wheels[3].fz
 	var rear_over := false
-	for w in [wheels[2], wheels[3]]:
+	for wi in range(2, 4):
+		var w := wheels[wi]
 		if w.fz > 0.15 * fz_r and w.kappa > 0.3 * kappa_peak and Vector2(w.kappa / kappa_peak, w.alpha / alpha_peak).length() > 1.0:
 			rear_over = true
 	tc_cut = minf(0.9, tc_cut + dt * 15.0) if assists.tc and rear_over else maxf(0.0, tc_cut - dt * 3.0)

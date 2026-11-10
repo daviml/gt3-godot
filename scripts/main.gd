@@ -500,6 +500,9 @@ func _set_quality(level: int) -> void:
 	if speed_blur:
 		speed_blur.enabled = level > 0
 		speed_blur.max_strength = 0.8 if level == 1 else 1.0
+	# desfoque das rodas: 24 malhas transparentes a mais, caras no celular
+	if car_view:
+		car_view.blur_enabled = level > 0
 
 
 func _screenshot() -> void:
