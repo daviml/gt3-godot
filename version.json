@@ -1,6 +1,6 @@
 {
-  "version": 4,
+  "version": 5,
   "base_data_url": "https://github.com/daviml/gt3-godot/releases/download/v1.0/base_data.pck",
-  "patch_url": "https://github.com/daviml/gt3-godot/releases/download/v1.3/patch.pck",
-  "changelog": "Lancamento automatico de atualizacao v1.3: Otimizacoes criticas mobile (fim da espiral de 10 FPS, culling e shaders rapidos), 4 esquemas de controles mobile e re automatica."
+  "patch_url": "",
+  "changelog": "Versao 1.4: APK standalone completo atualizado com protecao de versao."
 }

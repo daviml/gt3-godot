@@ -1,9 +1,9 @@
 extends Control
 
 ## Auto-Updater do GT3 Time Attack
-## Verifica se há novidades e baixa apenas o patch leve (2~4 MB). Se estiver offline, entra direto no jogo!
+## Verifica se há novidades e baixa apenas o patch leve (2~4 MB). Se estiver offline ou atualizado, entra direto no jogo!
 
-const CURRENT_CLIENT_VERSION: int = 2
+const CURRENT_CLIENT_VERSION: int = 5
 const VERSION_URL: String = "https://raw.githubusercontent.com/daviml/gt3-godot/main/version.json"
 const PATCH_PCK_PATH: String = "user://patch.pck"
 const LOCAL_VERSION_PATH: String = "user://installed_version.json"
@@ -20,10 +20,11 @@ var status_label: Label
 var details_label: Label
 var progress_bar: ProgressBar
 var is_downloading: bool = false
-var next_version_to_save: int = 1
+var next_version_to_save: int = CURRENT_CLIENT_VERSION
 
 func _ready() -> void:
 	_setup_ui()
+	_cleanup_stale_or_incompatible_patches()
 	_setup_network()
 	
 	# No editor, entra direto
@@ -96,7 +97,7 @@ func _setup_ui() -> void:
 
 func _setup_network() -> void:
 	http_version = HTTPRequest.new()
-	http_version.timeout = 4.0 # Timeout rápido de 4s para não prender o jogador
+	http_version.timeout = 3.0 # Timeout rápido de 3s para não prender o jogador
 	add_child(http_version)
 	
 	http_download = HTTPRequest.new()
@@ -104,21 +105,66 @@ func _setup_network() -> void:
 	http_download.use_threads = true
 	add_child(http_download)
 
-func _get_local_version() -> int:
+func _get_saved_version_on_disk() -> int:
 	if not FileAccess.file_exists(LOCAL_VERSION_PATH):
-		return CURRENT_CLIENT_VERSION
+		return 0
 	var f = FileAccess.open(LOCAL_VERSION_PATH, FileAccess.READ)
 	if not f:
-		return CURRENT_CLIENT_VERSION
+		return 0
 	var json = JSON.parse_string(f.get_as_text())
-	if json and json.has("version"):
+	if json and json is Dictionary and json.has("version"):
 		return int(json["version"])
-	return CURRENT_CLIENT_VERSION
+	return 0
+
+func _get_local_version() -> int:
+	var saved = _get_saved_version_on_disk()
+	return maxi(saved, CURRENT_CLIENT_VERSION)
 
 func _save_local_version(ver: int) -> void:
 	var f = FileAccess.open(LOCAL_VERSION_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify({"version": ver}))
+
+func _is_pck_compatible(path: String) -> bool:
+	if not FileAccess.file_exists(path):
+		return false
+	var f = FileAccess.open(path, FileAccess.READ)
+	if not f:
+		return false
+	if f.get_length() < 20:
+		f.close()
+		return false
+	var magic = f.get_32()
+	# "GDPC" em little-endian é 0x43504447
+	if magic != 0x43504447:
+		f.close()
+		return false
+	var _pck_format = f.get_32()
+	var major = f.get_32()
+	var minor = f.get_32()
+	f.close()
+	var engine_info = Engine.get_version_info()
+	var cur_major = int(engine_info.get("major", 0))
+	var cur_minor = int(engine_info.get("minor", 0))
+	if major != cur_major or minor != cur_minor:
+		print("[Updater] PCK gerado para Godot %d.%d, mas engine atual é %d.%d! Incompatível." % [major, minor, cur_major, cur_minor])
+		return false
+	return true
+
+func _cleanup_stale_or_incompatible_patches() -> void:
+	var saved_ver = _get_saved_version_on_disk()
+	# Se a versão base do APK for maior ou igual ao patch que estava salvo,
+	# o APK atual já tem tudo atualizado; descarta o patch antigo para evitar conflitos.
+	if CURRENT_CLIENT_VERSION >= saved_ver:
+		if FileAccess.file_exists(PATCH_PCK_PATH):
+			print("[Updater] Novo APK instalado (v%d >= v%d). Removendo patch antigo..." % [CURRENT_CLIENT_VERSION, saved_ver])
+			DirAccess.remove_absolute(PATCH_PCK_PATH)
+		_save_local_version(CURRENT_CLIENT_VERSION)
+	elif FileAccess.file_exists(PATCH_PCK_PATH):
+		if not _is_pck_compatible(PATCH_PCK_PATH):
+			print("[Updater] Patch existente é incompatível com o Godot atual. Removendo...")
+			DirAccess.remove_absolute(PATCH_PCK_PATH)
+			_save_local_version(CURRENT_CLIENT_VERSION)
 
 func _check_for_patches() -> void:
 	http_version.request_completed.connect(func(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray):
@@ -136,7 +182,7 @@ func _check_for_patches() -> void:
 		var patch_url: String = data.get("patch_url", "")
 		var local_ver: int = _get_local_version()
 		
-		# Se há um patch mais recente e a URL é válida
+		# Só baixa se a versão remota for estritamente mais recente E houver URL de patch válida
 		if remote_ver > local_ver and not patch_url.is_empty():
 			next_version_to_save = remote_ver
 			status_label.text = "Nova atualização encontrada (v%d)! Baixando..." % remote_ver
@@ -162,14 +208,19 @@ func _download_patch(url: String) -> void:
 		is_downloading = false
 		
 		if result == HTTPRequest.RESULT_SUCCESS and (response_code == 200 or response_code == 302):
-			if FileAccess.file_exists(PATCH_PCK_PATH):
-				DirAccess.remove_absolute(PATCH_PCK_PATH)
-			DirAccess.rename_absolute(temp_patch, PATCH_PCK_PATH)
-			
-			_save_local_version(next_version_to_save)
-			status_label.text = "Atualização instalada com sucesso!"
-			progress_bar.value = 100.0
-			await get_tree().create_timer(0.4).timeout
+			if not _is_pck_compatible(temp_patch):
+				print("[Updater] Patch baixado é incompatível com a versão do engine Godot! Descartando.")
+				DirAccess.remove_absolute(temp_patch)
+				status_label.text = "Atualização incompatível com este app."
+				await get_tree().create_timer(1.0).timeout
+			else:
+				if FileAccess.file_exists(PATCH_PCK_PATH):
+					DirAccess.remove_absolute(PATCH_PCK_PATH)
+				DirAccess.rename_absolute(temp_patch, PATCH_PCK_PATH)
+				_save_local_version(next_version_to_save)
+				status_label.text = "Atualização instalada com sucesso!"
+				progress_bar.value = 100.0
+				await get_tree().create_timer(0.4).timeout
 		else:
 			print("[Updater] Falha ao baixar patch (%d). Usando versão instalada." % response_code)
 			
@@ -196,8 +247,14 @@ func _process(_delta: float) -> void:
 
 func _load_existing_patch() -> void:
 	if FileAccess.file_exists(PATCH_PCK_PATH):
+		if not _is_pck_compatible(PATCH_PCK_PATH):
+			print("[Updater] Patch incompatível ignorado e removido.")
+			DirAccess.remove_absolute(PATCH_PCK_PATH)
+			return
 		var ok = ProjectSettings.load_resource_pack(PATCH_PCK_PATH)
 		print("[Updater] patch.pck carregado com sucesso: ", ok)
+		if not ok:
+			DirAccess.remove_absolute(PATCH_PCK_PATH)
 
 func _finish_and_enter_game() -> void:
 	_load_existing_patch()
