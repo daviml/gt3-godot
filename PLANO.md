@@ -126,8 +126,8 @@ Tudo desenhado por código em `scripts/ui/hud.gd` (um Control com `_draw`, escal
   - Três presets reais integrados com `main.gd` e `SurroundingsView.set_detail()`. (10/11)
 
 ### 11. Som
-- [ ] Bancos do `engine-sim` por carro (CC-BY-4.0, os mesmos de `public/sounds`): dois loops vizinhos com crossfade pelo giro e `pitch_scale` corrigido; filtro low-pass abafando ao soltar o acelerador; som de turbo e válvula (blow-off).
-- [ ] Sons de pneu cantando (proporcional ao slip), grama, escape, vento em alta velocidade e batida na zebra, usando os buses de áudio nativos da Godot.
+- [x] Bancos do `engine-sim` por carro (CC-BY-4.0, os mesmos de `public/sounds`): dois loops vizinhos com crossfade de mesma potência (cos/sin) pelo giro e `pitch_scale` corrigido; filtro low-pass nativo abafando ao soltar o acelerador; corte no limitador; som de turbo e válvula (blow-off). (10/11)
+- [x] Sons de pneu cantando (proporcional ao slip), grama, brita/escape, vento em alta velocidade e batida periódica na zebra, usando os buses de áudio nativos da Godot (Master, Engine, Tires, Surface, Wind, FX). Teste: `scripts/tests/audio.gd`. (10/11)
 
 ### 12. Online (Ranking e Fantasmas)
 - [ ] **Ranking compartilhado com o web por HTTP (`HTTPRequest`):** consumir `/api/ranking` e enviar voltas válidas para `/api/volta` (mesmo back-end da Vercel, dividindo tabela entre Web, PC e Android).

@@ -18,6 +18,7 @@ var track: Track
 var track_view: TrackView
 var car: Car
 var car_view: CarView
+var car_audio: CarAudio
 var cam: Camera3D
 var chase: ChaseCamera
 var speed_blur: SpeedBlur
@@ -203,6 +204,9 @@ func _build_car() -> void:
 	add_child(car_view)
 	car_data = car_view.data
 	car = Car.new(track, car_data.params)
+	# som do carro (etapa 11): motor engine-sim, turbo, pneu, superfícies e vento
+	car_audio = CarAudio.new(car, car_id)
+	add_child(car_audio)
 
 
 func _update_car_view() -> void:
@@ -257,6 +261,8 @@ func _fmt(t: float) -> String:
 func _spawn() -> void:
 	car.reset_at(track.index_at(-120.0))
 	timer.reset()
+	if car_audio:
+		car_audio.reset()
 
 
 ## Volta fechada por você (não pelo piloto automático): vira recorde se for a melhor desse nick nesse carro.
@@ -312,6 +318,8 @@ func _process(dt: float) -> void:
 	_update_car_view()
 	if not paused:
 		rumble.update(car, dt)
+		if car_audio:
+			car_audio.update(dt)
 	if shot_dir != "":
 		_shot_tick(dt)
 	chase.update(dt)
@@ -403,6 +411,8 @@ func _set_paused(on: bool, focus_nick := false) -> void:
 		touch.set_enabled(not on)
 	if speed_blur and on:
 		speed_blur.rect.visible = false
+	if car_audio:
+		car_audio.set_paused(on)
 	if on:
 		menu.open(nick, quality_name, volume, car.assists, focus_nick)
 	elif menu.is_open:
@@ -411,6 +421,8 @@ func _set_paused(on: bool, focus_nick := false) -> void:
 
 func _to_garage() -> void:
 	paused = false
+	if car_audio:
+		car_audio.set_paused(true)
 	get_tree().change_scene_to_file("res://scenes/garagem.tscn")
 
 

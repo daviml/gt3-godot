@@ -3,9 +3,14 @@ config_version=5
 
 [application]
 
-config/name="GT3 Godot (protótipo)"
+config/name="GT3 Time Attack"
 run/main_scene="res://scenes/garagem.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.png"
+
+[audio]
+
+buses/default_bus_layout="res://default_bus_layout.tres"
 
 [display]
 
@@ -13,6 +18,7 @@ window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/size/mode=2
 window/vsync/vsync_mode=1
+window/handheld/orientation=4
 
 [input_devices]
 
