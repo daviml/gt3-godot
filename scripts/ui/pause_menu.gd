@@ -14,11 +14,12 @@ signal quality_changed(name: String)
 signal volume_changed(v: float)
 signal assist_changed(key: String, on: bool)
 
-const QUALITIES := ["Leve", "Médio", "Extremo"]
+const QUALITIES := ["Mínimo", "Leve", "Médio", "Extremo"]
 const QUALITY_NOTE := {
-	"Leve": "60 fps cravados no celular: MSAA 2x, sombras curtas, sem reflexo de tela",
-	"Médio": "celular topo de linha ou PC intermediário",
-	"Extremo": "PC com placa de vídeo: SSAO, SSIL, SSR e sombras em 4 cortes",
+	"Mínimo": "Máximo FPS no celular: FSR 0.70x, sem sombras de sol, sem pós-processamento",
+	"Leve": "Recomendado para Galaxy S22: 60 FPS com FSR 0.80x, sombra curta, sem glow",
+	"Médio": "Celular topo com refrigeração ou PC intermediário: resolução nativa, sombras e SSAO",
+	"Extremo": "PC com placa de vídeo dedicada: SSAO, SSIL, SSR e sombras em 4 cortes",
 }
 const AIDS := [["abs", "ABS"], ["tc", "Controle de tração"], ["auto", "Câmbio automático"]]
 const HELP := """Teclado: W/S ou ↑/↓ acelera e freia · A/D ou ←/→ esterça · E/Shift sobe marcha · Q/Ctrl reduz

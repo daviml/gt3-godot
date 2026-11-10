@@ -56,6 +56,7 @@ const REFS := {"porsche-992-gt3r": "interlagos-porsche", "audi-r8-lms-gt3": "int
 
 
 func _ready() -> void:
+	Engine.max_physics_steps_per_frame = 5
 	var args := OS.get_cmdline_user_args()
 	autopilot = "--auto" in args
 	for a in args:
@@ -138,10 +139,9 @@ func _build_env() -> void:
 
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = load("res://shaders/sky.gdshader")
-	# HDRI em meio-float (o import padrão do Godot quantizava o céu em faixas)
-	var pano := Image.load_from_file("res://assets/sky/ceu_2k.hdr")  # importer "keep": o .hdr vai cru no executável
-	pano.convert(Image.FORMAT_RGBAH)
-	sky_mat.set_shader_parameter("pano", ImageTexture.create_from_image(pano))
+	# HDRI em meio-float carregado de forma segura no Android e PC
+	var sky_tex := _load_sky_tex("res://assets/sky/ceu_2k.hdr")
+	sky_mat.set_shader_parameter("pano", sky_tex)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	sky.radiance_size = Sky.RADIANCE_SIZE_256
@@ -209,8 +209,8 @@ func _build_car() -> void:
 	add_child(car_audio)
 
 
-func _update_car_view() -> void:
-	car_view.update_from(car)
+func _update_car_view(frac := 1.0) -> void:
+	car_view.update_from(car, frac)
 
 
 # ------------------------------------------------------------------ HUD e menu (etapa 10)
@@ -315,22 +315,25 @@ func _physics_process(dt: float) -> void:
 
 
 func _process(dt: float) -> void:
-	_update_car_view()
+	var frac := Engine.get_physics_interpolation_fraction()
+	_update_car_view(frac)
 	if not paused:
 		rumble.update(car, dt)
 		if car_audio:
 			car_audio.update(dt)
 	if shot_dir != "":
 		_shot_tick(dt)
-	chase.update(dt)
+	chase.update(dt, frac)
 	if not paused and speed_blur:
 		speed_blur.update(cam, car, chase.mode, dt)
 	if shot_dir != "" and shot_k % 3 == 0 and not fixed_cam:
 		# prints de vitrine: 3/4 de frente, perto do carro
-		var r := car.basis().x
-		var fwd := -car.basis().z
-		cam.global_position = car.pos + fwd * 5.2 + r * 3.2 + Vector3.UP * 0.6
-		cam.look_at(car.pos + Vector3.UP * 0.1, Vector3.UP)
+		var v_pos := car.visual_pos(frac)
+		var b := car.visual_basis(frac)
+		var r := b.x
+		var fwd := -b.z
+		cam.global_position = v_pos + fwd * 5.2 + r * 3.2 + Vector3.UP * 0.6
+		cam.look_at(v_pos + Vector3.UP * 0.1, Vector3.UP)
 
 	hud.records = top_records
 	hud.autopilot = autopilot
@@ -436,73 +439,116 @@ func _set_volume(v: float) -> void:
 	AudioServer.set_bus_mute(0, volume <= 0.0)
 
 
-const PRESET_INDEX := {"Leve": 0, "Médio": 1, "Extremo": 2}
+const PRESET_INDEX := {"Mínimo": 0, "Leve": 1, "Médio": 2, "Extremo": 3}
 
 
-## Preset gráfico pelo nome do menu (Leve / Médio / Extremo) - Etapa 8.
+## Preset gráfico pelo nome do menu (Mínimo / Leve / Médio / Extremo).
 func _apply_quality(name: String) -> void:
 	quality_name = name
-	var level: int = PRESET_INDEX.get(name, 2)
+	var is_mobile := OS.has_feature("mobile")
+	var level: int = PRESET_INDEX.get(name, 1 if is_mobile else 3)
 	_set_quality(level)
 
 
-## Ajusta presets de qualidade: 0 = Leve (Mobile 60 FPS), 1 = Médio (Mobile Top / PC Médio), 2 = Extremo (PC com GPU).
+## Ajusta presets de qualidade:
+## 0 = Mínimo (FSR 0.70x, sem sombras, máx FPS mobile),
+## 1 = Leve (FSR 0.80x, sombras leves, sem glow - recomendado S22 60 FPS),
+## 2 = Médio (1.0x nativo, sombras 2 cortes, SSAO leve),
+## 3 = Extremo (PC com GPU: SSAO, SSIL, SSR, sombras 4 cortes).
 func _set_quality(level: int) -> void:
-	high = level > 0
+	high = level > 1
+	var vp := get_viewport()
 
-	# Ambiente e efeitos pós-processamento
+	# 1. Resolução interna e upscaling FSR 1.0 (AMD FidelityFX Super Resolution)
+	# No mobile, FSR economiza fillrate massivo enquanto o HUD 2D segue em 1080p nativo
+	if level == 0:
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
+		vp.scaling_3d_scale = 0.70
+		vp.fsr_sharpness = 0.2
+		vp.msaa_3d = Viewport.MSAA_DISABLED
+	elif level == 1:
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
+		vp.scaling_3d_scale = 0.80
+		vp.fsr_sharpness = 0.2
+		vp.msaa_3d = Viewport.MSAA_DISABLED
+	elif level == 2:
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+		vp.scaling_3d_scale = 1.0
+		vp.msaa_3d = Viewport.MSAA_2X
+	else:
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+		vp.scaling_3d_scale = 1.0
+		vp.msaa_3d = Viewport.MSAA_4X
+
+	# 2. Ambiente e efeitos pós-processamento
 	if env:
-		env.ssao_enabled = level > 0
-		if level == 1:
+		env.ssao_enabled = level >= 2
+		if level == 2:
 			env.ssao_radius = 1.0
 			env.ssao_intensity = 1.0
-		elif level == 2:
+		elif level == 3:
 			env.ssao_radius = 1.2
 			env.ssao_intensity = 1.6
 
-		env.ssil_enabled = level == 2
-		env.ssr_enabled = level == 2
-		if level == 2:
+		env.ssil_enabled = level == 3
+		env.ssr_enabled = level == 3
+		if level == 3:
 			env.ssr_max_steps = 48
 
-		env.glow_enabled = true
-		env.glow_intensity = 0.2 if level == 0 else (0.3 if level == 1 else 0.35)
-		env.glow_bloom = 0.02 if level == 0 else (0.03 if level == 1 else 0.04)
+		# Glow desligado em Mínimo e Leve (crítico para taxa de quadros e temperatura no celular)
+		env.glow_enabled = level >= 2
+		if env.glow_enabled:
+			env.glow_intensity = 0.3 if level == 2 else 0.35
+			env.glow_bloom = 0.03 if level == 2 else 0.04
 
-	# Sol e cortes de sombra (evita estouro de banda no celular)
+	# 3. Sol e sombras direcionais
 	if sun:
 		if level == 0:
-			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-			sun.directional_shadow_max_distance = 80.0
-			sun.directional_shadow_split_1 = 0.15
+			# Mínimo: sem sombras de sol, apenas o blob shadow sob o carro
+			sun.shadow_enabled = false
 		elif level == 1:
-			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-			sun.directional_shadow_max_distance = 130.0
-			sun.directional_shadow_split_1 = 0.08
-			sun.directional_shadow_split_2 = 0.25
-			sun.directional_shadow_split_3 = 0.55
+			# Leve: sombra direcional ortogonal curta (50 m)
+			sun.shadow_enabled = true
+			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+			sun.directional_shadow_max_distance = 50.0
+		elif level == 2:
+			# Médio: sombra em 2 cortes
+			sun.shadow_enabled = true
+			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+			sun.directional_shadow_max_distance = 110.0
+			sun.directional_shadow_split_1 = 0.15
 		else:
+			# Extremo: sombra em 4 cortes
+			sun.shadow_enabled = true
 			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 			sun.directional_shadow_max_distance = 180.0
 			sun.directional_shadow_split_1 = 0.08
 			sun.directional_shadow_split_2 = 0.22
 			sun.directional_shadow_split_3 = 0.50
 
-	# Anti-aliasing e resolução nativa nítida
-	get_viewport().msaa_3d = Viewport.MSAA_4X if level == 2 else Viewport.MSAA_2X
-	get_viewport().scaling_3d_scale = 1.0
+	# 4. Far plane da câmera (economiza precisão de Z e culling de geometria)
+	if cam:
+		if level == 0:
+			cam.far = 1800.0
+		elif level == 1:
+			cam.far = 2200.0
+		elif level == 2:
+			cam.far = 4000.0
+		else:
+			cam.far = 6000.0
 
-	# Arredores (corte de torcida e árvores de acordo com o orçamento de FPS)
+	# 5. Arredores (corte de torcida, torres e árvores pelo orçamento)
 	if track_view:
 		track_view.set_detail(level)
 
-	# Desfoque radial de velocidade (PLANO-visual etapa 1: ativo em Médio e Extremo)
+	# 6. Desfoque radial de velocidade (apenas em Médio e Extremo)
 	if speed_blur:
-		speed_blur.enabled = level > 0
-		speed_blur.max_strength = 0.8 if level == 1 else 1.0
-	# desfoque das rodas: 24 malhas transparentes a mais, caras no celular
+		speed_blur.enabled = level >= 2
+		speed_blur.max_strength = 0.8 if level == 2 else 1.0
+
+	# 7. Desfoque das rodas (24 malhas transparentes desativadas em Mínimo e Leve)
 	if car_view:
-		car_view.blur_enabled = level > 0
+		car_view.blur_enabled = level >= 2
 
 
 func _screenshot() -> void:
@@ -511,3 +557,30 @@ func _screenshot() -> void:
 	var path := "%s/godot-gt3-%d.png" % [dir, Time.get_unix_time_from_system()]
 	img.save_png(path)
 	print("print: ", path)
+
+
+static func _load_sky_tex(path: String) -> ImageTexture:
+	var img := Image.load_from_file(path)
+	if img and not img.is_empty():
+		img.convert(Image.FORMAT_RGBAH)
+		return ImageTexture.create_from_image(img)
+		
+	var user_cache := "user://ceu_cache.hdr"
+	if not FileAccess.file_exists(user_cache) and FileAccess.file_exists(path):
+		var bytes := FileAccess.get_file_as_bytes(path)
+		if bytes.size() > 0:
+			var f := FileAccess.open(user_cache, FileAccess.WRITE)
+			if f:
+				f.store_buffer(bytes)
+				f.close()
+				
+	if FileAccess.file_exists(user_cache):
+		var abs_path := ProjectSettings.globalize_path(user_cache)
+		img = Image.load_from_file(abs_path)
+		if img and not img.is_empty():
+			img.convert(Image.FORMAT_RGBAH)
+			return ImageTexture.create_from_image(img)
+			
+	img = Image.create(16, 16, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0.2, 0.35, 0.55))
+	return ImageTexture.create_from_image(img)

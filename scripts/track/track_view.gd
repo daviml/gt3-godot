@@ -58,12 +58,12 @@ func _fix(n: Node) -> void:
 			shadow = m.get_string(2) == "1"
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		# Otimização de Distância de Visão (Culling / HLOD):
-		# Detalhes pequenos não precisam ser renderizados a 6000 m de distância
+		# Detalhes pequenos não precisam ser renderizados a longas distâncias
 		if shadow and order == 0:
-			# Postes, alambrado, cones, placas secundárias
-			mi.visibility_range_end = 650.0
-			mi.visibility_range_end_margin = 50.0
-			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+			# Postes, alambrado, cones, placas secundárias (sem esmaecer para evitar overdraw em mobile)
+			mi.visibility_range_end = 550.0
+			mi.visibility_range_end_margin = 0.0
+			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 		for s in mi.mesh.get_surface_count():
 			var mat := mi.mesh.surface_get_material(s)
 			if mat:

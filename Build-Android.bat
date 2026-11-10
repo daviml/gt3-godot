@@ -2,6 +2,9 @@
 setlocal
 rem Compila o APK do GT3 Time Attack para Android (arm64).
 set GODOT=C:\Users\davim\Tools\godot\Godot_v4.7.2-stable_win64_console.exe
+if not exist "%GODOT%" (
+    set GODOT=C:\Users\davi.ladeira\Tools\godot\Godot_v4.7.2-stable_win64_console.exe
+)
 set OUT=build\android\GT3 Time Attack.apk
 
 if not exist "build\android" mkdir "build\android"

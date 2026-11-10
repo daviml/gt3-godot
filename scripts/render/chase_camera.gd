@@ -73,8 +73,9 @@ static func fit_fov(fov16x9: float, aspect: float) -> float:
 	return minf(100.0, rad_to_deg(2.0 * atan(half_h / aspect)))
 
 
-func update(dt: float) -> void:
-	var b := car.basis()
+func update(dt: float, frac := 1.0) -> void:
+	var v_pos := car.visual_pos(frac)
+	var b := car.visual_basis(frac)
 	var aspect := 16.0 / 9.0
 	if cam.is_inside_tree():
 		var vp := cam.get_viewport().get_visible_rect().size
@@ -84,7 +85,7 @@ func update(dt: float) -> void:
 	fwd = fwd.normalized()
 
 	if mode == 1:  # capô
-		cam.transform = Transform3D(b, car.pos + b * Vector3(0, 0.85, -1.3))
+		cam.transform = Transform3D(b, v_pos + b * Vector3(0, 0.85, -1.3))
 		cam.fov = fit_fov(75.0, aspect)
 		return
 
@@ -106,8 +107,8 @@ func update(dt: float) -> void:
 	var height := 3.4 if far else 1.85
 	if first:
 		dist.reset(base_dist)
-		py.reset(car.pos.y + height)
-		look_y.reset(car.pos.y + 0.75)
+		py.reset(v_pos.y + height)
+		look_y.reset(v_pos.y + 0.75)
 		gl.reset(0.0)
 		shake.reset(0.0)
 		first = false
@@ -115,9 +116,9 @@ func update(dt: float) -> void:
 	# A força G é filtrada antes, para a troca de marcha não dar tranco.
 	var g := gl.update(clampf(car.g_long, -2.2, 1.0), 0.25, dt)
 	var d := dist.update(base_dist + (g * 0.16 if g < 0.0 else g * 0.24), 0.45, dt)
-	var pos := car.pos - heading * d
+	var pos := v_pos - heading * d
 	# altura bem filtrada: zebra e lombada não chacoalham a câmera
-	pos.y = py.update(car.pos.y + height, 0.2, dt)
+	pos.y = py.update(v_pos.y + height, 0.2, dt)
 	# tremida bem leve: rodas na zebra e acima de 250 km/h
 	time += dt
 	var on_kerb := false
@@ -128,8 +129,8 @@ func update(dt: float) -> void:
 	if amp > 1e-4:
 		pos.y += amp * (sin(time * 61.0) * 0.6 + sin(time * 97.0 + 1.3) * 0.4)
 		pos += Vector3(-heading.z, 0, heading.x) * (amp * 0.5 * sin(time * 73.0 + 0.7))
-	var look := car.pos + heading * 3.0
-	look.y = look_y.update(car.pos.y + 0.8, 0.2, dt)
+	var look := v_pos + heading * 3.0
+	look.y = look_y.update(v_pos.y + 0.8, 0.2, dt)
 	# transform local: a câmera é filha direta da cena (sem deslocamento), então vale como global
 	cam.transform = Transform3D(Basis.looking_at(look - pos, Vector3.UP), pos)
 	# FOV abre um pouco com a velocidade (sensação de velocidade), suavizado

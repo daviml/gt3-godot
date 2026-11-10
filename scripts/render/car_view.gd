@@ -124,9 +124,11 @@ func _build_wheel(suf: String) -> void:
 	ghosts.append(list)
 
 
-## Posição de cada roda a partir da física (main.gd).
-func update_from(car: Car) -> void:
-	transform = Transform3D(Basis(car.rot), car.pos)
+## Posição do chassi e de cada roda a partir da física com interpolação sub-frame (main.gd).
+func update_from(car: Car, frac := 1.0) -> void:
+	var v_pos := car.visual_pos(frac)
+	var v_rot := car.visual_rot(frac)
+	transform = Transform3D(Basis(v_rot), v_pos)
 	for k in 4:
 		var w: Car.Wheel = car.wheels[k]
 		var p := w.mount

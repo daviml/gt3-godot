@@ -30,12 +30,12 @@ Ao analisar os commits mais recentes do repositório web (`gt3-time-attack`), id
    - **RefBot com malha fechada de giro (Yaw Rate):** controle com ganhos `yaw_p`, `yaw_i`, `line_gain` e `hold_line` sincronizados com o web.
 
 4. **Estratégia de Otimização Extrema do APK Android para Alto FPS (60+ FPS Estáveis):**
-   - **Novo Preset Gráfico "Mínimo (Celular Fraco)":** além de Leve, Médio e Extremo, adicionar o preset Mínimo (sem sombras direcionais, sem reflexos/pós-processamento, cenário simplificado, 70-75% de resolução interna com upscaling nítido).
-   - **FSR 1.0 (AMD FidelityFX Super Resolution) no Mobile:** ativar `scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR` na Godot 4 com escala 0.70x–0.80x no Android, aliviando o fillrate das GPUs mobile em telas FHD+/QHD+ enquanto o HUD e botões 2D continuam nítidos em resolução nativa.
-   - **Otimização de Sombras Mobile:** sombras direcionais limitadas a 1 ou 2 splits a 60–80 m no preset Leve, e apenas sombra de contato (blob shadow) no preset Mínimo.
-   - **Culling de Geometria e Draw Calls:** distância de visão dos blocos de edifícios procedurais e torcida reduzidos em dispositivos móveis, e `cam.far` reduzido de 6000 m para 2000 m no celular.
-   - **Avaliação de Renderer (Vulkan Mobile vs OpenGL Compatibility):** suporte e testes com fallback para `gl_compatibility` (OpenGL ES 3.0), que evita bugs de drivers Vulkan e reduz aquecimento térmico em SoCs com GPU Mali (Exynos/MediaTek).
-   - **Redução do Tamanho do APK:** exclusão de assets e pastas de teste (`scripts/tests/*`, `data/tests/*`), compactação de texturas ASTC e otimização de GLBs.
+   - **Novo Preset Gráfico "Mínimo (Celular Fraco)":** além de Leve, Médio e Extremo, adicionado o preset Mínimo (sem sombras direcionais de sol, sem reflexos/pós-processamento, cenário simplificado com 70% de resolução interna e FSR). (10/11)
+   - **FSR 1.0 (AMD FidelityFX Super Resolution) no Mobile:** ativado `scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR` na Godot 4 com escala 0.70x (Mínimo) e 0.80x (Leve), aliviando o fillrate das GPUs mobile em telas FHD+/QHD+ mantendo HUD e botões 2D em 1080p nativo. (10/11)
+   - **Interpolação de Física Sub-Frame:** eliminação do micro-stutter/judder de 30/120 Hz usando `Engine.get_physics_interpolation_fraction()` na posição/rotação do `CarView` e da `ChaseCamera`, tornando o movimento fluido mesmo quando o FPS oscila. (10/11)
+   - **Eliminação do "Physics Spiral of Death":** `common/max_physics_steps_per_frame.mobile` aumentado de 2 para 5 no `project.godot`, impedindo que a física entre em câmera lenta quando o frame rate cai momentaneamente. (10/11)
+   - **Otimização de Sombras Mobile:** resolução mobile reduzida para 1024, sombra ortogonal curta (50 m) no preset Leve e desativada no preset Mínimo. (10/11)
+   - **Culling de Geometria, Draw Calls e Far Plane:** `cam.far` reduzido de 6000 m para 1800 m (Mínimo) e 2200 m (Leve), desativação de Glow/MSAA em Leve/Mínimo e fast-path nas colisões de muro no `car.gd`. (10/11)
 
 ---
 

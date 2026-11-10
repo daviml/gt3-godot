@@ -116,14 +116,13 @@ static func _sub_arrays(arr: Array, tri: PackedInt32Array) -> Array:
 	return out
 
 
-# Orçamento dos arredores por preset (para a etapa 8 chamar ao trocar a qualidade): 0 = Leve, 1 = Médio,
-# 2 = Extremo. A torcida em cartões (~40 mil pessoas, juntadas em blocos de 250 m pelo exportador) e a mata
-# (MultiMesh por bloco de 250 m) ganham uma distância máxima de desenho; torres e horizonte ficam sempre (baratos).
-# Sem esmaecer na borda (o esmaecimento desenha com transparência, caro no celular).
+# Orçamento dos arredores por preset: 0 = Mínimo, 1 = Leve, 2 = Médio, 3 = Extremo.
+# A torcida em cartões e a mata ganham distância de corte adequada para alta taxa de quadros no mobile.
 const DETAIL := [
-	{"crowd": 220.0, "trees": 1500.0},
-	{"crowd": 450.0, "trees": 2600.0},
-	{"crowd": 0.0, "trees": 0.0},
+	{"crowd": 0.0, "trees": 900.0, "towers": 1400.0},     # 0 = Mínimo (sem torcida, mata e torres curtas)
+	{"crowd": 180.0, "trees": 1400.0, "towers": 2000.0},  # 1 = Leve (60 fps S22)
+	{"crowd": 400.0, "trees": 2400.0, "towers": 0.0},     # 2 = Médio
+	{"crowd": 0.0, "trees": 0.0, "towers": 0.0},          # 3 = Extremo (0 = ilimitado)
 ]
 
 
@@ -137,6 +136,8 @@ func _apply_detail(n: Node, d: Dictionary) -> void:
 		_range(n, d.trees)
 	elif n is MeshInstance3D and _is_crowd(n):
 		_range(n, d.crowd)
+	elif n is MultiMeshInstance3D and n.name == "Torres":
+		_range(n, d.get("towers", 0.0))
 	for c in n.get_children():
 		_apply_detail(c, d)
 

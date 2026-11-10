@@ -47,6 +47,8 @@ var ground: Ground
 var assists := {"abs": true, "tc": true, "auto": false}
 var pos := Vector3.ZERO
 var rot := Quaternion.IDENTITY
+var prev_pos := Vector3.ZERO
+var prev_rot := Quaternion.IDENTITY
 var vel := Vector3.ZERO
 var ang_vel := Vector3.ZERO
 var force := Vector3.ZERO
@@ -181,6 +183,8 @@ func reset(at: Vector3, heading: float) -> void:
 func reset_basis(at: Vector3, b: Basis) -> void:
 	pos = at
 	rot = b.orthonormalized().get_rotation_quaternion()
+	prev_pos = pos
+	prev_rot = rot
 	vel = Vector3.ZERO
 	ang_vel = Vector3.ZERO
 	_last_vel = Vector3.ZERO
@@ -205,6 +209,19 @@ func reset_at(i: int) -> void:
 
 func basis() -> Basis:
 	return Basis(rot)
+
+
+## Interpolação de física sub-frame para movimento 100% fluido em qualquer taxa de quadros (30/60/120 Hz)
+func visual_pos(frac: float) -> Vector3:
+	return prev_pos.lerp(pos, frac)
+
+
+func visual_rot(frac: float) -> Quaternion:
+	return prev_rot.slerp(rot, frac)
+
+
+func visual_basis(frac: float) -> Basis:
+	return Basis(visual_rot(frac))
 
 
 func speed() -> float:
@@ -314,6 +331,8 @@ const WALL_C := 4e4
 const WALL_FRICTION := 0.35
 
 func step(dt: float, steer_in: float, throttle_in: float, brake_in: float, shift_up := false, shift_down := false) -> void:
+	prev_pos = pos
+	prev_rot = rot
 	# Sub-stepping interno para manter exatamente a estabilidade e paridade de 500 Hz
 	# independente se a engine roda a 60 Hz, 120 Hz ou 500 Hz:
 	if dt > SUB_DT * 1.5:
@@ -462,21 +481,32 @@ func _single_step(dt: float, steer_in: float, throttle_in: float, brake_in: floa
 		_force_at(wf * w.fx + wr * w.fy, w.cpoint + up * s.rc)
 
 	# muros: mola-amortecedor nos cantos da carroceria + atrito
-	for c: Vector3 in CORNERS:
-		var m := pos + B * c
-		var pen := ground.wall_penetration(m, hint)
-		if pen <= 0.0:
-			continue
-		var wn := ground.wall_normal
-		var v := _point_vel(m)
-		var vn := v.dot(wn)
-		var fn := maxf(0.0, WALL_K * pen - WALL_C * vn)
-		var f := wn * fn
-		var vt := v - wn * vn
-		vt.y = 0
-		if vt.length() > 0.01:
-			f += vt * (-WALL_FRICTION * fn / vt.length())
-		_force_at(f, m)
+	# Otimização mobile: se o carro está no miolo da pista (longe dos muros com margem de 3.5m),
+	# nenhum canto pode estar colidindo, dispensando 6 queries pesadas por sub-passo.
+	var track_obj := ground as Track
+	var near_wall := true
+	if track_obj != null:
+		var lat := absf(track_obj.ld)
+		var wall_dist := minf(track_obj.lwalll, track_obj.lwallr)
+		if lat < wall_dist - 3.5:
+			near_wall = false
+
+	if near_wall:
+		for c: Vector3 in CORNERS:
+			var m := pos + B * c
+			var pen := ground.wall_penetration(m, hint)
+			if pen <= 0.0:
+				continue
+			var wn := ground.wall_normal
+			var v := _point_vel(m)
+			var vn := v.dot(wn)
+			var fn := maxf(0.0, WALL_K * pen - WALL_C * vn)
+			var f := wn * fn
+			var vt := v - wn * vn
+			vt.y = 0
+			if vt.length() > 0.01:
+				f += vt * (-WALL_FRICTION * fn / vt.length())
+			_force_at(f, m)
 
 	_integrate(dt)
 
