@@ -56,8 +56,9 @@ const REFS := {"porsche-992-gt3r": "interlagos-porsche", "audi-r8-lms-gt3": "int
 
 
 func _ready() -> void:
-	Engine.max_physics_steps_per_frame = 5
 	var args := OS.get_cmdline_user_args()
+	var is_mobile_init := OS.has_feature("mobile") or "--mobile" in args
+	Engine.max_physics_steps_per_frame = 2 if is_mobile_init else 4
 	autopilot = "--auto" in args
 	for a in args:
 		if a.begins_with("--shot="):
@@ -234,11 +235,20 @@ func _build_hud() -> void:
 	hud.best_sectors = best_sectors
 	hud.nick = nick
 	layer.add_child(hud)
+	var touch_mode_saved := String(Game.get_setting("controles", "modo_toque", "padrao"))
+	if not touch_mode_saved in TouchControls.MODES:
+		touch_mode_saved = "padrao"
+	input.touch_mode = touch_mode_saved
+	input.grip_scale = car.grip_scale
 	if input.touch:
 		touch = TouchControls.new()
+		touch.mode = touch_mode_saved
 		touch.keys = input.touch_keys
+		touch.axes = input.touch_axes
 		touch.menu_pressed.connect(_toggle_pause)
+		touch.recenter_requested.connect(func(): _toast("Volante calibrado"))
 		layer.add_child(touch)
+		car.assists.brake_reverse = true
 	# menu de pausa (scripts/ui/pause_menu.gd): CanvasLayer própria por cima de tudo
 	menu = PauseMenu.new()
 	menu.resumed.connect(func(): _set_paused(false))
@@ -248,6 +258,17 @@ func _build_hud() -> void:
 	menu.quality_changed.connect(_apply_quality)
 	menu.volume_changed.connect(_set_volume)
 	menu.assist_changed.connect(func(key: String, on: bool): car.assists[key] = on)
+	menu.touch_mode_changed.connect(func(tm: String):
+		input.touch_mode = tm
+		if touch:
+			touch.mode = tm
+		_toast("Controles: " + TouchControls.MODE_NAMES.get(tm, tm))
+	)
+	menu.recenter_tilt.connect(func():
+		if touch:
+			touch.recenter_tilt()
+		_toast("Volante calibrado")
+	)
 	add_child(menu)
 
 
@@ -293,6 +314,9 @@ func _on_nick(t: String) -> void:
 # ------------------------------------------------------------------ laço
 
 func _input_axes(dt: float) -> Array:
+	if touch and input.touch_mode == "inclinar":
+		touch.step_tilt(dt)
+	input.grip_scale = car.grip_scale
 	input.update(dt, car.speed())
 	# Back/Select do controle = R (volta para o grid)
 	if input.reset:
@@ -417,7 +441,7 @@ func _set_paused(on: bool, focus_nick := false) -> void:
 	if car_audio:
 		car_audio.set_paused(on)
 	if on:
-		menu.open(nick, quality_name, volume, car.assists, focus_nick)
+		menu.open(nick, quality_name, volume, car.assists, input.touch_mode, input.touch, focus_nick)
 	elif menu.is_open:
 		menu.close()
 
@@ -458,17 +482,19 @@ func _apply_quality(name: String) -> void:
 func _set_quality(level: int) -> void:
 	high = level > 1
 	var vp := get_viewport()
+	var is_mobile := OS.has_feature("mobile")
 
-	# 1. Resolução interna e upscaling FSR 1.0 (AMD FidelityFX Super Resolution)
-	# No mobile, FSR economiza fillrate massivo enquanto o HUD 2D segue em 1080p nativo
+	# 1. Resolução interna e upscaling
+	# No mobile em Mínimo, usamos Bilinear nativo a 65% (elimina passes de compute shader de FSR
+	# que quebram o pipeline de tile memory (TBDR) e sobrecarregam GPU mobile)
+	# No Leve, 75% Bilinear no mobile / FSR no desktop
 	if level == 0:
-		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
-		vp.scaling_3d_scale = 0.70
-		vp.fsr_sharpness = 0.2
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+		vp.scaling_3d_scale = 0.65
 		vp.msaa_3d = Viewport.MSAA_DISABLED
 	elif level == 1:
-		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
-		vp.scaling_3d_scale = 0.80
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR if is_mobile else Viewport.SCALING_3D_MODE_FSR
+		vp.scaling_3d_scale = 0.75
 		vp.fsr_sharpness = 0.2
 		vp.msaa_3d = Viewport.MSAA_DISABLED
 	elif level == 2:
@@ -529,9 +555,9 @@ func _set_quality(level: int) -> void:
 	# 4. Far plane da câmera (economiza precisão de Z e culling de geometria)
 	if cam:
 		if level == 0:
-			cam.far = 1800.0
+			cam.far = 1200.0
 		elif level == 1:
-			cam.far = 2200.0
+			cam.far = 1600.0
 		elif level == 2:
 			cam.far = 4000.0
 		else:

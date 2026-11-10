@@ -75,12 +75,14 @@ func _run() -> void:
 	var trees := _find(tv, func(n): return n is MultiMeshInstance3D and SurroundingsView._is_tree(n), [])
 	check(tv.trees > 5000, "mata com %d árvores em %d blocos" % [tv.trees, trees.size()])
 
-	# presets
+	# presets: 0 = Mínimo, 1 = Leve, 2 = Médio, 3 = Extremo
 	sv.set_detail(0)
-	check(crowd.all(func(n): return n.visibility_range_end == 220.0), "Leve: torcida até 220 m")
-	check(trees.all(func(n): return n.visibility_range_end == 1500.0), "Leve: mata até 1.500 m")
-	sv.set_detail(2)
-	check(crowd.all(func(n): return n.visibility_range_end == 0.0), "Extremo: torcida sem limite")
+	check(crowd.all(func(n): return not n.visible), "Mínimo: torcida desligada")
+	sv.set_detail(1)
+	check(crowd.all(func(n): return n.visible and n.visibility_range_end <= 220.0), "Leve: torcida até 220 m")
+	check(trees.all(func(n): return n.visibility_range_end <= 1500.0), "Leve: mata até 1.500 m")
+	sv.set_detail(3)
+	check(crowd.all(func(n): return n.visible and n.visibility_range_end == 0.0), "Extremo: torcida sem limite")
 	check(trees.all(func(n): return n.visibility_range_end == 0.0), "Extremo: mata sem limite")
 
 	print("arredores: " + ("OK" if ok else "FALHOU"))

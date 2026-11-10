@@ -21,6 +21,7 @@ var trees := 0
 var surroundings: SurroundingsView
 var detail_level := 2
 var _cache := {}
+var _shader_mats: Array[ShaderMaterial] = []
 var _name_re := RegEx.create_from_string("^o(-?\\d+)_s(\\d)")
 
 
@@ -37,11 +38,15 @@ func _ready() -> void:
 	# torres residenciais e horizonte (etapa 9): scripts/track/surroundings_view.gd
 	surroundings = SurroundingsView.new()
 	add_child(surroundings)
-	surroundings.set_detail(detail_level)
+	set_detail(detail_level)
 
 
 func set_detail(level: int) -> void:
 	detail_level = level
+	var fast: bool = level <= 1
+	for mat in _shader_mats:
+		if mat:
+			mat.set_shader_parameter("fast_mode", fast)
 	if surroundings:
 		surroundings.set_detail(level)
 
@@ -123,6 +128,7 @@ func _shader(file: String, params: Dictionary) -> ShaderMaterial:
 	m.shader = load("res://shaders/%s.gdshader" % file)
 	for k in params:
 		m.set_shader_parameter(k, params[k])
+	_shader_mats.append(m)
 	return m
 
 

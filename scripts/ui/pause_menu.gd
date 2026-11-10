@@ -1,8 +1,9 @@
 # Menu de pausa e configurações (etapa 10; porte do src/ui/menu.ts do web): Esc no PC, ☰ / Voltar no Android,
 # Start no controle. Nick, qualidade gráfica (Leve / Médio / Extremo) com o FPS ao vivo, volume, assistências
-# (ABS, TC, câmbio automático), instruções, voltar para a garagem (trocar carro) e sair.
+# (ABS, TC, câmbio automático), esquemas de controles mobile (Padrão, Fly-by-wire, Inclinar, Legacy),
+# instruções, voltar para a garagem (trocar carro) e sair.
 # Fica numa CanvasLayer própria escalada pela densidade da tela (no celular os botões ficam do tamanho do dedo).
-# Qualidade, volume e assistências ficam guardados em user://jogo.cfg (Game.get_setting / set_setting).
+# Qualidade, volume, controles e assistências ficam guardados em user://jogo.cfg (Game.get_setting / set_setting).
 class_name PauseMenu
 extends CanvasLayer
 
@@ -13,6 +14,8 @@ signal nick_changed(nick: String)
 signal quality_changed(name: String)
 signal volume_changed(v: float)
 signal assist_changed(key: String, on: bool)
+signal touch_mode_changed(mode: String)
+signal recenter_tilt
 
 const QUALITIES := ["Mínimo", "Leve", "Médio", "Extremo"]
 const QUALITY_NOTE := {
@@ -21,12 +24,25 @@ const QUALITY_NOTE := {
 	"Médio": "Celular topo com refrigeração ou PC intermediário: resolução nativa, sombras e SSAO",
 	"Extremo": "PC com placa de vídeo dedicada: SSAO, SSIL, SSR e sombras em 4 cortes",
 }
+const TOUCH_MODES := ["padrao", "fly", "inclinar", "legacy"]
+const TOUCH_MODE_NAMES := {
+	"padrao": "Padrão",
+	"fly": "Fly-by-wire",
+	"inclinar": "Inclinar",
+	"legacy": "Legacy"
+}
+const TOUCH_MODE_NOTES := {
+	"padrao": "Analógico suave à esquerda + pedais de acelerador e freio por altura à direita",
+	"fly": "Analógico à esquerda + barra única multifunção: cima acelera, baixo freia (com vibração no meio)",
+	"inclinar": "Vire o celular como volante usando o acelerômetro + botão de recalibrar + pedais na tela",
+	"legacy": "Botões digitais clássicos ◀ ▶ à esquerda e pedais liga/desliga à direita",
+}
 const AIDS := [["abs", "ABS"], ["tc", "Controle de tração"], ["auto", "Câmbio automático"]]
 const HELP := """Teclado: W/S ou ↑/↓ acelera e freia · A/D ou ←/→ esterça · E/Shift sobe marcha · Q/Ctrl reduz
 1 = ABS · 2 = controle de tração · G = câmbio automático · C = câmera · R = volta para o grid
 P = piloto automático · T = telemetria · F1 = qualidade · F12 = print · N = nick · Esc = este menu
 Controle: analógico esterça · gatilhos aceleram e freiam · RB/A sobe marcha · LB/X reduz · Y câmera · Back grid · Start menu
-Celular: ◀ ▶ esterçam · ACEL. e FREIO à direita · ☰ ou Voltar abre este menu · câmbio automático"""
+Celular: 4 esquemas (Padrão com pedais por altura, Fly-by-wire, Inclinar com acelerômetro e Legacy) · ☰ ou Voltar abre este menu"""
 
 var is_open := false
 var _s := 1.0
@@ -39,6 +55,11 @@ var _qnote: Label
 var _vol: HSlider
 var _vol_lbl: Label
 var _aids := {}
+var _touch_section: VBoxContainer
+var _tbtn := {}
+var _tnote: Label
+var _recenter_btn: Button
+var _current_touch_mode := "padrao"
 var _help: Label
 var _resume: Button
 var _fps_hist: Array[int] = []
@@ -181,6 +202,32 @@ func _build() -> void:
 		arow.add_child(cb)
 		_aids[a[0]] = cb
 
+	# controles de toque no celular
+	_touch_section = VBoxContainer.new()
+	_touch_section.add_theme_constant_override("separation", 6)
+	box.add_child(_touch_section)
+	_touch_section.add_child(_field("Controles no Celular"))
+	var trow := HBoxContainer.new()
+	trow.add_theme_constant_override("separation", 8)
+	_touch_section.add_child(trow)
+	var tgroup := ButtonGroup.new()
+	for tm in TOUCH_MODES:
+		var b := _button(TOUCH_MODE_NAMES[tm], 15)
+		b.toggle_mode = true
+		b.button_group = tgroup
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.pressed.connect(func(): _pick_touch_mode(tm))
+		trow.add_child(b)
+		_tbtn[tm] = b
+	_tnote = _label("", 12, Color(1, 1, 1, 0.7))
+	_tnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_touch_section.add_child(_tnote)
+
+	_recenter_btn = _button("⟳ CALIBRAR VOLANTE (RECENTRALIZAR)", 15)
+	_recenter_btn.pressed.connect(func(): recenter_tilt.emit())
+	_recenter_btn.visible = false
+	_touch_section.add_child(_recenter_btn)
+
 	# botões
 	var brow := HBoxContainer.new()
 	brow.add_theme_constant_override("separation", 8)
@@ -252,7 +299,7 @@ func _button(t: String, size: int, primary := false) -> Button:
 # ------------------------------------------------------------------ estado
 
 ## abre com o estado atual do jogo
-func open(nick: String, quality: String, volume: float, assists: Dictionary, focus_nick := false) -> void:
+func open(nick: String, quality: String, volume: float, assists: Dictionary, touch_mode := "padrao", is_touch := false, focus_nick := false) -> void:
 	_nick.text = nick
 	for q in _qbtn:
 		_qbtn[q].button_pressed = q == quality
@@ -261,6 +308,14 @@ func open(nick: String, quality: String, volume: float, assists: Dictionary, foc
 	_vol_lbl.text = "%d%%" % roundi(volume * 100)
 	for key in _aids:
 		_aids[key].set_pressed_no_signal(bool(assists.get(key, false)))
+
+	_current_touch_mode = touch_mode
+	for tm in _tbtn:
+		_tbtn[tm].button_pressed = (tm == touch_mode)
+	_note_touch_mode(touch_mode)
+	if _touch_section:
+		_touch_section.visible = is_touch or OS.has_feature("mobile")
+
 	is_open = true
 	visible = true
 	_fps_hist.clear()
@@ -316,6 +371,20 @@ func _note_quality(q: String, fps := 0) -> void:
 	if q != "Leve" and fps > 0 and fps < 45:
 		parts.append("se travar, use o Leve")
 	_qnote.text = " · ".join(parts)
+
+
+func _pick_touch_mode(tm: String) -> void:
+	_current_touch_mode = tm
+	Game.set_setting("controles", "modo_toque", tm)
+	touch_mode_changed.emit(tm)
+	_note_touch_mode(tm)
+
+
+func _note_touch_mode(tm: String) -> void:
+	if TOUCH_MODE_NOTES.has(tm):
+		_tnote.text = TOUCH_MODE_NOTES[tm]
+	if _recenter_btn:
+		_recenter_btn.visible = (tm == "inclinar")
 
 
 func _on_volume(v: float) -> void:
