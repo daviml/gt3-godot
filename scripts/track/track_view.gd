@@ -18,6 +18,8 @@ const CHUNK := 250.0
 
 var meshes := 0
 var trees := 0
+var surroundings: SurroundingsView
+var detail_level := 2
 var _cache := {}
 var _name_re := RegEx.create_from_string("^o(-?\\d+)_s(\\d)")
 
@@ -33,7 +35,15 @@ func _ready() -> void:
 	_fix(root)
 	_build_trees()
 	# torres residenciais e horizonte (etapa 9): scripts/track/surroundings_view.gd
-	add_child(SurroundingsView.new())
+	surroundings = SurroundingsView.new()
+	add_child(surroundings)
+	surroundings.set_detail(detail_level)
+
+
+func set_detail(level: int) -> void:
+	detail_level = level
+	if surroundings:
+		surroundings.set_detail(level)
 
 
 func _fix(n: Node) -> void:

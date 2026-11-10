@@ -100,8 +100,9 @@ Protótipo em `REPOS/gt3-godot` (Godot 4.7.2, `Jogar.bat`):
   - Verniz da pintura do carro recalibrado com rugosidade nítida e especular alto para refletir o céu mesmo sem SSR.
   - Sombra de contato escura (blob shadow) sob o chassi para o carro nunca parecer flutuando no Android.
   - Detecção automática de modo Mobile ao iniciar o jogo e escala de resolução nativa (sem embaçar). (10/11)
-- [ ] **Desfoque de Velocidade (PLANO-visual etapa 1):**
-  - Implementar o desfoque radial na direção do ponto de fuga (de 90 a 260 km/h, mascarando a caixa projetada do carro). Ativo no Médio/Extremo.
+- [x] **Desfoque de Velocidade e Presets Reais (PLANO-visual etapa 1):**
+  - Desfoque radial pós-processado na direção do ponto de fuga (`shaders/speed_blur.gdshader` e `scripts/render/speed_blur.gd`) de 90 a 260 km/h, mascarando a caixa projetada do carro na tela e deixando o centro e o HUD nítidos.
+  - Três presets reais configurados em `main.gd`: **Leve** (Mobile 60 FPS, sem SSAO/SSIL/SSR, sombras 2 splits 80 m, MSAA 2x, blur desligado, arredores 220 m), **Médio** (Mobile Top / PC Médio, SSAO suave, sombras 4 splits 130 m, MSAA 2x, blur 0.8, arredores 500 m) e **Extremo** (PC com GPU, SSAO forte, SSIL, SSR 48 passos, sombras 180 m, MSAA 4x, blur 1.0, arredores 900 m). Teste: `scripts/tests/qualidade_blur.gd`. (10/11)
 
 ### 9. Arredores no nível LMU (PLANO-visual etapa 5 completa)
 Todas as melhorias de cenário da etapa 5 do web portadas e integradas na Godot com orçamento de renderização para PC e Android (`scripts/track/surroundings_view.gd` + `tools/arredores.mjs`). Teste: `scripts/tests/arredores.gd`. (10/11)
@@ -122,7 +123,7 @@ Tudo desenhado por código em `scripts/ui/hud.gd` (um Control com `_draw`, escal
 - [x] **Painéis de Tempo e Mapa:** melhores tempos à esquerda (gap para o 1º, linha do seu nick destacada); `Best / Current` + 3 setores coloridos + barra de delta ao vivo + nome da curva + última volta à direita; minimapa da pista com o carro na cor dele; FPS no topo. No celular: painéis menores, mapa ao lado dos tempos e mostrador em cima no centro, longe dos botões de toque. T = telemetria. (10/11)
 - [x] **Menu de Pausa e Configurações (`Esc` / Start no controle, `☰` / Voltar no Android):** (10/11)
   - Trocar nick, voltar para a garagem (trocar carro), escolher qualidade gráfica (**Leve / Médio / Extremo**) mostrando o FPS ao vivo, ajustar volume (bus Master), alternar assistências (ABS, TC, Câmbio), instruções e sair. Tudo guardado em `user://jogo.cfg` (`Game.get_setting / set_setting`); F1 alterna o preset sem abrir o menu.
-  - Pendente da etapa 8: `_apply_quality()` no `main.gd` ainda trata Médio = Extremo (os três presets reais entram ali).
+  - Três presets reais integrados com `main.gd` e `SurroundingsView.set_detail()`. (10/11)
 
 ### 11. Som
 - [ ] Bancos do `engine-sim` por carro (CC-BY-4.0, os mesmos de `public/sounds`): dois loops vizinhos com crossfade pelo giro e `pitch_scale` corrigido; filtro low-pass abafando ao soltar o acelerador; som de turbo e válvula (blow-off).

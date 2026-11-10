@@ -15,9 +15,12 @@ const SUN_U := 0.5947
 const SUN_ELEV := deg_to_rad(48.0)
 
 var track: Track
+var track_view: TrackView
 var car: Car
 var car_view: CarView
 var cam: Camera3D
+var chase: ChaseCamera
+var speed_blur: SpeedBlur
 var env: Environment
 var sun: DirectionalLight3D
 var hud: Hud
@@ -34,7 +37,6 @@ var rumble := Rumble.new()
 var touch: TouchControls
 ## ☰ ou voltar do Android: pausa (o menu da etapa 9 entra no lugar)
 var paused := false
-var chase: ChaseCamera
 var timer: LapTimer
 var nick := ""
 ## melhores setores da sessão, de todas as voltas válidas (roxo no painel)
@@ -71,7 +73,8 @@ func _ready() -> void:
 	track = Track.new("res://data/track/track.json")
 	_build_env()
 	# pista e arredores exportados do jogo web (etapa 7): scripts/track/track_view.gd
-	add_child(TrackView.new())
+	track_view = TrackView.new()
+	add_child(track_view)
 	_build_car()
 	timer = LapTimer.new(track)
 	timer.on_lap = _on_lap
@@ -215,7 +218,12 @@ func _build_hud() -> void:
 	cam.far = 6000.0
 	add_child(cam)
 	chase = ChaseCamera.new(cam, car)
+	# desfoque de velocidade no layer 1 (etapa 8 / PLANO-visual etapa 1)
+	speed_blur = SpeedBlur.new()
+	add_child(speed_blur)
+	# HUD e controles de toque no layer 2 (ficam por cima do desfoque)
 	var layer := CanvasLayer.new()
+	layer.layer = 2
 	add_child(layer)
 	# HUD estilo LMU: mostrador, pneus, tempos, melhores tempos, mapa, FPS (scripts/ui/hud.gd)
 	hud = Hud.new(car, timer, track, car_id, input.touch)
@@ -307,6 +315,8 @@ func _process(dt: float) -> void:
 	if shot_dir != "":
 		_shot_tick(dt)
 	chase.update(dt)
+	if not paused and speed_blur:
+		speed_blur.update(cam, car, chase.mode, dt)
 	if shot_dir != "" and shot_k % 3 == 0 and not fixed_cam:
 		# prints de vitrine: 3/4 de frente, perto do carro
 		var r := car.basis().x
@@ -391,6 +401,8 @@ func _set_paused(on: bool, focus_nick := false) -> void:
 	paused = on
 	if touch:
 		touch.set_enabled(not on)
+	if speed_blur and on:
+		speed_blur.rect.visible = false
 	if on:
 		menu.open(nick, quality_name, volume, car.assists, focus_nick)
 	elif menu.is_open:
@@ -412,37 +424,70 @@ func _set_volume(v: float) -> void:
 	AudioServer.set_bus_mute(0, volume <= 0.0)
 
 
-## Preset gráfico pelo nome do menu (Leve / Médio / Extremo). Por enquanto Leve = celular e os outros dois = alto;
-## a etapa 8 pluga aqui os três presets reais.
+const PRESET_INDEX := {"Leve": 0, "Médio": 1, "Extremo": 2}
+
+
+## Preset gráfico pelo nome do menu (Leve / Médio / Extremo) - Etapa 8.
 func _apply_quality(name: String) -> void:
 	quality_name = name
-	high = name != "Leve"
-	_set_quality(high)
+	var level: int = PRESET_INDEX.get(name, 2)
+	_set_quality(level)
 
 
-## superfície sob cada roda (DE DD / TE TD), quando alguma sai do asfalto
-func _surfaces() -> String:
-	var out := []
-	var any := false
-	for w in car.wheels:
-		out.append(Ground.NAMES[w.surface] if w.contact else "ar")
-		any = any or w.surface != Ground.ASPHALT or not w.contact
-	return "%s %s / %s %s" % out if any else ""
+## Ajusta presets de qualidade: 0 = Leve (Mobile 60 FPS), 1 = Médio (Mobile Top / PC Médio), 2 = Extremo (PC com GPU).
+func _set_quality(level: int) -> void:
+	high = level > 0
 
+	# Ambiente e efeitos pós-processamento
+	if env:
+		env.ssao_enabled = level > 0
+		if level == 1:
+			env.ssao_radius = 1.0
+			env.ssao_intensity = 1.0
+		elif level == 2:
+			env.ssao_radius = 1.2
+			env.ssao_intensity = 1.6
 
-## Ajusta presets de qualidade: h=true (Alto/PC), h=false (Leve/Mobile Bonito).
-func _set_quality(h: bool) -> void:
-	high = h
-	env.ssao_enabled = h
-	env.ssil_enabled = h
-	env.ssr_enabled = h
-	env.glow_enabled = true
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if h else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	sun.directional_shadow_max_distance = 180.0 if h else 90.0
-	get_viewport().msaa_3d = Viewport.MSAA_4X if h else Viewport.MSAA_2X
-	# No mobile, mantemos a resolução nítida nativa (1.0) ou muito próxima (0.95 com FSR se necessário)
-	# para nunca ficar embaçado ou parecer PS1
+		env.ssil_enabled = level == 2
+		env.ssr_enabled = level == 2
+		if level == 2:
+			env.ssr_max_steps = 48
+
+		env.glow_enabled = true
+		env.glow_intensity = 0.2 if level == 0 else (0.3 if level == 1 else 0.35)
+		env.glow_bloom = 0.02 if level == 0 else (0.03 if level == 1 else 0.04)
+
+	# Sol e cortes de sombra (evita estouro de banda no celular)
+	if sun:
+		if level == 0:
+			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+			sun.directional_shadow_max_distance = 80.0
+			sun.directional_shadow_split_1 = 0.15
+		elif level == 1:
+			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+			sun.directional_shadow_max_distance = 130.0
+			sun.directional_shadow_split_1 = 0.08
+			sun.directional_shadow_split_2 = 0.25
+			sun.directional_shadow_split_3 = 0.55
+		else:
+			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+			sun.directional_shadow_max_distance = 180.0
+			sun.directional_shadow_split_1 = 0.08
+			sun.directional_shadow_split_2 = 0.22
+			sun.directional_shadow_split_3 = 0.50
+
+	# Anti-aliasing e resolução nativa nítida
+	get_viewport().msaa_3d = Viewport.MSAA_4X if level == 2 else Viewport.MSAA_2X
 	get_viewport().scaling_3d_scale = 1.0
+
+	# Arredores (corte de torcida e árvores de acordo com o orçamento de FPS)
+	if track_view:
+		track_view.set_detail(level)
+
+	# Desfoque radial de velocidade (PLANO-visual etapa 1: ativo em Médio e Extremo)
+	if speed_blur:
+		speed_blur.enabled = level > 0
+		speed_blur.max_strength = 0.8 if level == 1 else 1.0
 
 
 func _screenshot() -> void:
