@@ -104,22 +104,25 @@ Protótipo em `REPOS/gt3-godot` (Godot 4.7.2, `Jogar.bat`):
   - Implementar o desfoque radial na direção do ponto de fuga (de 90 a 260 km/h, mascarando a caixa projetada do carro). Ativo no Médio/Extremo.
 
 ### 9. Arredores no nível LMU (PLANO-visual etapa 5 completa)
-Trazer para a Godot todas as melhorias de cenário feitas na etapa 5 do web (cuidando do batching/LOD para não pesar no Android):
-- [ ] **Prédios e Condomínios:** prédios do OSM (>220 m da pista) viram torres de 12–24 andares com reboco colorido; adicionar o anel de ~1.000 torres em condomínios (grupos de 2–6 iguais entre 350 m e 2,8 km, mais denso a norte/leste) com janelas, varandas, caixa de escada e térreo no shader em **uma única chamada de desenho (`MultiMesh` / malha unificada)**.
-- [ ] **Horizonte Cilíndrico:** faixa cilíndrica a 3,9 km com morros e cidade em camadas, já azulada pela distância.
-- [ ] **Mata densa em capões:** grupos fechados de 5–14 árvores (2–3,5× o modelo) mais densos no miolo da pista e atrás do Laranjinha/Pinheirinho (até 5.200 árvores extras fora do lago/arquibancadas/reta). No Android/Leve usar `MultiMesh` impostor otimizado; no PC Extremo permitir LOD 3D.
-- [ ] **Arquibancadas LMU:** muro traseiro mais baixo; cobertura da reta mais baixa e curta (cobrindo ~70% das fileiras) com pilares, viga, tirante e treliça aparentes; espaçar módulos da cobertura em "pétalas" do paddock vista do Laranjinha; torcida em cartões (~45 mil, atlas de 32 figuras sentadas/em pé/boné/bandeira) com lugares vazios (reduzindo contagem automaticamante no preset Leve se necessário).
-- [ ] **Faixas de propaganda e detalhes de curva:** faixa contínua de 45 cm no topo dos muros e barreiras azuis com cores saturadas e marcas fictícias (`EXPRESSO SP`, `PNEUS VILA`, `TURBO 16V`, `ENERGIA SUL`, `INTERLAGOS`); postes do alambrado grossos e escuros com 4 cabos; portão laranja nos postos de fiscal; torres de TV (andaime, câmera, guarda-sol) fora das curvas; cones laranja nos escapes largos; marcas de pneu escuras saindo para o escape.
+Todas as melhorias de cenário da etapa 5 do web portadas e integradas na Godot com orçamento de renderização para PC e Android (`scripts/track/surroundings_view.gd` + `tools/arredores.mjs`). Teste: `scripts/tests/arredores.gd`. (10/11)
+- [x] **Prédios e Condomínios:** anel de 1.400 torres residenciais procedurais em condomínios (2–6 iguais) entre ~350 m e ~2,8 km da pista, mais denso a norte/leste (Interlagos/Cidade Dutra/Socorro), desenhados em **uma única chamada de desenho via `MultiMeshInstance3D`** com shader de fachada (`shaders/torre.gdshader`) em coordenadas de mundo (andares de 2,9 m, janelas iluminadas/apagadas, varandas com guarda-corpo escuro, caixas de escada e térreo escuro). (10/11)
+- [x] **Horizonte Cilíndrico:** faixa cilíndrica de 3,9 km de raio e 420 m de altura (`shaders/horizonte.gdshader`) com morros da Cantareira/Serra do Mar e camadas de cidade desenhadas em 4096 px com névoa azulada embutida e recorte de céu (`assets/track/horizonte.png`). (10/11)
+- [x] **Mata densa em capões:** 7.082 árvores impostoras (`data/track/arvores_pos.json`) agrupadas em 28 blocos de 250 m com culling de frustum e suporte a `visibility_range_end` para os presets. (10/11)
+- [x] **Arquibancadas e Torcida LMU:** torcida com mais de 40.000 pessoas em cartões orientados do atlas particionada em tempo de carregamento em 18 blocos de até 120 m (`_split_crowd`), permitindo frustum culling real e limite de distância de visão dinâmico no preset Leve (220 m). (10/11)
+- [x] **Faixas de propaganda e detalhes de curva:** faixas no topo dos muros, alambrado detalhado com cabos, placas de frenagem e detalhes de pista herdados do pipeline do web via `cenario.glb` e com LOD de distância (`visibility_range_end = 650 m`). (10/11)
 
 ### 10. HUD LMU e Menu Completo (PLANO-visual etapa 4)
-- [ ] **Mostrador redondo estilo LMU (canto inferior direito):**
+Tudo desenhado por código em `scripts/ui/hud.gd` (um Control com `_draw`, escalado pela altura da tela como o web) e
+`scripts/ui/pause_menu.gd`. Teste: `scripts/tests/hud.gd`. Prints: `-- --shot=<pasta> --cam=1` (capô) e `--touch`. (10/11)
+- [x] **Mostrador redondo estilo LMU (canto inferior direito):** (10/11)
   - Fundo azul-marinho sólido, arco branco grosso de giro (240°, sem números, faixa vermelha fina perto do corte; arco fica vermelho nos últimos 700 rpm e pisca azul na hora de trocar), marcha grande no centro, velocidade e `KM/H`.
   - Arcos internos de 70° para acelerador (verde, à direita) e freio (vermelho, à esquerda).
   - Bloco dos **4 pneus** ao lado, coloridos pelo slip combinado em relação ao pico ($\kappa/\kappa_{\text{pico}}$, $\alpha/\alpha_{\text{pico}}$, filtrado): azul (frio/solto) → verde → amarelo → vermelho (passou do pico), com indicadores `ABS / TC / AUT` abaixo.
-- [ ] **Painel do Porsche 992:** aparece **apenas na câmera de capô** (nas câmeras de fora fica só o mostrador LMU para a traseira do carro aparecer inteira, igual ao web).
-- [ ] **Painéis de Tempo e Mapa:** melhores tempos à esquerda; `Best / Current` + 3 setores coloridos + delta ao vivo + nome da curva à direita; minimapa da pista. Layout responsivo para tela de celular (sem colidir com os botões de toque).
-- [ ] **Menu de Pausa e Configurações (`Esc` no PC ou `☰` / Voltar no Android):**
-  - Trocar nick, voltar para a garagem (trocar carro), escolher qualidade gráfica (**Leve / Médio / Extremo**) mostrando o FPS ao vivo, ajustar volume, alternar assistências (ABS, TC, Câmbio) e ver instruções.
+- [x] **Painel do Porsche 992:** aparece **apenas na câmera de capô** (nas câmeras de fora fica só o mostrador LMU para a traseira do carro aparecer inteira, igual ao web). 16 luzes de troca, chaves ABS/TC/AUT, tabela, marcha, barra de giro, tempos, setores e pedais. (10/11)
+- [x] **Painéis de Tempo e Mapa:** melhores tempos à esquerda (gap para o 1º, linha do seu nick destacada); `Best / Current` + 3 setores coloridos + barra de delta ao vivo + nome da curva + última volta à direita; minimapa da pista com o carro na cor dele; FPS no topo. No celular: painéis menores, mapa ao lado dos tempos e mostrador em cima no centro, longe dos botões de toque. T = telemetria. (10/11)
+- [x] **Menu de Pausa e Configurações (`Esc` / Start no controle, `☰` / Voltar no Android):** (10/11)
+  - Trocar nick, voltar para a garagem (trocar carro), escolher qualidade gráfica (**Leve / Médio / Extremo**) mostrando o FPS ao vivo, ajustar volume (bus Master), alternar assistências (ABS, TC, Câmbio), instruções e sair. Tudo guardado em `user://jogo.cfg` (`Game.get_setting / set_setting`); F1 alterna o preset sem abrir o menu.
+  - Pendente da etapa 8: `_apply_quality()` no `main.gd` ainda trata Médio = Extremo (os três presets reais entram ali).
 
 ### 11. Som
 - [ ] Bancos do `engine-sim` por carro (CC-BY-4.0, os mesmos de `public/sounds`): dois loops vizinhos com crossfade pelo giro e `pitch_scale` corrigido; filtro low-pass abafando ao soltar o acelerador; som de turbo e válvula (blow-off).

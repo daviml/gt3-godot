@@ -21,7 +21,27 @@ static func _load_car() -> String:
 
 static func save_car(id: String) -> void:
 	car_id = id
+	set_setting("garagem", "carro", id)
+
+
+## ajuste guardado em user://jogo.cfg (qualidade, volume, assistências — menu de pausa da etapa 10)
+static func get_setting(section: String, key: String, default: Variant) -> Variant:
+	var c := ConfigFile.new()
+	if c.load(CFG) != OK or not c.has_section_key(section, key):
+		return default
+	return c.get_value(section, key, default)
+
+
+static func set_setting(section: String, key: String, value: Variant) -> void:
 	var c := ConfigFile.new()
 	c.load(CFG)
-	c.set_value("garagem", "carro", id)
+	c.set_value(section, key, value)
+	c.save(CFG)
+
+
+static func erase_setting(section: String, key: String) -> void:
+	var c := ConfigFile.new()
+	if c.load(CFG) != OK or not c.has_section_key(section, key):
+		return
+	c.erase_section_key(section, key)
 	c.save(CFG)

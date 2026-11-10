@@ -2,10 +2,12 @@
 # Controles (iguais ao web): setas/WASD ou controle (gatilhos + analógico). E/Shift ou RB/A sobe marcha,
 # Q/Ctrl ou LB/X reduz. 1 = ABS, 2 = TC, G = câmbio automático. C/Y = câmera (perseguição, capô, longe).
 # R ou Back = volta para a pista. P = piloto automático. Etapa 3: curva e suavização da direção do web,
-# vibração no controle; no celular (ou -- --touch no PC) botões de toque, câmbio automático e ☰ = pausa.
-# F1 = alterna qualidade (Alto/Celular). F12 = salva print. Esc = sai.
+# vibração no controle; no celular (ou -- --touch no PC) botões de toque, câmbio automático e ☰ = menu.
+# F1 = alterna qualidade (Leve / Médio / Extremo). F12 = salva print. T = telemetria.
+# Esc, Start ou ☰ / Voltar = menu de pausa (scripts/ui/pause_menu.gd): nick, qualidade, volume, assistências,
+# garagem e sair. HUD estilo LMU em scripts/ui/hud.gd (etapa 10).
 # Linha de comando (depois de --): --car=<id> escolhe o carro (data/cars.json), --auto liga o piloto,
-# --nick=<nome> define o nick, --shot=<pasta> tira prints sozinho.
+# --nick=<nome> define o nick, --shot=<pasta> tira prints sozinho, --cam=<0..2> fixa a câmera nos prints.
 # Cronometragem (etapa 4): R volta para o grid e zera a volta; N = nick (recordes por nick e carro).
 extends Node3D
 
@@ -18,10 +20,13 @@ var car_view: CarView
 var cam: Camera3D
 var env: Environment
 var sun: DirectionalLight3D
-var hud: Label
-var hud_big: Label
-var panel: RichTextLabel
-var nick_edit: LineEdit
+var hud: Hud
+var menu: PauseMenu
+## preset gráfico atual (PauseMenu.QUALITIES): Leve / Médio / Extremo
+var quality_name := ""
+var volume := 0.6
+## última entrada aplicada ao carro [direção, acelerador, freio, sobe, reduz], para o HUD
+var last_inp := [0.0, 0.0, 0.0, false, false]
 
 # entrada (etapa 3, scripts/input/): curva e suavização do web, vibração e botões de toque no celular
 var input := InputReader.new()
@@ -42,8 +47,6 @@ var bot: RefCounted
 var car_id := Game.car_id  # escolhido na garagem (scenes/garagem.tscn)
 var car_data: Dictionary
 var high := true
-var toast := ""
-var toast_t := 0.0
 # referência do iRacing de cada carro que tem uma: o piloto automático segue a volta real
 const REFS := {"porsche-992-gt3r": "interlagos-porsche", "audi-r8-lms-gt3": "interlagos-r8", "ford-mustang-gt3": "interlagos-mustang"}
 
@@ -70,10 +73,17 @@ func _ready() -> void:
 	# pista e arredores exportados do jogo web (etapa 7): scripts/track/track_view.gd
 	add_child(TrackView.new())
 	_build_car()
-	_build_hud()
 	timer = LapTimer.new(track)
 	timer.on_lap = _on_lap
+	_build_hud()
 	top_records = Records.top(8)
+	# assistências e volume guardados no menu de pausa (user://jogo.cfg)
+	for key in ["abs", "tc", "auto"]:
+		car.assists[key] = bool(Game.get_setting("assistencias", key, car.assists[key]))
+	_set_volume(float(Game.get_setting("audio", "volume", 0.6)))
+	# no celular e no piloto automático o câmbio é automático, como no web
+	if autopilot or input.touch:
+		car.assists.auto = true
 	_spawn()
 	if REFS.has(car_id):
 		# malha de giro: segue o traçado real do iRacing sem passar da zebra (Porsche 1:35,9 e Mustang 1:33,6 válidas).
@@ -84,20 +94,30 @@ func _ready() -> void:
 		bot = RefBot.new(track, car, RefBot.load_ref(REFS[car_id]), opts)
 	else:
 		bot = Bot.new(track, car)
-	# No celular ou com flag --mobile, já inicia configurado para Mobile
+	# No celular ou com flag --mobile, já inicia configurado para Mobile; o menu de pausa guarda a escolha
 	var is_mobile := OS.has_feature("mobile") or "--mobile" in args
-	_set_quality(not is_mobile)
+	var saved := String(Game.get_setting("video", "qualidade", ""))
+	_apply_quality("Leve" if "--mobile" in args else (saved if saved in PauseMenu.QUALITIES else ("Leve" if is_mobile else "Extremo")))
+	for a in args:
+		if a.begins_with("--cam="):
+			chase.mode = clampi(int(a.substr(6)), 0, 2)
+			fixed_cam = true
+		if a == "--menu":
+			# teste: abre o menu de pausa já na largada (os prints usam o tempo real)
+			_set_paused.call_deferred(true)
 
 
 # modo de teste: --shot=<pasta> pilota sozinho, salva prints em alguns tempos e sai
 var shot_dir := ""
+## --cam=<n>: prints na câmera escolhida (0 perseguição, 1 capô, 2 longe) em vez da vitrine
+var fixed_cam := false
 var shot_times := [3.0, 9.0, 16.0, 24.0, 33.0, 45.0]
 var shot_k := 0
 var real_time := 0.0
 
 func _shot_tick(dt: float) -> void:
 	real_time += dt
-	if shot_k < shot_times.size() and time >= shot_times[shot_k]:
+	if shot_k < shot_times.size() and (real_time if paused else time) >= shot_times[shot_k]:
 		var img := get_viewport().get_texture().get_image()
 		img.save_png("%s/shot_%d.png" % [shot_dir, shot_k])
 		print("shot %d t=%.1f v=%.0f km/h idx=%d fps=%d" % [shot_k, time, car.vel.length() * 3.6, car.hint, Engine.get_frames_per_second()])
@@ -186,7 +206,7 @@ func _update_car_view() -> void:
 	car_view.update_from(car)
 
 
-# ------------------------------------------------------------------ HUD
+# ------------------------------------------------------------------ HUD e menu (etapa 10)
 
 func _build_hud() -> void:
 	cam = Camera3D.new()
@@ -197,32 +217,26 @@ func _build_hud() -> void:
 	chase = ChaseCamera.new(cam, car)
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	hud = Label.new()
-	hud.position = Vector2(24, 18)
-	hud.add_theme_font_size_override("font_size", 22)
-	hud.add_theme_color_override("font_outline_color", Color.BLACK)
-	hud.add_theme_constant_override("outline_size", 6)
+	# HUD estilo LMU: mostrador, pneus, tempos, melhores tempos, mapa, FPS (scripts/ui/hud.gd)
+	hud = Hud.new(car, timer, track, car_id, input.touch)
+	hud.best_sectors = best_sectors
+	hud.nick = nick
 	layer.add_child(hud)
-	hud_big = Label.new()
-	hud_big.anchor_left = 0.5
-	hud_big.anchor_right = 0.5
-	hud_big.anchor_top = 1.0
-	hud_big.anchor_bottom = 1.0
-	hud_big.offset_left = -200
-	hud_big.offset_right = 200
-	hud_big.offset_top = -120
-	hud_big.offset_bottom = -20
-	hud_big.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hud_big.add_theme_font_size_override("font_size", 44)
-	hud_big.add_theme_color_override("font_outline_color", Color.BLACK)
-	hud_big.add_theme_constant_override("outline_size", 10)
-	layer.add_child(hud_big)
-	_build_timing_hud(layer)
 	if input.touch:
 		touch = TouchControls.new()
 		touch.keys = input.touch_keys
 		touch.menu_pressed.connect(_toggle_pause)
 		layer.add_child(touch)
+	# menu de pausa (scripts/ui/pause_menu.gd): CanvasLayer própria por cima de tudo
+	menu = PauseMenu.new()
+	menu.resumed.connect(func(): _set_paused(false))
+	menu.garage.connect(_to_garage)
+	menu.quit.connect(func(): get_tree().quit())
+	menu.nick_changed.connect(_on_nick)
+	menu.quality_changed.connect(_apply_quality)
+	menu.volume_changed.connect(_set_volume)
+	menu.assist_changed.connect(func(key: String, on: bool): car.assists[key] = on)
+	add_child(menu)
 
 
 func _fmt(t: float) -> String:
@@ -230,39 +244,6 @@ func _fmt(t: float) -> String:
 
 
 # ------------------------------------------------------------------ cronometragem (etapa 4)
-
-func _build_timing_hud(layer: CanvasLayer) -> void:
-	# painel de tempos (canto superior direito); o painel LMU completo vem na etapa 9
-	panel = RichTextLabel.new()
-	panel.bbcode_enabled = true
-	panel.fit_content = true
-	panel.scroll_active = false
-	panel.anchor_left = 1.0
-	panel.anchor_right = 1.0
-	panel.offset_left = -420
-	panel.offset_right = -24
-	panel.offset_top = 18
-	panel.add_theme_font_size_override("normal_font_size", 22)
-	panel.add_theme_font_size_override("bold_font_size", 22)
-	panel.add_theme_color_override("font_outline_color", Color.BLACK)
-	panel.add_theme_constant_override("outline_size", 6)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(panel)
-	# nick (tecla N): os recordes ficam guardados por nick e carro
-	nick_edit = LineEdit.new()
-	nick_edit.placeholder_text = "Seu nick (Enter grava, Esc cancela)"
-	nick_edit.max_length = 16
-	nick_edit.anchor_left = 0.5
-	nick_edit.anchor_right = 0.5
-	nick_edit.anchor_top = 0.4
-	nick_edit.anchor_bottom = 0.4
-	nick_edit.offset_left = -200
-	nick_edit.offset_right = 200
-	nick_edit.add_theme_font_size_override("font_size", 26)
-	nick_edit.visible = false
-	nick_edit.text_submitted.connect(_on_nick)
-	layer.add_child(nick_edit)
-
 
 ## Largada na reta dos boxes, 120 m antes da linha, com a volta zerada (como o spawn do web).
 func _spawn() -> void:
@@ -289,70 +270,10 @@ func _on_lap(lap: LapTimer.Lap) -> void:
 		_toast("Sem nick: aperte N para gravar seus recordes")
 
 
-func _open_nick() -> void:
-	nick_edit.text = nick
-	nick_edit.visible = true
-	nick_edit.grab_focus.call_deferred()
-
-
 func _on_nick(t: String) -> void:
-	nick = t.strip_edges()
+	nick = t
+	hud.nick = nick
 	Records.save_nick(nick)
-	nick_edit.visible = false
-	nick_edit.release_focus()
-	_toast("Nick: " + (nick if nick != "" else "(nenhum)"))
-
-
-## cor do setor como no web: roxo = melhor da sessão, verde = melhor que a melhor volta, amarelo = mais lento
-func _sector_color(i: int, v: float) -> String:
-	if i >= best_sectors.size() or v <= best_sectors[i]:
-		return "#b26cff"
-	if timer.best == null or v <= timer.best.sectors[i]:
-		return "#3ddc6a"
-	return "#ffd23f"
-
-
-func _panel_text() -> String:
-	var t := timer
-	var red := "#ff5a5a"
-	var cur := _fmt(t.current)
-	if t.current >= 0.0 and not t.valid:
-		cur = "[color=%s]%s  inválida[/color]" % [red, cur]
-	var last := _fmt(t.last.time if t.last else -1.0)
-	if t.last and not t.last.valid:
-		last = "[color=%s]%s[/color]" % [red, last]
-	var lines := [
-		"[right][b]%s[/b]" % track.section_at(t.s),
-		"Melhor  %s" % _fmt(t.best.time if t.best else -1.0),
-		"Última  %s" % last,
-		"Atual   %s" % cur,
-	]
-	var secs := []
-	for i in 3:
-		if i < t.sectors.size():
-			secs.append("[color=%s]%.2f[/color]" % [_sector_color(i, t.sectors[i]), t.sectors[i]])
-		else:
-			secs.append("--.--")
-	lines.append("S1 %s   S2 %s   S3 %s" % secs)
-	if not is_nan(t.delta):
-		var d := t.delta
-		lines.append("[font_size=34][color=%s]%s%.2f[/color][/font_size]" % ["#3ddc6a" if d < 0.0 else red, "−" if d < 0.0 else "+", absf(d)])
-	lines.append("")
-	lines.append("[b]Recordes[/b]  ·  " + (nick if nick != "" else "sem nick (N)"))
-	for k in top_records.size():
-		var r: Dictionary = top_records[k]
-		lines.append("%d. %s  %s  %s" % [k + 1, r.nick, _car_short(r.carId), _fmt(float(r.time))])
-	return "\n".join(lines) + "[/right]"
-
-
-var _shorts := {}
-
-func _car_short(id: String) -> String:
-	if _shorts.is_empty():
-		var list = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars.json"))
-		for c in list:
-			_shorts[c.id] = c.get("short", c.get("name", c.id))
-	return _shorts.get(id, id)
 
 
 # ------------------------------------------------------------------ laço
@@ -370,9 +291,10 @@ func _input_axes(dt: float) -> Array:
 
 
 func _physics_process(dt: float) -> void:
-	if paused or nick_edit.visible:
+	if paused:
 		return
 	var inp := _input_axes(dt)
+	last_inp = inp
 	car.step(dt, inp[0], inp[1], inp[2], inp[3], inp[4])
 	time += dt
 	timer.update(dt, car)
@@ -385,45 +307,35 @@ func _process(dt: float) -> void:
 	if shot_dir != "":
 		_shot_tick(dt)
 	chase.update(dt)
-	if shot_dir != "" and shot_k % 3 == 0:
+	if shot_dir != "" and shot_k % 3 == 0 and not fixed_cam:
 		# prints de vitrine: 3/4 de frente, perto do carro
 		var r := car.basis().x
 		var fwd := -car.basis().z
 		cam.global_position = car.pos + fwd * 5.2 + r * 3.2 + Vector3.UP * 0.6
 		cam.look_at(car.pos + Vector3.UP * 0.1, Vector3.UP)
 
-	var kmh := car.vel.length() * 3.6
-	hud_big.text = "%d km/h   %s" % [int(kmh), "N" if car.gear == 0 else ("R" if car.gear < 0 else str(car.gear))]
+	hud.records = top_records
+	hud.autopilot = autopilot
+	hud.quality = quality_name
+	hud.set_view(chase.mode_name())
+	hud.update(dt, last_inp[1], last_inp[2])
 	if paused:
-		hud_big.text = "PAUSA"
-	var abs_on := false
-	for w in car.wheels:
-		abs_on = abs_on or w.abs_active
-	toast_t -= dt
-	panel.text = _panel_text()
-	hud.text = "%s\n%d rpm   %.1f g lat  %+.1f g long\n%s  %s  %s%s%s\n%s\n%d fps   %s   %s%s\n%s\n%s" % [
-		car.name, int(car.rpm),
-		absf(car.g_lat), car.g_long,
-		"ABS" if car.assists.abs else "abs off", "TC" if car.assists.tc else "tc off",
-		"câmbio auto" if car.assists.auto else "câmbio manual",
-		"   [ABS atuando]" if abs_on else "", "   [TC atuando]" if car.tc_cut > 0.05 else "",
-		_surfaces(), Engine.get_frames_per_second(), "Alto" if high else "Celular", input.source,
-		"  · piloto automático" if autopilot else "", toast if toast_t > 0.0 else "",
-		"[E/Q] marcha  [1] ABS  [2] TC  [G] câmbio  [R] grid  [N] nick  [C] câmera  [P] piloto  [F1] qualidade  [F12] print"]
+		menu.update_fps(hud.fps)
 
 
 func _unhandled_input(e: InputEvent) -> void:
-	# digitando o nick: as teclas não comandam o carro
-	if nick_edit.visible:
-		if e is InputEventKey and e.pressed and e.keycode == KEY_ESCAPE:
-			nick_edit.visible = false
-			nick_edit.release_focus()
+	var key: bool = e is InputEventKey and e.pressed and not e.echo
+	var pad: bool = e is InputEventJoypadButton and e.pressed
+	# menu aberto: Esc / Start / Voltar fecham; o resto é do menu (o carro está parado)
+	if paused:
+		if (key and e.keycode == KEY_ESCAPE) or (pad and e.button_index == JOY_BUTTON_START):
+			_set_paused(false)
 			get_viewport().set_input_as_handled()
 		return
-	if e is InputEventKey and e.pressed and not e.echo:
+	if key:
 		match e.keycode:
 			KEY_N:
-				_open_nick()
+				_set_paused(true, true)
 			KEY_R:
 				_spawn()
 				chase.snap()
@@ -434,6 +346,8 @@ func _unhandled_input(e: InputEvent) -> void:
 				autopilot = not autopilot
 				if autopilot:
 					car.assists.auto = true
+			KEY_T:
+				hud.telemetry = not hud.telemetry
 			KEY_1:
 				car.assists.abs = not car.assists.abs
 				_toast("ABS " + ("ligado" if car.assists.abs else "desligado"))
@@ -444,36 +358,66 @@ func _unhandled_input(e: InputEvent) -> void:
 				car.assists.auto = not car.assists.auto
 				_toast("Câmbio " + ("automático" if car.assists.auto else "manual"))
 			KEY_F1:
-				_set_quality(not high)
+				var q: Array = PauseMenu.QUALITIES
+				_apply_quality(q[(q.find(quality_name) + 1) % q.size()])
+				_toast("Gráficos: " + quality_name)
 			KEY_F12:
 				_screenshot()
 			KEY_ESCAPE:
-				# volta para a garagem (sem garagem, quando aberto direto com --car/--shot, sai)
-				if Game.from_garage:
-					get_tree().change_scene_to_file("res://scenes/garagem.tscn")
-				else:
-					get_tree().quit()
-
-
-	# câmera também no controle (Y, como no web)
-	if e is InputEventJoypadButton and e.pressed and e.button_index == JOY_BUTTON_Y:
-		chase.next()
-		_toast("Câmera: " + chase.mode_name())
+				_set_paused(true)
+	if pad:
+		# câmera também no controle (Y, como no web); Start abre o menu
+		if e.button_index == JOY_BUTTON_Y:
+			chase.next()
+			_toast("Câmera: " + chase.mode_name())
+		elif e.button_index == JOY_BUTTON_START:
+			_set_paused(true)
 
 
 func _notification(what: int) -> void:
-	# botão voltar do Android: pausa (o menu entra na etapa 9)
+	# botão voltar do Android: abre/fecha o menu
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
 		_toggle_pause()
 
 
 func _toggle_pause() -> void:
-	paused = not paused
+	_set_paused(not paused)
+
+
+## pausa = menu aberto (o carro para, os botões de toque somem)
+func _set_paused(on: bool, focus_nick := false) -> void:
+	if on == paused and not (on and focus_nick):
+		return
+	paused = on
+	if touch:
+		touch.set_enabled(not on)
+	if on:
+		menu.open(nick, quality_name, volume, car.assists, focus_nick)
+	elif menu.is_open:
+		menu.close()
+
+
+func _to_garage() -> void:
+	paused = false
+	get_tree().change_scene_to_file("res://scenes/garagem.tscn")
 
 
 func _toast(t: String) -> void:
-	toast = t
-	toast_t = 2.0
+	hud.toast(t)
+
+
+func _set_volume(v: float) -> void:
+	volume = clampf(v, 0.0, 1.0)
+	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(volume, 0.0001)))
+	AudioServer.set_bus_mute(0, volume <= 0.0)
+
+
+## Preset gráfico pelo nome do menu (Leve / Médio / Extremo). Por enquanto Leve = celular e os outros dois = alto;
+## a etapa 8 pluga aqui os três presets reais.
+func _apply_quality(name: String) -> void:
+	quality_name = name
+	high = name != "Leve"
+	_set_quality(high)
 
 
 ## superfície sob cada roda (DE DD / TE TD), quando alguma sai do asfalto

@@ -61,6 +61,15 @@ func _layout() -> void:
 	queue_redraw()
 
 
+## menu de pausa aberto: esconde os botões e solta tudo (os toques vão só para o menu)
+func set_enabled(on: bool) -> void:
+	visible = on
+	set_process_input(on)
+	if not on:
+		_fingers.clear()
+		_sync()
+
+
 func _hit(pos: Vector2) -> String:
 	for name in _rects:
 		if _rects[name][1].has_point(pos):
