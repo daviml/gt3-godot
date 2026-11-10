@@ -2,5 +2,5 @@
   "version": 4,
   "base_data_url": "https://github.com/daviml/gt3-godot/releases/download/v1.0/base_data.pck",
   "patch_url": "https://github.com/daviml/gt3-godot/releases/download/v1.3/patch.pck",
-  "changelog": "v1.3: Otimizações críticas de performance mobile (fim da espiral de 10 FPS, culling de torcida/torres e shaders rápidos em Mínimo/Leve), 4 esquemas de controles mobile (Padrão, Fly-by-wire, Inclinar e Legacy) e ré automática no toque."
+  "changelog": "Lancamento automatico de atualizacao v1.3: Otimizacoes criticas mobile (fim da espiral de 10 FPS, culling e shaders rapidos), 4 esquemas de controles mobile e re automatica."
 }
