@@ -119,10 +119,10 @@ static func _sub_arrays(arr: Array, tri: PackedInt32Array) -> Array:
 # Orçamento dos arredores por preset: 0 = Mínimo, 1 = Leve, 2 = Médio, 3 = Extremo.
 # A torcida em cartões e a mata ganham distância de corte adequada para alta taxa de quadros no mobile.
 const DETAIL := [
-	{"crowd": 0.0, "trees": 900.0, "towers": 1400.0},     # 0 = Mínimo (sem torcida, mata e torres curtas)
-	{"crowd": 180.0, "trees": 1400.0, "towers": 2000.0},  # 1 = Leve (60 fps S22)
-	{"crowd": 400.0, "trees": 2400.0, "towers": 0.0},     # 2 = Médio
-	{"crowd": 0.0, "trees": 0.0, "towers": 0.0},          # 3 = Extremo (0 = ilimitado)
+	{"level": 0, "crowd": 0.0, "trees": 600.0, "towers": 0.0},     # 0 = Mínimo (sem torcida, sem torres, mata 600m)
+	{"level": 1, "crowd": 180.0, "trees": 1200.0, "towers": 1800.0}, # 1 = Leve (60 fps S22)
+	{"level": 2, "crowd": 400.0, "trees": 2400.0, "towers": 0.0},    # 2 = Médio
+	{"level": 3, "crowd": 0.0, "trees": 0.0, "towers": 0.0},         # 3 = Extremo (0 = ilimitado)
 ]
 
 
@@ -132,12 +132,21 @@ func set_detail(level: int) -> void:
 
 
 func _apply_detail(n: Node, d: Dictionary) -> void:
+	var lvl: int = int(d.get("level", 2))
 	if n is MultiMeshInstance3D and _is_tree(n):
 		_range(n, d.trees)
 	elif n is MeshInstance3D and _is_crowd(n):
-		_range(n, d.crowd)
+		if lvl == 0:
+			n.visible = false
+		else:
+			n.visible = true
+			_range(n, d.crowd)
 	elif n is MultiMeshInstance3D and n.name == "Torres":
-		_range(n, d.get("towers", 0.0))
+		if lvl == 0:
+			n.visible = false
+		else:
+			n.visible = true
+			_range(n, d.get("towers", 0.0))
 	for c in n.get_children():
 		_apply_detail(c, d)
 
@@ -212,7 +221,8 @@ func _build_horizon() -> void:
 		st.add_index(i + 3)
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/horizonte.gdshader")
-	mat.set_shader_parameter("tex", load(HORIZON_TEX))
+	if ResourceLoader.exists(HORIZON_TEX):
+		mat.set_shader_parameter("tex", load(HORIZON_TEX))
 	var mi := MeshInstance3D.new()
 	mi.name = "Horizonte"
 	mi.mesh = st.commit()

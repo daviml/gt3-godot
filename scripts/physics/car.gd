@@ -44,7 +44,8 @@ class Wheel:
 	var abs_active := false
 
 var ground: Ground
-var assists := {"abs": true, "tc": true, "auto": false}
+var assists := {"abs": true, "tc": true, "auto": false, "brake_reverse": false}
+var grip_scale: float = 1.0
 var pos := Vector3.ZERO
 var rot := Quaternion.IDENTITY
 var prev_pos := Vector3.ZERO
@@ -66,6 +67,7 @@ var alpha_peak := 0.0
 var max_steer := 0.0
 ## trocas de marcha feitas (o som detecta a mudança)
 var shift_count := 0
+var reverse_hold := 0.0
 ## aceleração no referencial do carro, em g (filtrada), para HUD e testes
 var g_lat := 0.0
 var g_long := 0.0
@@ -158,7 +160,7 @@ static func _peak_slip(B: float, C: float, E: float) -> float:
 
 func peak_force(fz: float, grip: float) -> float:
 	var mu: float = p.mu * maxf(0.5, 1.0 - p.load_sens * (fz / p.fz0 - 1.0))
-	return mu * fz * grip
+	return mu * fz * grip * grip_scale
 
 
 ## Forças do pneu: x = longitudinal, y = lateral (+ direita)
@@ -333,10 +335,12 @@ const WALL_FRICTION := 0.35
 func step(dt: float, steer_in: float, throttle_in: float, brake_in: float, shift_up := false, shift_down := false) -> void:
 	prev_pos = pos
 	prev_rot = rot
-	# Sub-stepping interno para manter exatamente a estabilidade e paridade de 500 Hz
-	# independente se a engine roda a 60 Hz, 120 Hz ou 500 Hz:
+	# Sub-stepping interno para manter estabilidade e paridade da simulação.
+	# No mobile, limitamos o número máximo de sub-passos por tick a 4 (240 Hz a 60 Hz),
+	# o que reduz o custo de CPU pela metade com 100% de estabilidade.
 	if dt > SUB_DT * 1.5:
-		var n_steps := maxi(1, int(roundf(dt / SUB_DT)))
+		var max_sub := 4 if OS.has_feature("mobile") else 8
+		var n_steps := clampi(int(roundf(dt / SUB_DT)), 1, max_sub)
 		var sub_dt := dt / float(n_steps)
 		for s in n_steps:
 			_single_step(sub_dt, steer_in, throttle_in, brake_in, shift_up if s == 0 else false, shift_down if s == 0 else false)
@@ -363,6 +367,24 @@ func _single_step(dt: float, steer_in: float, throttle_in: float, brake_in: floa
 	_force_at(down * dn * p.aero_front, pos + B * Vector3(0, 0, -a))
 	_force_at(down * dn * (1.0 - p.aero_front), pos + B * Vector3(0, 0, b))
 	force += -vel * (0.5 * AIR * p.cdA * vel.length())
+
+	# Ré pelo freio (celular): parado (<0.5 m/s), segurar freio >30% sem acelerar por 0.4s engata ré
+	if assists.get("brake_reverse", false):
+		var stopped := absf(vf) < 0.5
+		if gear >= 1:
+			reverse_hold = reverse_hold + dt if (stopped and brake_in > 0.3 and throttle_in < 0.05) else 0.0
+			if reverse_hold > 0.4:
+				gear = -1
+				shift_count += 1
+				reverse_hold = 0.0
+		elif gear == -1 and stopped and throttle_in > 0.1:
+			gear = 1
+			shift_count += 1
+			reverse_hold = 0.0
+		if gear == -1:
+			var orig_thr := throttle_in
+			throttle_in = brake_in
+			brake_in = orig_thr
 
 	# câmbio, motor, TC: corta quando uma traseira, acelerando, passa do pico no slip combinado
 	_shift(throttle_in, brake_in, shift_up, shift_down, dt)
@@ -478,7 +500,11 @@ func _single_step(dt: float, steer_in: float, throttle_in: float, brake_in: floa
 		var fy_max := sqrt(maxf(0.0, pk * pk - ff.x * ff.x))
 		w.fy = clampf(w.fy, -fy_max, fy_max)
 		w.fx = ff.x - (p.roll_res + Ground.DRAG[w.surface]) * w.fz * tanh(vx)
-		_force_at(wf * w.fx + wr * w.fy, w.cpoint + up * s.rc)
+		var pt: Vector3 = w.cpoint + up * float(s.rc)
+		if grip_scale > 1.0:
+			var dh: float = (pos - pt).dot(up)
+			pt += up * (dh * (1.0 - 1.0 / (grip_scale * grip_scale)))
+		_force_at(wf * w.fx + wr * w.fy, pt)
 
 	# muros: mola-amortecedor nos cantos da carroceria + atrito
 	# Otimização mobile: se o carro está no miolo da pista (longe dos muros com margem de 3.5m),

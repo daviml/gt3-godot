@@ -1,6 +1,6 @@
 {
-  "version": 2,
+  "version": 3,
   "base_data_url": "https://github.com/daviml/gt3-godot/releases/download/v1.0/base_data.pck",
-  "patch_url": "https://github.com/daviml/gt3-godot/releases/download/v1.1/patch.pck",
-  "changelog": "v1.1: Otimização mobile 60 FPS, FSR 1.0, interpolação de física sub-frame e preset Mínimo."
+  "patch_url": "https://github.com/daviml/gt3-godot/releases/download/v1.2/patch.pck",
+  "changelog": "v1.2: 4 esquemas de controles mobile (Padrão com pedais proporcionais por altura, Fly-by-wire com resposta háptica, Inclinar com giroscópio e Legacy), ré automática no toque (brake_to_reverse) e limite de esterço escalado para o modo Arcade."
 }

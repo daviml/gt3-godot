@@ -55,9 +55,14 @@ jobs:
             echo "NOTES=${{ github.event.inputs.changelog }}" >> $GITHUB_OUTPUT
           else
             TAG_NAME="${GITHUB_REF#refs/tags/}"
-            echo "VER=2" >> $GITHUB_OUTPUT
+            if [ -f version.json ]; then
+              CUR_VER=$(grep -o '"version": *[0-9]*' version.json | grep -o '[0-9]*' || echo 2)
+            else
+              CUR_VER=2
+            fi
+            echo "VER=${CUR_VER}" >> $GITHUB_OUTPUT
             echo "TAG=${TAG_NAME}" >> $GITHUB_OUTPUT
-            echo "NOTES=Lancamento automatico de atualizacao ${TAG_NAME}" >> $GITHUB_OUTPUT
+            echo "NOTES=Lancamento automatico de atualizacao ${TAG_NAME}: Novos esquemas de controles mobile (Padrao, Fly-by-wire, Inclinar, Legacy) e re automatica." >> $GITHUB_OUTPUT
           fi
 
       - name: Criar Release no GitHub

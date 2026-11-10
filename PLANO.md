@@ -33,7 +33,9 @@ Ao analisar os commits mais recentes do repositório web (`gt3-time-attack`), id
    - **Novo Preset Gráfico "Mínimo (Celular Fraco)":** além de Leve, Médio e Extremo, adicionado o preset Mínimo (sem sombras direcionais de sol, sem reflexos/pós-processamento, cenário simplificado com 70% de resolução interna e FSR). (10/11)
    - **FSR 1.0 (AMD FidelityFX Super Resolution) no Mobile:** ativado `scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR` na Godot 4 com escala 0.70x (Mínimo) e 0.80x (Leve), aliviando o fillrate das GPUs mobile em telas FHD+/QHD+ mantendo HUD e botões 2D em 1080p nativo. (10/11)
    - **Interpolação de Física Sub-Frame:** eliminação do micro-stutter/judder de 30/120 Hz usando `Engine.get_physics_interpolation_fraction()` na posição/rotação do `CarView` e da `ChaseCamera`, tornando o movimento fluido mesmo quando o FPS oscila. (10/11)
-   - **Eliminação do "Physics Spiral of Death":** `common/max_physics_steps_per_frame.mobile` aumentado de 2 para 5 no `project.godot`, impedindo que a física entre em câmera lenta quando o frame rate cai momentaneamente. (10/11)
+   - **Eliminação do "Physics Spiral of Death":** `common/max_physics_steps_per_frame.mobile` fixado em 2 no `project.godot` e `Engine.max_physics_steps_per_frame = 2` no mobile, com sub-passos do `car.gd` limitados a 4 (240 Hz a 60 Hz). Isso impede que uma queda momentânea de FPS acumule múltiplos passos de física que saturavam a CPU em 100% em loop infinito (a causa raiz dos 10 FPS travados). (10/11)
+   - **Correção de Culling da Torcida e Torres no Mínimo:** correção do bug onde `crowd = 0.0` desativava o culling em vez de ocultar a torcida no Godot 4, além de ocultar as 1.400 torres no preset Mínimo. (10/11)
+   - **Shader de Grama e Asfalto com `fast_mode`:** modo simplificado nos presets Mínimo e Leve que corta 28 senos por pixel, normal map e ARM map no chão do vale de Interlagos, aliviando o fillrate ao entrar no S do Senna. (10/11)
    - **Otimização de Sombras Mobile:** resolução mobile reduzida para 1024, sombra ortogonal curta (50 m) no preset Leve e desativada no preset Mínimo. (10/11)
    - **Culling de Geometria, Draw Calls e Far Plane:** `cam.far` reduzido de 6000 m para 1800 m (Mínimo) e 2200 m (Leve), desativação de Glow/MSAA em Leve/Mínimo e fast-path nas colisões de muro no `car.gd`. (10/11)
 
@@ -77,7 +79,7 @@ Ao analisar os commits mais recentes do repositório web (`gt3-time-attack`), id
     $$\Delta h = (\text{body.pos} - \text{point}) \cdot \text{up}$$
     $$\text{point} += \text{up} \cdot \left(\Delta h \cdot \left(1 - \frac{1}{\text{grip\_scale}^2}\right)\right)$$
     Evita capotamentos acima de 3 g nas curvas velozes (Curva do Sol, Junção, Subida dos Boxes).
-- [ ] **Ré Automática no Toque (`brake_to_reverse`):**
+- [x] **Ré Automática no Toque (`brake_to_reverse`):** (10/11)
   - Quando a velocidade longitudinal for $< 0,5\text{ m/s}$ e o freio for segurado $> 30\%$ sem acelerar por $0,4\text{ s}$, engatar marcha ré (`gear = -1`).
   - Em ré, os pedais invertem (freio acelera para trás, acelerador freia o carro).
   - Parado em ré com acelerador $> 10\%$, engatar 1ª marcha automaticamente.
@@ -92,7 +94,7 @@ Ao analisar os commits mais recentes do repositório web (`gt3-time-attack`), id
 - [x] Teclado e controle com limites de esterço por velocidade, zona morta e curvas exponenciais. (07/11)
 - [x] Vibração háptica de controle (rumble para zebras, ABS, rotação e limitador). (07/11)
 - [x] Controle de toque Legacy funcional com botões digitais. (07/11)
-- [ ] **Implementar os 4 Modos de Toque no `touch_controls.gd` e `input_reader.gd`:**
+- [x] **Implementar os 4 Modos de Toque no `touch_controls.gd` e `input_reader.gd`:** (10/11)
   - **1. Modo Padrão (Recomendado):**
     - Analógico virtual horizontal à esquerda com retorno automático, deadzone de 8% e resposta exponencial 1.6.
     - Pedais de FREIO e ACEL. proporcionais à direita: leitura da coordenada Y do toque com curva (0 a 15% de toque = 0 a 10% do pedal; 15 a 85% = proporcional; >85% = 100%).
@@ -107,11 +109,11 @@ Ao analisar os commits mais recentes do repositório web (`gt3-time-attack`), id
     - Pedais na tela (digitais ou proporcionais).
   - **4. Modo Legacy:**
     - Botões digitais ◀ ▶ e pedais liga/desliga com as rampas clássicas de aceleração e retorno.
-- [ ] **Pointer Capture e Transição Suave entre Pedais:**
+- [x] **Pointer Capture e Transição Suave entre Pedais:** (10/11)
   - Rastrear toques por ID (`event.index`); ao deslizar o polegar da área de acelerador para freio (ou vice-versa), trocar o comando sem necessidade de levantar o dedo e sem cancelamento acidental.
-- [ ] **Escala do Limite de Esterço no Arcade:**
+- [x] **Escala do Limite de Esterço no Arcade:** (10/11)
   - Ajustar `steer_limit` no `input_reader.gd`: `limit = min(1.0, steer_limit(speed) * grip_scale)`.
-- [ ] Teste de controles: atualizar `scripts/tests/controles.gd` para cobrir os 4 modos mobile e o sensor de inclinação.
+- [x] Teste de controles: atualizar `scripts/tests/controles.gd` para cobrir os 4 modos mobile e o sensor de inclinação. (10/11)
 
 ### 4. Cronometragem, Regras e Recordes Separados
 - [x] Volta lançada, 3 setores, delta ao vivo e detecção de corte de pista. (07/11)

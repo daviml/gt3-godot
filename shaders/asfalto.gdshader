@@ -5,6 +5,7 @@
 // UV em metros/4 (igual ao web).
 shader_type spatial;
 
+uniform bool fast_mode = false;
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D arm_tex : filter_linear_mipmap_anisotropic, repeat_enable;
@@ -23,20 +24,28 @@ void vertex() {
 }
 
 void fragment() {
-	vec3 c = texture(albedo_tex, UV).rgb;
-	c = mix(c, texture(albedo_tex, UV * 0.23 + 0.41).rgb, 0.4);
-	c = c * vec3(1.22, 1.0, 0.66) + vec3(0.035, 0.026, 0.014);
-	float big = a_noise(ground / 45.0) * 0.65 + a_noise(ground / 18.0 + 13.0) * 0.35;
-	float newer = smoothstep(0.6, 0.68, big);
-	float older = smoothstep(0.36, 0.28, big);
-	c *= mix(vec3(1.0), vec3(0.64, 0.65, 0.7), newer);
-	c *= mix(vec3(1.0), vec3(1.18, 1.16, 1.13), older);
-	c *= 0.92 + 0.16 * a_noise(ground / 7.0 + 3.0);
-	ALBEDO = c;
-	NORMAL_MAP = texture(normal_tex, UV).rgb;
-	vec3 arm = texture(arm_tex, UV).rgb;
-	AO = arm.r;
-	AO_LIGHT_AFFECT = 0.3;
-	ROUGHNESS = arm.g;
-	METALLIC = 0.0;
+	if (fast_mode) {
+		vec3 c = texture(albedo_tex, UV).rgb;
+		c = c * vec3(1.22, 1.0, 0.66) + vec3(0.035, 0.026, 0.014);
+		ALBEDO = c;
+		ROUGHNESS = 0.8;
+		METALLIC = 0.0;
+	} else {
+		vec3 c = texture(albedo_tex, UV).rgb;
+		c = mix(c, texture(albedo_tex, UV * 0.23 + 0.41).rgb, 0.4);
+		c = c * vec3(1.22, 1.0, 0.66) + vec3(0.035, 0.026, 0.014);
+		float big = a_noise(ground / 45.0) * 0.65 + a_noise(ground / 18.0 + 13.0) * 0.35;
+		float newer = smoothstep(0.6, 0.68, big);
+		float older = smoothstep(0.36, 0.28, big);
+		c *= mix(vec3(1.0), vec3(0.64, 0.65, 0.7), newer);
+		c *= mix(vec3(1.0), vec3(1.18, 1.16, 1.13), older);
+		c *= 0.92 + 0.16 * a_noise(ground / 7.0 + 3.0);
+		ALBEDO = c;
+		NORMAL_MAP = texture(normal_tex, UV).rgb;
+		vec3 arm = texture(arm_tex, UV).rgb;
+		AO = arm.r;
+		AO_LIGHT_AFFECT = 0.3;
+		ROUGHNESS = arm.g;
+		METALLIC = 0.0;
+	}
 }
