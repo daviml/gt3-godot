@@ -137,13 +137,13 @@ Tudo desenhado por código em `scripts/ui/hud.gd` (um Control com `_draw`, escal
 - [ ] Carros fantasmas translúcidos com etiqueta de nick acima, interpolação de 120 ms, lista "Na pista agora" e aviso quando alguém baixa o tempo na sessão.
 
 ### 13. Exportação e Polimento Android (e Preparação iOS)
-- [ ] Configurar JDK 17 + Android SDK + templates de exportação da Godot 4.7, keystore de debug/release e preset `Android` no `export_presets.cfg` (orientação paisagem travada, tela cheia imersiva, ícone).
+- [x] Configurar JDK 17 + Android SDK + templates de exportação da Godot 4.7, keystore de debug/release e preset `Android` no `export_presets.cfg` (orientação paisagem travada, tela cheia imersiva, ícone). (10/11)
 - [ ] Testar o APK diretamente no celular do Davi: validar os 60 FPS no preset **Leve/Médio**, nitidez da imagem, reflexo do carro, resposta dos botões de toque e temperatura do aparelho.
-- [ ] Deixar o preset de **iOS** pré-configurado no `export_presets.cfg` caso queira compilar num Mac futuramente.
+- [x] Deixar o preset de **iOS** pré-configurado no `export_presets.cfg` caso queira compilar num Mac futuramente. (10/11)
 
 ### 14. Distribuição e Atualização
 - [x] **PC (`.exe` em zip):** `export_presets.cfg` (preset "Windows") gerando executável com `godot --headless --path . --export-release "Windows" "build/windows/GT3 Time Attack.exe"`. (08/11)
-- [ ] **Android (`.apk` / `.aab`):** script de build de 1 comando gerando o `.apk` pronto para instalar no celular ou enviar para amigos (e `.aab` caso decida colocar na Play Store depois).
+- [x] **Android (`.apk` / `.aab`):** script de build de 1 comando gerando o `.apk` pronto para instalar no celular ou enviar para amigos (`Build-Android.bat`). (10/11)
 - [ ] Aviso no menu inicial quando houver versão nova disponível para download (consulta leve a um JSON online).
 
 ---
