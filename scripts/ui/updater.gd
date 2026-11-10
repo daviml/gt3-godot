@@ -3,7 +3,7 @@ extends Control
 ## Auto-Updater do GT3 Time Attack
 ## Verifica se há novidades e baixa apenas o patch leve (2~4 MB). Se estiver offline, entra direto no jogo!
 
-const CURRENT_CLIENT_VERSION: int = 1
+const CURRENT_CLIENT_VERSION: int = 2
 const VERSION_URL: String = "https://raw.githubusercontent.com/daviml/gt3-godot/main/version.json"
 const PATCH_PCK_PATH: String = "user://patch.pck"
 const LOCAL_VERSION_PATH: String = "user://installed_version.json"

@@ -44,7 +44,7 @@ goto FIM
 :BUILD_PATCH
 echo.
 echo Exportando patch.pck...
-"%GODOT%" --headless --path "%~dp0." --export-pack "Windows" "%OUT_PATCH%"
+"%GODOT%" --headless --path "%~dp0." --export-pack "Patch" "%OUT_PATCH%"
 if %ERRORLEVEL% equ 0 (
     echo [OK] patch.pck gerado em: %OUT_PATCH%
 ) else (
@@ -57,7 +57,7 @@ echo.
 echo Exportando base_data.pck...
 "%GODOT%" --headless --path "%~dp0." --export-pack "DataPack" "%OUT_BASE%"
 echo Exportando patch.pck...
-"%GODOT%" --headless --path "%~dp0." --export-pack "Windows" "%OUT_PATCH%"
+"%GODOT%" --headless --path "%~dp0." --export-pack "Patch" "%OUT_PATCH%"
 echo [OK] Pacotes gerados com sucesso em %OUT_DIR%!
 goto FIM
 

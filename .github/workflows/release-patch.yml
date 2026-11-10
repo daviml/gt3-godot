@@ -41,10 +41,10 @@ jobs:
           chmod +x godot
           sudo mv godot /usr/local/bin/
 
-      - name: Exportar Patch PCK
+      - name: Exportar Patch PCK (Leve)
         run: |
           mkdir -p build/packs
-          godot --headless --path . --export-pack "Windows" "build/packs/patch.pck"
+          godot --headless --path . --export-pack "Patch" "build/packs/patch.pck"
 
       - name: Determinar Versao e Tag
         id: vars
