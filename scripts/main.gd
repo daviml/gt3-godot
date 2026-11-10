@@ -84,9 +84,9 @@ func _ready() -> void:
 		bot = RefBot.new(track, car, RefBot.load_ref(REFS[car_id]), opts)
 	else:
 		bot = Bot.new(track, car)
-	# no celular o câmbio é automático, como no web
-	if autopilot or input.touch:
-		car.assists.auto = true
+	# No celular ou com flag --mobile, já inicia configurado para Mobile
+	var is_mobile := OS.has_feature("mobile") or "--mobile" in args
+	_set_quality(not is_mobile)
 
 
 # modo de teste: --shot=<pasta> pilota sozinho, salva prints em alguns tempos e sai
@@ -115,7 +115,7 @@ func _build_env() -> void:
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = load("res://shaders/sky.gdshader")
 	# HDRI em meio-float (o import padrão do Godot quantizava o céu em faixas)
-	var pano := Image.load_from_file(ProjectSettings.globalize_path("res://assets/sky/ceu_2k.hdr"))
+	var pano := Image.load_from_file("res://assets/sky/ceu_2k.hdr")  # importer "keep": o .hdr vai cru no executável
 	pano.convert(Image.FORMAT_RGBAH)
 	sky_mat.set_shader_parameter("pano", ImageTexture.create_from_image(pano))
 	var sky := Sky.new()
@@ -153,13 +153,17 @@ func _build_env() -> void:
 	add_child(we)
 
 	sun = DirectionalLight3D.new()
-	sun.light_color = Color(1.0, 0.95, 0.88)
-	sun.light_energy = 2.2
+	# Sol LMU: mais quente e brilhante (0xffe6c2 = Color(1.0, 0.90, 0.76))
+	sun.light_color = Color(1.0, 0.91, 0.78)
+	sun.light_energy = 2.8
 	sun.shadow_enabled = true
-	sun.shadow_bias = 0.03
-	sun.shadow_normal_bias = 1.0
+	sun.shadow_bias = 0.02
+	sun.shadow_normal_bias = 0.8
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.directional_shadow_max_distance = 260.0
+	sun.directional_shadow_max_distance = 180.0
+	sun.directional_shadow_split_1 = 0.08
+	sun.directional_shadow_split_2 = 0.22
+	sun.directional_shadow_split_3 = 0.50
 	sun.light_angular_distance = 0.5
 	add_child(sun)
 	sun.look_at_from_position(sun_dir * 100.0, Vector3.ZERO, Vector3.UP)
@@ -482,7 +486,7 @@ func _surfaces() -> String:
 	return "%s %s / %s %s" % out if any else ""
 
 
-## "Celular": desliga o que o renderizador Mobile do Godot não tem ou é caro em celular, para ter uma ideia.
+## Ajusta presets de qualidade: h=true (Alto/PC), h=false (Leve/Mobile Bonito).
 func _set_quality(h: bool) -> void:
 	high = h
 	env.ssao_enabled = h
@@ -490,9 +494,11 @@ func _set_quality(h: bool) -> void:
 	env.ssr_enabled = h
 	env.glow_enabled = true
 	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS if h else DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	sun.directional_shadow_max_distance = 260.0 if h else 120.0
+	sun.directional_shadow_max_distance = 180.0 if h else 90.0
 	get_viewport().msaa_3d = Viewport.MSAA_4X if h else Viewport.MSAA_2X
-	get_viewport().scaling_3d_scale = 1.0 if h else 0.75
+	# No mobile, mantemos a resolução nítida nativa (1.0) ou muito próxima (0.95 com FSR se necessário)
+	# para nunca ficar embaçado ou parecer PS1
+	get_viewport().scaling_3d_scale = 1.0
 
 
 func _screenshot() -> void:

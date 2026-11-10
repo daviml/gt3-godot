@@ -57,7 +57,7 @@ func _build_studio() -> void:
 	# luz ambiente do mesmo céu da pista (fraca); o reflexo vem da sonda, que enxerga as faixas de luz
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = load("res://shaders/sky.gdshader")
-	var pano := Image.load_from_file(ProjectSettings.globalize_path("res://assets/sky/ceu_2k.hdr"))
+	var pano := Image.load_from_file("res://assets/sky/ceu_2k.hdr")  # importer "keep": o .hdr vai cru no executável
 	pano.convert(Image.FORMAT_RGBAH)
 	sky_mat.set_shader_parameter("pano", ImageTexture.create_from_image(pano))
 	var sky := Sky.new()

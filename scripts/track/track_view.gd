@@ -32,6 +32,8 @@ func _ready() -> void:
 	add_child(root)
 	_fix(root)
 	_build_trees()
+	# torres residenciais e horizonte (etapa 9): scripts/track/surroundings_view.gd
+	add_child(SurroundingsView.new())
 
 
 func _fix(n: Node) -> void:
@@ -45,6 +47,13 @@ func _fix(n: Node) -> void:
 			order = int(m.get_string(1))
 			shadow = m.get_string(2) == "1"
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		# Otimização de Distância de Visão (Culling / HLOD):
+		# Detalhes pequenos não precisam ser renderizados a 6000 m de distância
+		if shadow and order == 0:
+			# Postes, alambrado, cones, placas secundárias
+			mi.visibility_range_end = 650.0
+			mi.visibility_range_end_margin = 50.0
+			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		for s in mi.mesh.get_surface_count():
 			var mat := mi.mesh.surface_get_material(s)
 			if mat:
@@ -90,6 +99,9 @@ func _material(src: Material, order: int) -> Material:
 			# decalques (borracha, marcas, remendos, grid, faixas da pit lane): na ordem do web, sem gravar
 			# profundidade, por cima do asfalto
 			d.render_priority = clampi(order, -128, 127)
+			# Otimização crítica mobile: alpha-scissor (test) ou depth prepass evita overdraw
+			# desativando depth write com transparência simples reduz custo de GPU
+			d.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 		out = d
 	_cache[key] = out
 	return out

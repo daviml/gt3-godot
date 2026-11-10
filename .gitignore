@@ -12,3 +12,5 @@ assets/cars/*/*.png.import
 # texturas extraídas do cenário da pista ao importar
 assets/track/*.png
 assets/track/*.png.import
+# exportação (etapa 14)
+build/

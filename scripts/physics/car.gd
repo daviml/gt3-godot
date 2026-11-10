@@ -6,6 +6,7 @@ class_name Car
 extends RefCounted
 
 const HZ := 500
+const SUB_DT := 1.0 / 500.0
 const G := 9.81
 const AIR := 1.225
 const V_LOW := 3.0
@@ -313,6 +314,18 @@ const WALL_C := 4e4
 const WALL_FRICTION := 0.35
 
 func step(dt: float, steer_in: float, throttle_in: float, brake_in: float, shift_up := false, shift_down := false) -> void:
+	# Sub-stepping interno para manter exatamente a estabilidade e paridade de 500 Hz
+	# independente se a engine roda a 60 Hz, 120 Hz ou 500 Hz:
+	if dt > SUB_DT * 1.5:
+		var n_steps := maxi(1, int(roundf(dt / SUB_DT)))
+		var sub_dt := dt / float(n_steps)
+		for s in n_steps:
+			_single_step(sub_dt, steer_in, throttle_in, brake_in, shift_up if s == 0 else false, shift_down if s == 0 else false)
+	else:
+		_single_step(dt, steer_in, throttle_in, brake_in, shift_up, shift_down)
+
+
+func _single_step(dt: float, steer_in: float, throttle_in: float, brake_in: float, shift_up := false, shift_down := false) -> void:
 	var B := basis()
 	force = Vector3(0, -p.mass * G, 0)
 	torque = Vector3.ZERO

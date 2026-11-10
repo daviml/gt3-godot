@@ -47,8 +47,28 @@ func setup(car_id: String) -> void:
 	offset = Vector3(0, -p.cgHeight, -p.wheelbase * (1.0 - p.weightFront) - front)
 	model.position = offset
 	fix_materials(model, id)
+	_build_blob_shadow(p)
 	for suf in WHEELS:
 		_build_wheel(suf)
+
+
+## Sombra de contato suave sob o chassi (essencial no mobile para o carro não parecer flutuar sem SSAO)
+func _build_blob_shadow(p: Dictionary) -> void:
+	var mi := MeshInstance3D.new()
+	mi.name = "blob_shadow"
+	var quad := PlaneMesh.new()
+	quad.size = Vector2(2.1, p.wheelbase + 1.6)
+	mi.mesh = quad
+	mi.position = Vector3(0, -p.cgHeight + 0.03, -p.wheelbase * (0.5 - p.weightFront))
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0, 0, 0, 0.65)
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	mat.no_depth_test = false
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
 
 
 ## roda: um nó "cubo" no centro dela, com a roda (que gira) e a pinça (que não gira) dentro
@@ -174,7 +194,9 @@ static func fix_material(src: BaseMaterial3D, car_id: String) -> BaseMaterial3D:
 			m.clearcoat_enabled = true
 			m.clearcoat = 1.0
 			m.clearcoat_roughness = 0.04
-			m.metallic_specular = 0.6
+			m.metallic_specular = 0.75
+			# Assegura que mesmo em renderizadores sem SSR (como o Mobile), o reflexo do céu seja nítido
+			m.roughness = clampf(m.roughness, 0.15, 0.32)
 	elif m.metallic_texture != null:
 		pass # textura de metalness feita pelo autor: confia nela
 	elif _non_metal.search(nm) or not _metal.search(nm):
