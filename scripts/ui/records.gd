@@ -72,6 +72,23 @@ static func top(n: int, mode := "") -> Array:
 	return all.slice(0, n)
 
 
+## Mescla recordes remotos e locais, mantendo o melhor tempo de cada nick em cada carro
+static func merge_records(remote: Array, local: Array) -> Array:
+	var by_key := {}
+	for r in remote:
+		if r is Dictionary and r.has("nick") and r.has("carId") and r.has("time"):
+			var key := "%s|%s" % [String(r.nick).strip_edges().to_lower(), String(r.carId)]
+			by_key[key] = r
+	for l in local:
+		if l is Dictionary and l.has("nick") and l.has("carId") and l.has("time"):
+			var key := "%s|%s" % [String(l.nick).strip_edges().to_lower(), String(l.carId)]
+			if not by_key.has(key) or float(l.time) < float(by_key[key].time):
+				by_key[key] = l
+	var res := by_key.values()
+	res.sort_custom(func(a, b): return float(a.time) < float(b.time))
+	return res
+
+
 static func build_volta_payload(nick: String, car_id: String, lap: LapTimer.Lap, mode := "") -> String:
 	return JSON.stringify({
 		"nick": nick.strip_edges(),
@@ -206,13 +223,44 @@ class RemoteClient:
 
 static func load_nick() -> String:
 	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS) != OK:
-		return ""
-	return String(cfg.get_value("jogador", "nick", ""))
+	if cfg.load(SETTINGS) == OK:
+		var n := String(cfg.get_value("jogador", "nick", "")).strip_edges()
+		if n != "":
+			return n
+	if cfg.load(Game.CFG) == OK:
+		var n := String(cfg.get_value("jogador", "nick", "")).strip_edges()
+		if n != "":
+			save_nick(n)
+			return n
+	# Migração caso exista pasta antiga com nome diferente (ex.: protótipo)
+	var user_dir := OS.get_user_data_dir()
+	var base_dir := user_dir.get_base_dir()
+	if base_dir != "":
+		for candidate in ["GT3 Godot (protótipo)", "gt3-godot"]:
+			var p := base_dir.path_join(candidate).path_join("ajustes.cfg")
+			if FileAccess.file_exists(p):
+				var old_cfg := ConfigFile.new()
+				if old_cfg.load(p) == OK:
+					var n := String(old_cfg.get_value("jogador", "nick", "")).strip_edges()
+					if n != "":
+						save_nick(n)
+						return n
+	var env_user := OS.get_environment("USERNAME").strip_edges()
+	if env_user != "":
+		return env_user
+	return "Piloto"
 
 
 static func save_nick(nick: String) -> void:
+	var clean := nick.strip_edges()
+	if clean == "":
+		clean = "Piloto"
 	var cfg := ConfigFile.new()
 	cfg.load(SETTINGS)
-	cfg.set_value("jogador", "nick", nick)
+	cfg.set_value("jogador", "nick", clean)
 	cfg.save(SETTINGS)
+
+	var gcfg := ConfigFile.new()
+	gcfg.load(Game.CFG)
+	gcfg.set_value("jogador", "nick", clean)
+	gcfg.save(Game.CFG)

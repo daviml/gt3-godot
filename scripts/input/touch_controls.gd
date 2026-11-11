@@ -26,6 +26,12 @@ var mode := "padrao":
 			_clear_inputs()
 			_layout()
 
+## botão ☰ interno (desativado no jogo porque o HUD exibe ❚❚ MENU no topo central)
+var show_menu_btn := true:
+	set(v):
+		show_menu_btn = v
+		queue_redraw()
+
 ## teclas digitais de toque ("left", "right", "gas", "brake")
 var keys := {}
 ## eixos proporcionais de toque: steer (-1..1), gas (0..1), brake (0..1)
@@ -174,8 +180,8 @@ static func pedal_curve(t: float) -> float:
 # ------------------------------------------------------------------ entrada de toque
 
 func _hit_target(pos: Vector2) -> Dictionary:
-	# Menu sempre checado primeiro
-	if _r_menu[1].has_point(pos):
+	# Menu sempre checado primeiro (quando visível)
+	if show_menu_btn and _r_menu[1].has_point(pos):
 		return {"type": "menu"}
 
 	match mode:
@@ -361,8 +367,9 @@ func _notification(what: int) -> void:
 func _draw() -> void:
 	var k := _k
 
-	# 1. Botão Menu ☰
-	_draw_menu_btn(_r_menu[0])
+	# 1. Botão Menu ☰ (apenas quando não substituído pela barra superior do HUD)
+	if show_menu_btn:
+		_draw_menu_btn(_r_menu[0])
 
 	# 2. Desenho específico do esquema
 	match mode:
@@ -399,26 +406,24 @@ func _draw_menu_btn(r: Rect2) -> void:
 
 func _draw_stick(r: Rect2) -> void:
 	var k := _k
+	var active := absf(_stick_dx) > 0.05 or _fingers.values().any(func(t): return t.get("type", "") == "stick")
 	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(16 / 255.0, 19 / 255.0, 25 / 255.0, 0.35)
-	sb.border_color = Color(1, 1, 1, 0.35)
+	sb.bg_color = Color(16 / 255.0, 19 / 255.0, 25 / 255.0, 0.42)
+	sb.border_color = Color(1, 1, 1, 0.9 if active else 0.48)
 	sb.set_border_width_all(maxi(2, roundi(2 * k * 0.6)))
 	sb.set_corner_radius_all(roundi(r.size.y * 0.5))
 	draw_style_box(sb, r)
 
-	# Marca de centro neutro
+	# Botão / Manípulo (Knob) com traço vertical central (estilo da foto)
 	var c := r.get_center()
-	draw_line(c + Vector2(0, -10 * k), c + Vector2(0, 10 * k), Color(1, 1, 1, 0.25), 2.0 * k)
-
-	# Botão / Manípulo (Knob)
 	var max_travel := r.size.x * 0.36
 	var knob_center := c + Vector2(_stick_dx * max_travel, 0)
-	var knob_r := roundi(28 * k)
-	var active := absf(_stick_dx) > 0.05
-	var knob_bg := Color(1, 1, 1, 0.45) if active else Color(1, 1, 1, 0.22)
-	var knob_border := Color.WHITE if active else Color(1, 1, 1, 0.5)
+	var knob_r := roundi(27 * k)
+	var knob_bg := Color(1, 1, 1, 0.28) if active else Color(1, 1, 1, 0.14)
+	var knob_border := Color.WHITE if active else Color(1, 1, 1, 0.72)
 	draw_circle(knob_center, knob_r, knob_bg)
 	draw_arc(knob_center, knob_r, 0, TAU, 32, knob_border, maxi(2, roundi(2 * k)), true)
+	draw_line(knob_center + Vector2(0, -9 * k), knob_center + Vector2(0, 9 * k), knob_border, maxf(1.5, 2.0 * k))
 
 
 func _draw_pedal(key: String, r: Rect2, val: float, label: String) -> void:
@@ -428,14 +433,14 @@ func _draw_pedal(key: String, r: Rect2, val: float, label: String) -> void:
 	sb.bg_color = Color(16 / 255.0, 19 / 255.0, 25 / 255.0, 0.35)
 	var active := val > 0.05
 	var col := Color("#2fd36b") if is_gas else Color("#ff5a4f")
-	sb.border_color = col if active else (Color(47 / 255.0, 211 / 255.0, 107 / 255.0, 0.6) if is_gas else Color(1.0, 90 / 255.0, 79 / 255.0, 0.6))
+	sb.border_color = col if active else Color(1, 1, 1, 0.35)
 	sb.set_border_width_all(maxi(2, roundi(2 * k * 0.6)))
 	sb.set_corner_radius_all(roundi(18.0 * k))
 	draw_style_box(sb, r)
 
 	# Preenchimento proporcional de baixo para cima
 	if val > 0.01:
-		var fill_h := r.size.y * val
+		var fill_h := clampf(r.size.y * val, 0.0, r.size.y - 4 * k)
 		var fill_r := Rect2(r.position.x + 2 * k, r.end.y - fill_h - 2 * k, r.size.x - 4 * k, fill_h)
 		var fsb := StyleBoxFlat.new()
 		fsb.bg_color = Color(col.r, col.g, col.b, 0.45)
@@ -443,10 +448,10 @@ func _draw_pedal(key: String, r: Rect2, val: float, label: String) -> void:
 		draw_style_box(fsb, fill_r)
 
 	var c := r.get_center()
-	var fs := roundi(17 * k)
-	var fg := Color.WHITE if active else Color(1, 1, 1, 0.8)
+	var fs := roundi(16 * k)
+	var fg := Color.WHITE if active else Color(1, 1, 1, 0.85)
 	var w := _font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x
-	draw_string(_font, c + Vector2(-w / 2.0, fs * 0.35), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, fg)
+	draw_string(_font, Vector2(c.x - w / 2.0, r.end.y - 16 * k), label, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, fg)
 
 
 func _draw_fly_bar(r: Rect2) -> void:

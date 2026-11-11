@@ -1,21 +1,24 @@
 # HUD estilo LMU (porte de src/ui/hud.ts + minimap.ts do web), desenhado por código num único Control:
-# - superior esquerdo: melhores tempos (nick, carro, tempo/gap)
-# - superior direito: Best / Current com 3 setores coloridos, delta ao vivo e nome da curva
-# - inferior esquerdo: mapa da pista com o carro
-# - inferior direito: mostrador redondo (fundo azul-marinho, arco branco de giro de 240°, marcha grande,
-#   velocidade, acelerador/freio em arcos internos de 70°) com o bloco dos 4 pneus e ABS / TC / AUT ao lado
-# - Porsche na câmera de capô: painel no estilo do display real do 992 GT3 R, centralizado embaixo
-# - meio em cima: FPS. Aviso rápido (toast) no meio. Telemetria na tecla T.
-# No celular (touch): painéis menores, mapa ao lado dos tempos e mostrador em cima no centro, longe dos botões.
-# Medidas em px de CSS do web, escaladas por k (mostrador) e kp (painéis) a partir da altura da tela.
+# - topo central: FPS + botão MENU (+ botões rápidos de Câmera e Reset no modo toque)
+# - superior esquerdo: melhores tempos (expansível/recolhível ao clicar)
+# - superior direito: Best / Current com 3 setores coloridos, delta ao vivo, aviso de volta inválida e nome da curva
+# - minimapa (canto inferior esquerdo no PC; ao lado dos tempos no celular): modo RADAR dinâmico ou CIRCUITO (clicável)
+# - mostrador principal: Barra Horizontal no topo (padrão, com RPM, pneus, ABS/TC/AUT, pedais, marcha/kmh, força G e delta)
+#   ou Mostrador Circular clássico estilo LMU (alternável no menu de pausa)
+# - Porsche na câmera de capô: painel no estilo do display real do 992 GT3 R, centralizado embaixo (PC) ou em cima (touch)
 class_name Hud
 extends Control
 
+signal menu_requested
+signal camera_requested
+signal reset_requested
+
 const MAX_RPM := 9000.0
-## mostrador: arco de giro de 240° (150° → 390°) com raio 86 numa caixa de 200; pedais a 73 de raio, 70° cada
+## mostrador circular: arco de giro de 240° (150° → 390°) com raio 86 numa caixa de 200; pedais a 73 de raio, 70° cada
 const GR := 86.0
 const PR := 73.0
 const GAUGE := 226.0
+const HBAR_W := 536.0
 const ACCENT := Color("#e10600")
 const WHITE := Color("#f2f4f7")
 const PURPLE := Color("#c9a6ff")
@@ -28,6 +31,32 @@ const TYRE_STOPS := [[0.0, Color("#3d8bff")], [0.45, Color("#2fd36b")], [0.8, Co
 ## carros com painel próprio na câmera de capô
 const DASH_CARS := ["porsche-992-gt3r"]
 const DASH_LEDS := 16
+const GAUGE_STYLES := ["barra", "circular"]
+const MAP_MODES := ["dynamic", "circuit"]
+
+## Radar dinâmico: amostras atrás/à frente (passo de 2 amostras = 4 m → 156 pontos leves)
+const RADAR_BACK := 85
+const RADAR_AHEAD := 225
+const RADAR_STEP := 2
+const RADAR_N := (RADAR_BACK + RADAR_AHEAD) / RADAR_STEP + 1
+
+const INTERLAGOS_CORNERS := [
+	[1, "S do Senna 1", 360.0],
+	[2, "S do Senna 2", 460.0],
+	[3, "Curva do Sol", 720.0],
+	[4, "Descida do Lago 1", 1420.0],
+	[5, "Descida do Lago 2", 1540.0],
+	[6, "Ferradura", 2030.0],
+	[7, "Laranjinha", 2180.0],
+	[8, "Pinheirinho 1", 2330.0],
+	[9, "Pinheirinho 2", 2460.0],
+	[10, "Bico de Pato", 2780.0],
+	[11, "Mergulho", 3120.0],
+	[12, "Junção", 3280.0],
+	[13, "Subida dos Boxes", 3600.0],
+	[14, "Arquibancadas", 3950.0],
+	[15, "Café", 4200.0],
+]
 
 var car: Car
 var timer: LapTimer
@@ -45,6 +74,10 @@ var brake := 0.0
 var telemetry := false
 var dash := false
 var dash_on := false
+var gauge_style := "barra"
+var map_mode := "dynamic"
+var board_expanded := false
+var menu_open := false
 var section := ""
 var toast_text := ""
 var toast_t := 0.0
@@ -57,15 +90,19 @@ var _font: Font
 var _bold: Font
 var _mono: Font
 var _tyre_use := [0.0, 0.0, 0.0, 0.0]
+var _g_trail: Array[Vector2] = []
 var _fps_frames := 0
 var _fps_since := 0.0
 var _time := 0.0
 var _redraw_t := 0.0
 var _k := 1.0
+var _kb := 1.0
 var _kp := 1.0
+var _top_sc := 1.0
 var _shorts := {}
 var _colors := {}
-# mapa: pontos da pista em px do mapa (170×150) e cache já transformado para a tela
+
+# mapa / radar: pontos da pista, curvas detectadas e buffers pré-alocados
 var _map_pts := PackedVector2Array()
 var _map_scale := 1.0
 var _map_min := Vector2.ZERO
@@ -76,12 +113,40 @@ var _map_origin := Vector2.ZERO
 var _map_draw_pts := PackedVector2Array()
 var _map_finish_draw: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]
 var _map_layout_sc := -1.0
+var _corners: Array = []  # [{number, name, s, pos, map_pt}]
+var _radar_angle := 0.0
+var _radar_inited := false
+var _radar_center := Vector2.ZERO
+var _radar_radius := 76.0
+var _radar_left := PackedVector2Array()
+var _radar_right := PackedVector2Array()
+var _radar_cline := PackedVector2Array()
+var _radar_quad := PackedVector2Array()
+var _radar_kerb_pts := PackedVector2Array()
+var _radar_kerb_cols := PackedColorArray()
+
+# nós filhos para recorte circular do radar e áreas clicáveis (sem interferir em TouchControls)
+var _radar_clip: Control
+var _radar_view: _RadarView
+var _btn_menu: Button
+var _btn_cam: Button
+var _btn_reset: Button
+var _btn_board: Button
+var _btn_map: Button
+var _r_menu := Rect2()
+var _r_cam := Rect2()
+var _r_reset := Rect2()
+var _r_board := Rect2()
+var _r_map := Rect2()
+
 # StyleBoxes e buffers pré-alocados (sem alocação por quadro em _draw)
 var _fps_sb: StyleBoxFlat
 var _tyres_panel_sb: StyleBoxFlat
 var _tyres_body_sb: StyleBoxFlat
 var _tyre_sbs: Array[StyleBoxFlat] = []
 var _box_sb: StyleBoxFlat
+var _hbar_sb: StyleBoxFlat
+var _pill_sb: StyleBoxFlat
 var _panel_pts := PackedVector2Array()
 
 
@@ -91,12 +156,25 @@ func _init(c: Car, t: LapTimer, tr: Track, car_id: String, is_touch: bool) -> vo
 	track = tr
 	touch = is_touch
 	dash = car_id in DASH_CARS
+	var saved_g := String(Game.get_setting("hud", "mostrador", "barra"))
+	gauge_style = saved_g if saved_g in GAUGE_STYLES else "barra"
+	var saved_m := String(Game.get_setting("hud", "minimapa", "dynamic"))
+	map_mode = saved_m if saved_m in MAP_MODES else "dynamic"
 	var list = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars.json"))
 	for e in list:
 		_shorts[e.id] = e.get("short", e.id)
 		_colors[e.id] = Color(e.get("color", "#ffffff"))
 	car_color = _colors.get(car_id, Color.WHITE)
+	_build_corners()
 	_build_map()
+	_init_radar_buffers()
+
+
+func _init_radar_buffers() -> void:
+	_radar_left.resize(RADAR_N)
+	_radar_right.resize(RADAR_N)
+	_radar_cline.resize(RADAR_N)
+	_radar_quad.resize(4)
 
 
 func _ready() -> void:
@@ -107,14 +185,84 @@ func _ready() -> void:
 	_mono = SystemFont.new()
 	(_mono as SystemFont).font_names = PackedStringArray(["Consolas", "Droid Sans Mono", "monospace"])
 	_ensure_styleboxes()
+	_build_interactive_nodes()
 	get_viewport().size_changed.connect(_layout)
 	_layout()
+
+
+func _build_interactive_nodes() -> void:
+	_radar_clip = _RadarClip.new()
+	_radar_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_radar_clip.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+	add_child(_radar_clip)
+
+	_radar_view = _RadarView.new(self)
+	_radar_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_radar_clip.add_child(_radar_view)
+
+	var make_btn := func(cb: Callable) -> Button:
+		var b := Button.new()
+		b.flat = true
+		b.focus_mode = Control.FOCUS_NONE
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		var empty := StyleBoxEmpty.new()
+		for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+			b.add_theme_stylebox_override(st, empty)
+		b.pressed.connect(cb)
+		add_child(b)
+		return b
+
+	_btn_board = make_btn.call(_toggle_board)
+	_btn_map = make_btn.call(_toggle_map_mode)
+	_btn_menu = make_btn.call(func(): menu_requested.emit())
+	_btn_cam = make_btn.call(func(): camera_requested.emit())
+	_btn_reset = make_btn.call(func(): reset_requested.emit())
+	_sync_btn_visibility()
+
+
+func _sync_btn_visibility() -> void:
+	if _btn_menu == null:
+		return
+	var show_top := not menu_open
+	_btn_menu.visible = show_top
+	_btn_cam.visible = show_top and touch
+	_btn_reset.visible = show_top and touch
+	if _radar_clip:
+		_radar_clip.visible = (map_mode == "dynamic")
+
+
+func _toggle_board() -> void:
+	board_expanded = not board_expanded
+	_redraw_t = 1.0
+	queue_redraw()
+
+
+func _toggle_map_mode() -> void:
+	map_mode = "circuit" if map_mode == "dynamic" else "dynamic"
+	Game.set_setting("hud", "minimapa", map_mode)
+	_sync_btn_visibility()
+	_redraw_t = 1.0
+	queue_redraw()
+
+
+func set_gauge_style(style: String) -> void:
+	gauge_style = style if style in GAUGE_STYLES else "barra"
+	Game.set_setting("hud", "mostrador", gauge_style)
+	_redraw_t = 1.0
+	queue_redraw()
+
+
+func set_menu_open(is_open: bool) -> void:
+	menu_open = is_open
+	_sync_btn_visibility()
+	_redraw_t = 1.0
+	queue_redraw()
 
 
 func _ensure_styleboxes() -> void:
 	if _fps_sb == null:
 		_fps_sb = StyleBoxFlat.new()
-		_fps_sb.bg_color = Color(0, 0, 0, 0.45)
+		_fps_sb.bg_color = Color(10 / 255.0, 12 / 255.0, 16 / 255.0, 0.62)
 	if _tyres_panel_sb == null:
 		_tyres_panel_sb = StyleBoxFlat.new()
 		_tyres_panel_sb.bg_color = Color(13 / 255.0, 24 / 255.0, 46 / 255.0, 0.86)
@@ -131,6 +279,13 @@ func _ensure_styleboxes() -> void:
 			_tyre_sbs.append(tsb)
 	if _box_sb == null:
 		_box_sb = StyleBoxFlat.new()
+	if _hbar_sb == null:
+		_hbar_sb = StyleBoxFlat.new()
+		_hbar_sb.bg_color = Color(11 / 255.0, 20 / 255.0, 40 / 255.0, 0.90)
+		_hbar_sb.border_color = Color(1, 1, 1, 0.14)
+		_hbar_sb.shadow_color = Color(0, 0, 0, 0.42)
+	if _pill_sb == null:
+		_pill_sb = StyleBoxFlat.new()
 	if _panel_pts.size() != 5:
 		_panel_pts.resize(5)
 
@@ -148,13 +303,15 @@ func _layout() -> void:
 	var s := get_viewport_rect().size
 	if touch:
 		_k = maxf(0.34, minf(1.15, minf(s.y / 860.0, s.x / 1760.0)))
+		_kb = maxf(0.42, minf(1.0, _k * 1.18))
 		_kp = _k
 	else:
 		_k = maxf(0.62, minf(1.15, s.y / 860.0))
+		_kb = maxf(0.7, minf(1.05, _k * 0.92))
 		_kp = maxf(_k, minf(1.67, 1.67 * minf(s.x / 2552.0, s.y / 1268.0)))
 
-	var fps_sc := clampf(s.y / 860.0, 0.75, 1.1)
-	_fps_sb.set_corner_radius_all(roundi(9 * fps_sc))
+	_top_sc = clampf(s.y / 460.0, 0.82, 1.25) if touch else clampf(s.y / 860.0, 0.85, 1.18)
+	_fps_sb.set_corner_radius_all(roundi(4 * _top_sc))
 
 	_tyres_panel_sb.set_corner_radius_all(roundi(10 * _k))
 	_tyres_panel_sb.shadow_size = roundi(6 * _k)
@@ -168,10 +325,21 @@ func _layout() -> void:
 	for tsb in _tyre_sbs:
 		tsb.set_corner_radius_all(tyre_rad)
 
+	_hbar_sb.border_width_left = 1
+	_hbar_sb.border_width_right = 1
+	_hbar_sb.border_width_bottom = 1
+	_hbar_sb.border_width_top = 0
+	_hbar_sb.corner_radius_top_left = 0
+	_hbar_sb.corner_radius_top_right = 0
+	_hbar_sb.corner_radius_bottom_left = roundi(8 * _kb)
+	_hbar_sb.corner_radius_bottom_right = roundi(8 * _kb)
+	_hbar_sb.shadow_size = roundi(10 * _kb)
+	_hbar_sb.shadow_offset = Vector2(0, 5 * _kb)
+
 	var ins := _insets()
 	var timing_w := 250.0 * _kp
 	var tr := Vector2(s.x - ins.size.x - 14 - timing_w, 14 + ins.position.y)
-	var map_size := Vector2(186, 180) * _kp
+	var map_size := Vector2(186, 202) * _kp
 	var map_pos := Vector2(tr.x - 8 * _kp - map_size.x, tr.y) if touch else Vector2(14 + ins.position.x, s.y - ins.size.y - 14 - map_size.y)
 	_update_map_layout(map_pos, _kp)
 
@@ -179,13 +347,23 @@ func _layout() -> void:
 func _update_map_layout(pos: Vector2, sc: float) -> void:
 	_map_pos = pos
 	_map_layout_sc = sc
-	_map_origin = pos + Vector2(8 * sc, 26 * sc)
+	_map_origin = pos + Vector2(8 * sc, 34 * sc)
 	_map_draw_pts.resize(_map_pts.size())
 	for i in _map_pts.size():
 		_map_draw_pts[i] = _map_origin + _map_pts[i] * sc
 	if _map_finish.size() >= 2:
 		_map_finish_draw[0] = _map_origin + _map_finish[0] * sc
 		_map_finish_draw[1] = _map_origin + _map_finish[1] * sc
+
+	_radar_center = pos + Vector2(93.0 * sc, 25.0 * sc + 79.0 * sc)
+	_radar_radius = 74.0 * sc
+	if _radar_clip:
+		var box := Rect2(pos + Vector2(8 * sc, 25 * sc), Vector2(170 * sc, 158 * sc))
+		_radar_clip.position = box.position
+		_radar_clip.size = box.size
+		_radar_clip.set_circle(_radar_radius, _radar_center - box.position)
+		_radar_view.position = Vector2.ZERO
+		_radar_view.size = box.size
 
 
 ## câmera atual: o painel do Porsche só aparece na de capô (nas de fora ele tampava a traseira do carro)
@@ -235,6 +413,23 @@ func update(dt: float, thr: float, brk: float) -> void:
 	brake = brk
 	for i in 4:
 		_tyre_use[i] += (tyre_use(car, i) - _tyre_use[i]) * 0.15
+	# rastro recente de força G (até 2,8 G no raio útil de 24 unidades)
+	var gx := clampf(car.g_lat / 2.8 * 24.0, -24.0, 24.0)
+	var gy := clampf(-car.g_long / 2.8 * 24.0, -24.0, 24.0)
+	if _g_trail.is_empty() or _g_trail[_g_trail.size() - 1].distance_to(Vector2(gx, gy)) > 0.6:
+		_g_trail.append(Vector2(gx, gy))
+		if _g_trail.size() > 14:
+			_g_trail.pop_front()
+	# suavização angular do radar dinâmico (heading-up)
+	if map_mode == "dynamic":
+		var fvec := car.rot * Vector3.FORWARD
+		var target_ang := atan2(fvec.x, -fvec.z)
+		if not _radar_inited:
+			_radar_angle = target_ang
+			_radar_inited = true
+		else:
+			var diff := wrapf(target_ang - _radar_angle, -PI, PI)
+			_radar_angle += diff * clampf(dt * 10.0, 0.0, 1.0)
 	# FPS 4x por segundo (média da janela, sem tremer)
 	_fps_frames += 1
 	_fps_since += dt
@@ -251,6 +446,8 @@ func update(dt: float, thr: float, brk: float) -> void:
 	if _redraw_t >= interval:
 		_redraw_t = 0.0
 		queue_redraw()
+		if _radar_view and map_mode == "dynamic":
+			_radar_view.queue_redraw()
 
 
 # ------------------------------------------------------------------ desenho
@@ -260,34 +457,56 @@ func _draw() -> void:
 	var ins := _insets()
 	var k := _k
 	var kp := _kp
-	# painéis: melhores tempos (esq. cima), tempos (dir. cima), mapa (esq. baixo ou ao lado dos tempos no celular)
+	# 1. barra superior central: FPS + MENU + botões rápidos (touch)
+	var top_bottom := _draw_top_bar(Vector2(s.x / 2.0, 4.0 + ins.position.y))
+	# 2. painéis: melhores tempos (esq. cima), tempos (dir. cima), mapa (esq. baixo no PC ou ao lado dos tempos no celular)
 	_draw_board(Vector2(14 + ins.position.x, 14 + ins.position.y), kp)
 	var timing_w := 250.0 * kp
 	var tr := Vector2(s.x - ins.size.x - 14 - timing_w, 14 + ins.position.y)
 	_draw_timing(tr, kp)
-	var map_size := Vector2(186, 180) * kp
+	var map_size := Vector2(186, 202) * kp
 	if touch:
 		_draw_map(Vector2(tr.x - 8 * kp - map_size.x, tr.y), kp)
 	else:
 		_draw_map(Vector2(14 + ins.position.x, s.y - ins.size.y - 14 - map_size.y), kp)
-	# mostrador + pneus (ou painel do Porsche na câmera de capô)
+	# 3. mostrador principal (Barra Horizontal no topo, Circular LMU ou painel do Porsche na câmera de capô)
 	var cl_w := (GAUGE + 8 + 86) * k
 	if dash_on:
 		var ks := minf(s.x * 0.21 / 640.0, s.y * 0.198 / 300.0)
 		if touch:
 			ks = 226.0 * k / 300.0
-			_draw_dash(Vector2(s.x / 2.0 - 320 * ks, 22 + ins.position.y), ks)
+			_draw_dash(Vector2(s.x / 2.0 - 320 * ks, top_bottom + 4.0), ks)
 		else:
 			_draw_dash(Vector2(s.x / 2.0 - 320 * ks, s.y - 0.004 * s.x - 300 * ks), ks)
+	elif gauge_style == "barra":
+		_draw_hbar(Vector2(s.x / 2.0 - (HBAR_W * _kb) / 2.0, top_bottom + 4.0), _kb)
 	elif touch:
-		_draw_cluster(Vector2(s.x / 2.0 - cl_w / 2.0, 22 + ins.position.y), k)
+		_draw_cluster(Vector2(s.x / 2.0 - cl_w / 2.0, top_bottom + 4.0), k)
 	else:
 		_draw_cluster(Vector2(s.x - ins.size.x - 16 - cl_w, s.y - ins.size.y - 14 - GAUGE * k), k)
-	_draw_fps(Vector2(s.x / 2.0, 4 + ins.position.y))
 	if toast_t > 0.0:
 		_draw_toast(s)
 	if telemetry:
 		_draw_telemetry(Vector2(12, s.y * 0.5))
+	_sync_hitboxes()
+
+
+func _sync_hitboxes() -> void:
+	if _btn_board:
+		_btn_board.position = _r_board.position
+		_btn_board.size = _r_board.size
+	if _btn_map:
+		_btn_map.position = _r_map.position
+		_btn_map.size = _r_map.size
+	if _btn_menu:
+		_btn_menu.position = _r_menu.position
+		_btn_menu.size = _r_menu.size
+	if _btn_cam:
+		_btn_cam.position = _r_cam.position
+		_btn_cam.size = _r_cam.size
+	if _btn_reset:
+		_btn_reset.position = _r_reset.position
+		_btn_reset.size = _r_reset.size
 
 
 ## margens de recorte da tela (câmera/entalhe), como o env(safe-area-inset-*) do web
@@ -300,7 +519,7 @@ func _insets() -> Rect2:
 
 
 ## painel LMU: vidro escuro, filete de cor no topo e canto inferior direito cortado
-func _panel(r: Rect2, sc: float) -> void:
+func _panel(r: Rect2, sc: float, invalid := false) -> void:
 	var cut := 10.0 * sc
 	if _panel_pts.size() != 5:
 		_panel_pts.resize(5)
@@ -309,12 +528,12 @@ func _panel(r: Rect2, sc: float) -> void:
 	_panel_pts[2] = Vector2(r.end.x, r.end.y - cut)
 	_panel_pts[3] = Vector2(r.end.x - cut, r.end.y)
 	_panel_pts[4] = Vector2(r.position.x, r.end.y)
-	draw_colored_polygon(_panel_pts, Color(14 / 255.0, 17 / 255.0, 22 / 255.0, 0.78))
-	draw_rect(Rect2(r.position, Vector2(r.size.x, 2 * sc)), ACCENT)
+	var bg := Color(40 / 255.0, 14 / 255.0, 18 / 255.0, 0.84) if invalid else Color(14 / 255.0, 17 / 255.0, 22 / 255.0, 0.78)
+	draw_colored_polygon(_panel_pts, bg)
+	draw_rect(Rect2(r.position, Vector2(r.size.x, 2 * sc)), Color("#ff4b5c") if invalid else ACCENT)
 
 
 func _text(f: Font, pos: Vector2, t: String, size: float, c: Color, align := HORIZONTAL_ALIGNMENT_LEFT, width := -1.0) -> void:
-	# pos = canto superior esquerdo da caixa de texto (o ascent desce a linha de base)
 	var fs := maxi(6, roundi(size))
 	draw_string(f, pos + Vector2(0, f.get_ascent(fs)), t, align, width, fs, c)
 
@@ -323,16 +542,86 @@ func _text_w(f: Font, t: String, size: float) -> float:
 	return f.get_string_size(t, HORIZONTAL_ALIGNMENT_LEFT, -1, maxi(6, roundi(size))).x
 
 
-func _draw_fps(top_center: Vector2) -> void:
+# ------------------------------------------------------------------ barra superior (FPS + MENU + ações)
+
+func _draw_top_bar(top_center: Vector2) -> float:
 	_ensure_styleboxes()
-	var sc := clampf(get_viewport_rect().size.y / 860.0, 0.75, 1.1)
+	var sc := _top_sc
 	var fs := 12.0 * sc
-	var t := "%d FPS" % fps
-	var w := _text_w(_bold, t, fs) + 16 * sc
-	var r := Rect2(top_center - Vector2(w / 2.0, 0), Vector2(w, 18 * sc))
-	draw_style_box(_fps_sb, r)
-	var c := GREEN if fps >= 55 else (Color("#ffb020") if fps >= 30 else RED)
-	_text(_bold, r.position + Vector2(8 * sc, 2 * sc), t, fs, c)
+	var h := 22.0 * sc
+	var gap := 6.0 * sc
+
+	# FPS pill
+	var fps_num := str(fps)
+	var fps_lbl := " FPS"
+	var fps_w := _text_w(_bold, fps_num, fs) + _text_w(_font, fps_lbl, fs) + 14.0 * sc
+	var menu_lbl := "MENU"
+	var menu_w := 14.0 * sc + _text_w(_bold, menu_lbl, fs * 0.92) + 16.0 * sc
+	var icon_w := 28.0 * sc
+
+	var total_w := fps_w
+	if not menu_open:
+		total_w += gap + menu_w
+		if touch:
+			total_w += gap * 2.0 + icon_w * 2.0
+
+	var x := top_center.x - total_w / 2.0
+	var y := top_center.y
+
+	# 1. FPS
+	var fps_r := Rect2(x, y, fps_w, h)
+	draw_style_box(_fps_sb, fps_r)
+	var fc := GREEN if fps >= 55 else (Color("#ffb020") if fps >= 30 else RED)
+	var nw := _text_w(_bold, fps_num, fs)
+	_text(_bold, Vector2(x + 7.0 * sc, y + (h - fs) * 0.42), fps_num, fs, fc)
+	_text(_font, Vector2(x + 7.0 * sc + nw, y + (h - fs) * 0.42), fps_lbl, fs, Color(1, 1, 1, 0.6))
+	x += fps_w + gap
+
+	if not menu_open:
+		# 2. Botão ❚❚ MENU
+		_r_menu = Rect2(x, y, menu_w, h)
+		var m_hot := _btn_menu != null and (_btn_menu.is_hovered() or _btn_menu.button_pressed)
+		_draw_top_pill(_r_menu, sc, m_hot)
+		var bar_x := x + 8.0 * sc
+		var bar_y := y + h * 0.28
+		var bar_h := h * 0.44
+		draw_rect(Rect2(bar_x, bar_y, 2.2 * sc, bar_h), Color.WHITE if m_hot else Color(1, 1, 1, 0.9))
+		draw_rect(Rect2(bar_x + 4.2 * sc, bar_y, 2.2 * sc, bar_h), Color.WHITE if m_hot else Color(1, 1, 1, 0.9))
+		_text(_bold, Vector2(bar_x + 10.0 * sc, y + (h - fs * 0.92) * 0.42), menu_lbl, fs * 0.92, Color.WHITE if m_hot else Color(1, 1, 1, 0.92))
+		x += menu_w + gap
+
+		if touch:
+			# 3. Botão Câmera
+			_r_cam = Rect2(x, y, icon_w, h)
+			var c_hot := _btn_cam != null and (_btn_cam.is_hovered() or _btn_cam.button_pressed)
+			_draw_top_pill(_r_cam, sc, c_hot)
+			var cc := _r_cam.get_center()
+			var col_c := Color.WHITE if c_hot else Color(1, 1, 1, 0.9)
+			draw_rect(Rect2(cc + Vector2(-7 * sc, -4 * sc), Vector2(14 * sc, 9.5 * sc)), col_c, true)
+			draw_rect(Rect2(cc + Vector2(-3 * sc, -6.5 * sc), Vector2(6 * sc, 2.5 * sc)), col_c, true)
+			draw_circle(cc + Vector2(0, 0.8 * sc), 3.0 * sc, Color(10 / 255.0, 12 / 255.0, 16 / 255.0, 0.9))
+			draw_circle(cc + Vector2(0, 0.8 * sc), 1.6 * sc, col_c)
+			x += icon_w + gap
+
+			# 4. Botão Reset (voltar ao grid)
+			_r_reset = Rect2(x, y, icon_w, h)
+			var r_hot := _btn_reset != null and (_btn_reset.is_hovered() or _btn_reset.button_pressed)
+			_draw_top_pill(_r_reset, sc, r_hot)
+			var rc := _r_reset.get_center()
+			var col_r := Color.WHITE if r_hot else Color(1, 1, 1, 0.9)
+			draw_arc(rc + Vector2(0, 0.5 * sc), 5.2 * sc, deg_to_rad(-155), deg_to_rad(135), 14, col_r, 1.8 * sc, true)
+			var tip := rc + Vector2(-4.8 * sc, -2.5 * sc)
+			draw_colored_polygon(PackedVector2Array([tip + Vector2(-2.2 * sc, 2.2 * sc), tip + Vector2(2.6 * sc, 1.6 * sc), tip + Vector2(0.2 * sc, -2.6 * sc)]), col_r)
+
+	return y + h
+
+
+func _draw_top_pill(r: Rect2, sc: float, hot: bool) -> void:
+	_pill_sb.bg_color = Color(225 / 255.0, 6 / 255.0, 0.0, 0.85) if hot else Color(10 / 255.0, 12 / 255.0, 16 / 255.0, 0.72)
+	_pill_sb.border_color = Color(1, 1, 1, 0.65 if hot else 0.30)
+	_pill_sb.set_border_width_all(1)
+	_pill_sb.set_corner_radius_all(roundi(4 * sc))
+	draw_style_box(_pill_sb, r)
 
 
 func _draw_toast(s: Vector2) -> void:
@@ -345,29 +634,48 @@ func _draw_toast(s: Vector2) -> void:
 	_text(_bold, r.position + Vector2(16 * sc, 7 * sc), toast_text, fs, Color(1, 1, 1, a))
 
 
-# ------------------------------------------------------------------ melhores tempos
+# ------------------------------------------------------------------ melhores tempos (expansível)
 
 func _draw_board(pos: Vector2, sc: float) -> void:
 	var w := 300.0 * sc
 	var row := 27.0 * sc
-	var n := maxi(records.size(), 1)
+	var indices: Array[int] = []
+	if not records.is_empty():
+		if board_expanded or records.size() <= 3:
+			for i in records.size():
+				indices.append(i)
+		else:
+			indices.append(0)
+			var me_idx := -1
+			if nick != "":
+				for i in range(1, records.size()):
+					if String(records[i].get("nick", "")).to_lower() == nick.to_lower():
+						me_idx = i
+						break
+			if me_idx > 0:
+				indices.append(me_idx)
+			elif records.size() > 1:
+				indices.append(1)
+	var n := maxi(indices.size(), 1)
 	var h := 28 * sc + row * n + 6 * sc
-	_panel(Rect2(pos, Vector2(w, h)), sc)
+	_r_board = Rect2(pos, Vector2(w, h))
+	_panel(_r_board, sc)
 	_text(_bold, pos + Vector2(12 * sc, 7 * sc), "MELHORES TEMPOS", 12 * sc, Color(1, 1, 1, 0.92))
 	var dim := Color(1, 1, 1, 0.45)
-	var track_lbl := "INTERLAGOS · ARCADE" if arcade else "INTERLAGOS"
+	var chev := "▴" if board_expanded else "▾"
+	var track_lbl := ("INTERLAGOS · ARCADE " if arcade else "INTERLAGOS ") + chev
 	var tw := _text_w(_font, track_lbl, 12 * sc)
-	_text(_font, pos + Vector2(w - 12 * sc - tw, 7 * sc), track_lbl, 12 * sc, ACCENT if arcade else dim)
+	_text(_font, pos + Vector2(w - 12 * sc - tw, 7 * sc), track_lbl, 12 * sc, Color("#ff5e57") if arcade else dim)
 	var y := pos.y + 28 * sc
 	if records.is_empty():
 		_text(_font, Vector2(pos.x + 12 * sc, y + 6 * sc), "Nenhuma volta válida ainda", 13 * sc, Color(1, 1, 1, 0.5))
 		return
 	var best := float(records[0].time)
-	for i in records.size():
+	for i in indices:
 		var r: Dictionary = records[i]
-		var me: bool = r.nick == nick and nick != ""
+		var me: bool = String(r.get("nick", "")).to_lower() == nick.to_lower() and nick != ""
 		if me:
-			draw_rect(Rect2(pos.x, y, w, row), Color(1, 1, 1, 0.09))
+			draw_rect(Rect2(pos.x, y, w, row), Color(1, 1, 1, 0.11))
 		# posição
 		var pr := Rect2(pos.x + 12 * sc, y + 3.5 * sc, 22 * sc, 20 * sc)
 		draw_rect(pr, WHITE if i == 0 else Color(1, 1, 1, 0.1))
@@ -391,15 +699,21 @@ func _draw_timing(pos: Vector2, sc: float) -> void:
 	var w := 250.0 * sc
 	var pad := 12.0 * sc
 	var t := timer
-	var h := 170.0 * sc
-	_panel(Rect2(pos, Vector2(w, h)), sc)
+	var invalid := t.current >= 0.0 and not t.valid
+	var h := (192.0 if invalid else 170.0) * sc
+	_panel(Rect2(pos, Vector2(w, h)), sc, invalid)
 	var y := pos.y + 8 * sc
 	# curva atual (filete amarelo à esquerda)
 	draw_rect(Rect2(pos.x + pad, y, 3 * sc, 16 * sc), Color("#e3bd1c"))
 	_text(_bold, Vector2(pos.x + pad + 9 * sc, y), section.to_upper(), 13 * sc, Color(1, 1, 1, 0.9))
 	y += 22 * sc
+	if invalid:
+		var pulse := 0.79 + 0.21 * sin(_time * 5.2)
+		var ir := Rect2(pos.x + pad, y, w - 2 * pad, 18 * sc)
+		_box(ir, Color(1.0, 75 / 255.0, 92 / 255.0, 0.22 * pulse), Color(1.0, 75 / 255.0, 92 / 255.0, 0.7 * pulse), 1.0, 3.0 * sc)
+		_text(_bold, Vector2(ir.position.x, ir.position.y + 2 * sc), "VOLTA INVÁLIDA · 4 RODAS FORA", 10.5 * sc, Color(1.0, 128 / 255.0, 139 / 255.0, pulse), HORIZONTAL_ALIGNMENT_CENTER, ir.size.x)
+		y += 22 * sc
 	var dim := Color(1, 1, 1, 0.55)
-	# (o lambda recebe y: closures do GDScript copiam o valor na criação)
 	var row := func(ry: float, label: String, value: String, vs: float, vc: Color, f: Font) -> void:
 		_text(_bold, Vector2(pos.x + pad, ry + vs * 0.42 - 6 * sc), label, 12 * sc, dim)
 		var vw := _text_w(f, value, vs)
@@ -450,7 +764,46 @@ func _draw_timing(pos: Vector2, sc: float) -> void:
 	row.call(y, "ÚLTIMA", LapTimer.format_time(last.time if last else -1.0), 19 * sc, WHITE if (last == null or last.valid) else RED, _font)
 
 
-# ------------------------------------------------------------------ mapa
+# ------------------------------------------------------------------ minimapa (RADAR dinâmico / CIRCUITO)
+
+func _build_corners() -> void:
+	_corners.clear()
+	if track == null or track.n <= 0:
+		return
+	var L := track.length
+	# Interlagos (comprimento ~4309 m): usa os 15 nomes oficiais refinados pelo pico de curvatura
+	if absf(L - 4309.0) < 250.0 or not track.sections.is_empty():
+		for def in INTERLAGOS_CORNERS:
+			var target_s: float = def[2]
+			var best_i := 0
+			var max_curv := -1.0
+			for i in track.n:
+				var s_val := i * Track.STEP
+				var ds := absf(s_val - target_s)
+				if ds < 70.0 or ds > L - 70.0:
+					var c := absf(track.curv[i])
+					if c > max_curv:
+						max_curv = c
+						best_i = i
+			_corners.append({"number": def[0], "name": def[1], "s": best_i * Track.STEP, "pos": track.P[best_i]})
+	else:
+		var counter := 1
+		for i in track.n:
+			var c := absf(track.curv[i])
+			if c > 0.009:
+				var prev_c := absf(track.curv[(i - 1 + track.n) % track.n])
+				var next_c := absf(track.curv[(i + 1) % track.n])
+				if c >= prev_c and c >= next_c:
+					var s_val := i * Track.STEP
+					var near_other := false
+					for cr in _corners:
+						if absf(float(cr.s) - s_val) < 50.0:
+							near_other = true
+							break
+					if not near_other:
+						_corners.append({"number": counter, "name": "Curva %d" % counter, "s": s_val, "pos": track.P[i]})
+						counter += 1
+
 
 func _build_map() -> void:
 	var mn := Vector2(INF, INF)
@@ -476,22 +829,347 @@ func _to_map(p: Vector3) -> Vector2:
 	return _map_off + (Vector2(p.x, p.z) - _map_min) * _map_scale
 
 
+func _next_corner() -> Array:
+	var L := track.length
+	var track_s := timer.s
+	var best_c: Dictionary = {}
+	var best_dist := INF
+	for c in _corners:
+		var ds := float(c.s) - track_s
+		if ds < -L * 0.5:
+			ds += L
+		elif ds > L * 0.5:
+			ds -= L
+		if ds >= -20.0 and ds < best_dist:
+			best_dist = ds
+			best_c = c
+	return [best_c, best_dist]
+
+
 func _draw_map(pos: Vector2, sc: float) -> void:
 	var w := 186.0 * sc
-	var h := 180.0 * sc
-	_panel(Rect2(pos, Vector2(w, h)), sc)
-	_text(_bold, pos + Vector2(12 * sc, 7 * sc), "MAPA", 12 * sc, Color(1, 1, 1, 0.92))
+	var h := 202.0 * sc
+	_r_map = Rect2(pos, Vector2(w, h))
+	_panel(_r_map, sc)
+	_text(_bold, pos + Vector2(12 * sc, 7 * sc), "MINIMAP", 12 * sc, Color(1, 1, 1, 0.92))
+	# badge RADAR / CIRCUITO no topo direito do minimap
+	var badge := "RADAR" if map_mode == "dynamic" else "CIRCUITO"
+	var bfs := 9.5 * sc
+	var bw := _text_w(_bold, badge, bfs) + 12 * sc
+	var br := Rect2(pos.x + w - 8 * sc - bw, pos.y + 6 * sc, bw, 15 * sc)
+	_box(br, Color(225 / 255.0, 6 / 255.0, 0.0, 0.25), Color(225 / 255.0, 6 / 255.0, 0.0, 0.55), 1.0, 3.0 * sc)
+	_text(_bold, br.position + Vector2(0, 1.5 * sc), badge, bfs, Color("#ff5e57"), HORIZONTAL_ALIGNMENT_CENTER, bw)
+
 	if _map_draw_pts.size() != _map_pts.size() or _map_pos != pos or _map_layout_sc != sc:
 		_update_map_layout(pos, sc)
-	draw_polyline(_map_draw_pts, Color(0, 0, 0, 0.6), 7 * sc, true)
-	draw_polyline(_map_draw_pts, Color(235 / 255.0, 238 / 255.0, 242 / 255.0, 0.9), 3.5 * sc, true)
-	draw_line(_map_finish_draw[0], _map_finish_draw[1], Color("#e5483b"), 2.5 * sc, true)
-	var c := _map_origin + _to_map(car.pos) * sc
-	draw_circle(c, 5.5 * sc, Color.BLACK)
-	draw_circle(c, 4.0 * sc, car_color)
+
+	if map_mode == "dynamic":
+		# moldura externa do radar (desenhada por cima do clip filho)
+		draw_arc(_radar_center, _radar_radius, 0, TAU, 48, Color(1, 1, 1, 0.16), 1.5 * sc, true)
+		draw_arc(_radar_center, _radar_radius, -PI * 0.65, -PI * 0.35, 16, ACCENT, 2.5 * sc, true)
+		var tip := _radar_center + Vector2(0, -_radar_radius - 2 * sc)
+		draw_colored_polygon(PackedVector2Array([tip, tip + Vector2(-4 * sc, 6 * sc), tip + Vector2(4 * sc, 6 * sc)]), ACCENT)
+		var nc := _next_corner()
+		var c_info: Dictionary = nc[0]
+		if not c_info.is_empty():
+			var dist_m := maxi(0, roundi(float(nc[1])))
+			var lbl := "T%d %s • %dm" % [int(c_info.number), String(c_info.name), dist_m]
+			_text(_bold, Vector2(pos.x + 6 * sc, pos.y + h - 17 * sc), lbl, 10.0 * sc, Color(0.95, 0.96, 0.98, 0.95), HORIZONTAL_ALIGNMENT_CENTER, w - 12 * sc)
+	else:
+		draw_polyline(_map_draw_pts, Color(0, 0, 0, 0.6), 7 * sc, true)
+		draw_polyline(_map_draw_pts, Color(235 / 255.0, 238 / 255.0, 242 / 255.0, 0.9), 3.5 * sc, true)
+		draw_line(_map_finish_draw[0], _map_finish_draw[1], Color("#e5483b"), 2.5 * sc, true)
+		for cr in _corners:
+			var cp := _map_origin + _to_map(cr.pos) * sc
+			draw_circle(cp, 5.0 * sc, Color(20 / 255.0, 24 / 255.0, 34 / 255.0, 0.85))
+			draw_arc(cp, 5.0 * sc, 0, TAU, 16, ACCENT, 1.0 * sc, true)
+			_text(_bold, cp - Vector2(5.0 * sc, 4.0 * sc), str(cr.number), 7.0 * sc, WHITE, HORIZONTAL_ALIGNMENT_CENTER, 10.0 * sc)
+		var c := _map_origin + _to_map(car.pos) * sc
+		draw_circle(c, 5.5 * sc, Color.BLACK)
+		draw_circle(c, 4.0 * sc, car_color)
 
 
-# ------------------------------------------------------------------ mostrador LMU + pneus
+func _draw_radar_inside(canvas: Control, size: Vector2) -> void:
+	var sc := _map_layout_sc
+	var W := size.x
+	var H := size.y
+	var cx := W * 0.5
+	var cy := H * 0.72
+	var R := _radar_radius
+	var sc_m := R / 230.0  # ~340 m visíveis à frente do carro
+
+	# fundo escuro + anéis de distância (50 m a 300 m) + eixos
+	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("#070a13"))
+	canvas.draw_circle(Vector2(W * 0.5, H * 0.5), R * 0.55, Color(13 / 255.0, 19 / 255.0, 31 / 255.0, 0.65))
+	for dm in [50.0, 100.0, 150.0, 200.0, 250.0, 300.0]:
+		canvas.draw_arc(Vector2(cx, cy), dm * sc_m, 0, TAU, 40, Color(1, 1, 1, 0.06), 1.0, true)
+	canvas.draw_line(Vector2(cx, cy - R * 1.6), Vector2(cx, cy + R), Color(1, 1, 1, 0.04), 1.0)
+	canvas.draw_line(Vector2(cx - R, cy), Vector2(cx + R, cy), Color(1, 1, 1, 0.04), 1.0)
+
+	if track == null or track.n <= 0:
+		return
+
+	var car_pos := car.pos
+	var cur_idx := clampi(car.hint, 0, track.n - 1) if car.hint >= 0 else track.li
+	var cos_a := cos(-_radar_angle)
+	var sin_a := sin(-_radar_angle)
+
+	var N := track.n
+	_radar_kerb_pts.clear()
+	_radar_kerb_cols.clear()
+	for k_idx in RADAR_N:
+		var offset := -RADAR_BACK + k_idx * RADAR_STEP
+		var idx := posmod(cur_idx + offset, N)
+		var p := track.P[idx]
+		var r := track.R[idx]
+		var w_l := track.wl[idx]
+		var w_r := track.wr[idx]
+		var lx := p.x - r.x * w_l
+		var lz := p.z - r.z * w_l
+		var rx := p.x + r.x * w_r
+		var rz := p.z + r.z * w_r
+
+		var pl := Vector2(cx + ((lx - car_pos.x) * cos_a - (lz - car_pos.z) * sin_a) * sc_m, cy + ((lx - car_pos.x) * sin_a + (lz - car_pos.z) * cos_a) * sc_m)
+		var pr := Vector2(cx + ((rx - car_pos.x) * cos_a - (rz - car_pos.z) * sin_a) * sc_m, cy + ((rx - car_pos.x) * sin_a + (rz - car_pos.z) * cos_a) * sc_m)
+		var pc := Vector2(cx + ((p.x - car_pos.x) * cos_a - (p.z - car_pos.z) * sin_a) * sc_m, cy + ((p.x - car_pos.x) * sin_a + (p.z - car_pos.z) * cos_a) * sc_m)
+		_radar_left[k_idx] = pl
+		_radar_right[k_idx] = pr
+		_radar_cline[k_idx] = pc
+
+		if track.kerb_l[idx] > 0.0:
+			_radar_kerb_pts.append(pl)
+			_radar_kerb_cols.append(ACCENT if (offset % 4 == 0) else Color.WHITE)
+		if track.kerb_r[idx] > 0.0:
+			_radar_kerb_pts.append(pr)
+			_radar_kerb_cols.append(ACCENT if (offset % 4 == 0) else Color.WHITE)
+
+	for k_idx in RADAR_N - 1:
+		_radar_quad[0] = _radar_left[k_idx]
+		_radar_quad[1] = _radar_left[k_idx + 1]
+		_radar_quad[2] = _radar_right[k_idx + 1]
+		_radar_quad[3] = _radar_right[k_idx]
+		canvas.draw_colored_polygon(_radar_quad, Color("#222735"))
+	canvas.draw_polyline(_radar_left, Color(1, 1, 1, 0.35), 1.2 * sc, true)
+	canvas.draw_polyline(_radar_right, Color(1, 1, 1, 0.35), 1.2 * sc, true)
+	for ki in _radar_kerb_pts.size():
+		canvas.draw_circle(_radar_kerb_pts[ki], 1.5 * sc, _radar_kerb_cols[ki])
+	canvas.draw_polyline(_radar_cline, Color(235 / 255.0, 238 / 255.0, 245 / 255.0, 0.9), 2.4 * sc, true)
+
+	# curvas visíveis no radar
+	var nc := _next_corner()
+	var closest: Dictionary = nc[0]
+	var center_box := size * 0.5
+	for cr in _corners:
+		var cp: Vector3 = cr.pos
+		var kx := cx + ((cp.x - car_pos.x) * cos_a - (cp.z - car_pos.z) * sin_a) * sc_m
+		var ky := cy + ((cp.x - car_pos.x) * sin_a + (cp.z - car_pos.z) * cos_a) * sc_m
+		var kpt := Vector2(kx, ky)
+		if kpt.distance_to(center_box) <= R + 12 * sc:
+			var is_next := not closest.is_empty() and int(closest.number) == int(cr.number)
+			if is_next:
+				canvas.draw_circle(kpt, 17 * sc, Color(34 / 255.0, 197 / 255.0, 94 / 255.0, 0.28))
+				canvas.draw_arc(kpt, 14 * sc, 0, TAU, 24, Color(74 / 255.0, 222 / 255.0, 128 / 255.0, 0.6), 2.0 * sc, true)
+				canvas.draw_circle(kpt, 10.5 * sc, Color("#22c55e"))
+				var fs := maxi(6, roundi(10.0 * sc))
+				canvas.draw_string(_bold, kpt + Vector2(-10 * sc, _bold.get_ascent(fs) * 0.36), str(cr.number), HORIZONTAL_ALIGNMENT_CENTER, 20 * sc, fs, Color.WHITE)
+				var nfs := maxi(6, roundi(8.5 * sc))
+				canvas.draw_string(_bold, kpt + Vector2(-50 * sc, -15 * sc) + Vector2(1, 1), String(cr.name), HORIZONTAL_ALIGNMENT_CENTER, 100 * sc, nfs, Color(0, 0, 0, 0.75))
+				canvas.draw_string(_bold, kpt + Vector2(-50 * sc, -15 * sc), String(cr.name), HORIZONTAL_ALIGNMENT_CENTER, 100 * sc, nfs, Color.WHITE)
+			else:
+				canvas.draw_circle(kpt, 8.0 * sc, Color(22 / 255.0, 101 / 255.0, 52 / 255.0, 0.9))
+				canvas.draw_arc(kpt, 8.0 * sc, 0, TAU, 18, Color("#4ade80"), 1.5 * sc, true)
+				var fs2 := maxi(6, roundi(8.0 * sc))
+				canvas.draw_string(_bold, kpt + Vector2(-8 * sc, _bold.get_ascent(fs2) * 0.36), str(cr.number), HORIZONTAL_ALIGNMENT_CENTER, 16 * sc, fs2, Color.WHITE)
+
+	# feixe de farol + seta do carro do jogador
+	var cc := Vector2(cx, cy)
+	canvas.draw_colored_polygon(PackedVector2Array([cc, cc + Vector2(-18 * sc, -44 * sc), cc + Vector2(18 * sc, -44 * sc)]), Color(1.0, 0.92, 0.63, 0.14))
+	var arrow := PackedVector2Array([cc + Vector2(0, -8 * sc), cc + Vector2(-6 * sc, 7 * sc), cc + Vector2(0, 4 * sc), cc + Vector2(6 * sc, 7 * sc)])
+	canvas.draw_colored_polygon(arrow, Color("#22c55e"))
+	canvas.draw_polyline(PackedVector2Array([arrow[0], arrow[1], arrow[2], arrow[3], arrow[0]]), Color.BLACK, 1.5 * sc, true)
+	canvas.draw_circle(cc, 2.0 * sc, Color.WHITE)
+
+
+# ------------------------------------------------------------------ barra horizontal (padrão, estilo foto)
+
+func _draw_hbar(pos: Vector2, kb: float) -> void:
+	_ensure_styleboxes()
+	var w := HBAR_W * kb
+	var pad_x := 14.0 * kb
+	var pad_top := 8.0 * kb
+	var pad_bot := 9.0 * kb
+	var rpm_h := 10.0 * kb
+	var main_h := 56.0 * kb
+	var invalid := timer.current >= 0.0 and not timer.valid
+	var show_delta := invalid or not is_nan(timer.delta)
+	var delta_h := (24.0 * kb) if show_delta else 0.0
+	var h := pad_top + rpm_h + 7.0 * kb + main_h + (7.0 * kb + delta_h if show_delta else 0.0) + pad_bot
+
+	var r := Rect2(pos, Vector2(w, h))
+	draw_style_box(_hbar_sb, r)
+	draw_rect(Rect2(pos, Vector2(w, 2.0 * kb)), ACCENT)
+
+	var inner_x := pos.x + pad_x
+	var inner_w := w - 2.0 * pad_x
+	var y := pos.y + pad_top
+
+	# 1. Barra de RPM no topo
+	var lim: float = car.p.limiter
+	var red_frac := maxf(0.0, lim - 1000.0) / MAX_RPM
+	var rpm_r := Rect2(inner_x, y, inner_w, rpm_h)
+	_box(rpm_r, Color(1, 1, 1, 0.12), Color(0, 0, 0, 0), 0.0, 3.0 * kb)
+	var red_x := inner_x + inner_w * red_frac
+	draw_rect(Rect2(red_x, y, inner_w * (1.0 - red_frac), rpm_h), Color(216 / 255.0, 52 / 255.0, 60 / 255.0, 0.42))
+	draw_line(Vector2(red_x, y), Vector2(red_x, y + rpm_h), Color(1.0, 90 / 255.0, 85 / 255.0, 0.85), 2.0 * kb)
+	var frac := clampf(car.rpm / MAX_RPM, 0.0, 1.0)
+	var shift_now := car.rpm > lim - 300.0
+	var blink := int(_time / 0.07) % 2 == 0
+	var rpm_c := Color("#f4f6f8")
+	if shift_now:
+		rpm_c = Color("#3d8bff") if blink else Color("#1a3d78")
+	elif car.rpm > lim - 700.0:
+		rpm_c = Color("#ff5148")
+	if frac > 0.005:
+		_box(Rect2(inner_x, y, inner_w * frac, rpm_h), rpm_c, Color(0, 0, 0, 0), 0.0, 3.0 * kb)
+
+	y += rpm_h + 7.0 * kb
+
+	# 2. Linha principal: Pneus/Aids | Pedais + Marcha/KMH | Força G
+	var row_cy := y + main_h * 0.5
+	var x := inner_x
+
+	# 2a. Pneus (4 pneus + contorno) + ABS/TC/AUT empilhados
+	var car_cx := x + 23.0 * kb
+	var body_top := row_cy - 26.0 * kb
+	var body := Rect2(car_cx - 10.0 * kb, body_top, 20.0 * kb, 52.0 * kb)
+	draw_style_box(_tyres_body_sb, body)
+	draw_rect(Rect2(car_cx - 8.5 * kb, body_top + 25.0 * kb, 17.0 * kb, 1.5 * kb), Color(1, 1, 1, 0.18))
+	for i in 4:
+		var col := i % 2
+		var rw := i / 2
+		var tr := Rect2(car_cx + (-16.0 * kb if col == 0 else 5.0 * kb), body_top + 2.0 * kb + rw * 31.0 * kb, 11.0 * kb, 19.0 * kb)
+		var tsb := _tyre_sbs[i]
+		tsb.bg_color = tyre_color(_tyre_use[i])
+		draw_style_box(tsb, tr)
+
+	var abs_now := false
+	for wh in car.wheels:
+		abs_now = abs_now or wh.abs_active
+	var aids := [["ABS", car.assists.abs, abs_now and car.assists.abs], ["TC", car.assists.tc, car.tc_cut > 0.05 and car.assists.tc], ["AUT", car.assists.auto, false]]
+	var ax := x + 50.0 * kb
+	var ay := row_cy - 24.5 * kb
+	var aw := 30.0 * kb
+	var ah := 15.0 * kb
+	for a in aids:
+		var ar := Rect2(ax, ay, aw, ah)
+		var on: bool = a[1]
+		var active: bool = a[2]
+		var col := Color(1, 1, 1, 0.88 if on else 0.30)
+		if active:
+			_box(ar, Color("#ffb020"), Color("#ffb020"), 1.0, 2.0 * kb)
+			col = Color("#0b0d11")
+		else:
+			_box(ar, Color(0, 0, 0, 0), Color(1, 1, 1, 0.24 if on else 0.08), 1.0, 2.0 * kb)
+		_text(_bold, ar.position + Vector2(0, 2.0 * kb), a[0], 10.0 * kb, col, HORIZONTAL_ALIGNMENT_CENTER, aw)
+		ay += ah + 2.5 * kb
+
+	x += 90.0 * kb
+	draw_line(Vector2(x, y + 2 * kb), Vector2(x, y + main_h - 2 * kb), Color(1, 1, 1, 0.14), 1.0)
+	x += 12.0 * kb
+
+	# 2b. Pedais empilhados (ACEL / FREIO)
+	var ped_w := 112.0 * kb
+	var ped_lbl_w := 32.0 * kb
+	var peds := [["ACEL", throttle, GREEN], ["FREIO", brake, Color("#ff4b5c")]]
+	var py := row_cy - 14.0 * kb
+	for pd in peds:
+		_text(_bold, Vector2(x, py), pd[0], 10.0 * kb, pd[2])
+		var trk := Rect2(x + ped_lbl_w, py + 1.0 * kb, ped_w - ped_lbl_w, 9.5 * kb)
+		_box(trk, Color(1, 1, 1, 0.10), Color(0, 0, 0, 0), 0.0, 3.0 * kb)
+		var v := clampf(float(pd[1]), 0.0, 1.0)
+		if v > 0.01:
+			_box(Rect2(trk.position, Vector2(trk.size.x * v, trk.size.y)), pd[2], Color(0, 0, 0, 0), 0.0, 3.0 * kb)
+		py += 18.0 * kb
+
+	x += ped_w + 12.0 * kb
+
+	# 2c. Marcha e Velocidade (caixa central)
+	var g_box_w := inner_x + inner_w - x - 110.0 * kb
+	var g_box := Rect2(x, row_cy - 26.0 * kb, g_box_w, 52.0 * kb)
+	_box(g_box, Color(1, 1, 1, 0.07), Color(1, 1, 1, 0.12), 1.0, 5.0 * kb)
+	var gear := "R" if car.gear < 0 else ("N" if car.gear == 0 else str(car.gear))
+	var gear_w := 42.0 * kb
+	_text(_bold, g_box.position + Vector2(6 * kb, 3.0 * kb), gear, 44.0 * kb, Color("#6aa8ff") if shift_now else WHITE, HORIZONTAL_ALIGNMENT_CENTER, gear_w)
+	var sep_x := g_box.position.x + gear_w + 10.0 * kb
+	draw_line(Vector2(sep_x, g_box.position.y + 7 * kb), Vector2(sep_x, g_box.end.y - 7 * kb), Color(1, 1, 1, 0.2), 1.0)
+	var kmh := str(roundi(absf(car.fwd_speed()) * 3.6))
+	var kmh_lbl := "KM/H"
+	var kmh_w := _text_w(_bold, kmh, 36.0 * kb)
+	var unit_w := _text_w(_bold, kmh_lbl, 12.0 * kb)
+	var readout_r := g_box.end.x - 10.0 * kb
+	var unit_x := readout_r - unit_w
+	var spd_x := unit_x - 5.0 * kb - kmh_w
+	_text(_bold, Vector2(spd_x, g_box.position.y + 7.0 * kb), kmh, 36.0 * kb, WHITE)
+	_text(_bold, Vector2(unit_x, g_box.position.y + 24.0 * kb), kmh_lbl, 12.0 * kb, Color(1, 1, 1, 0.72))
+
+	# 2d. Radar de Força G
+	var gx_start := inner_x + inner_w - 98.0 * kb
+	draw_line(Vector2(gx_start, y + 2 * kb), Vector2(gx_start, y + main_h - 2 * kb), Color(1, 1, 1, 0.14), 1.0)
+	var gc := Vector2(gx_start + 34.0 * kb, row_cy)
+	var gr := 24.0 * kb
+	draw_circle(gc, gr, Color(0, 0, 0, 0.36))
+	draw_arc(gc, gr, 0, TAU, 32, Color(1, 1, 1, 0.22), 1.0, true)
+	draw_arc(gc, gr * (19.0 / 28.0), 0, TAU, 28, Color(1, 1, 1, 0.14), 0.8, true)
+	draw_arc(gc, gr * (9.5 / 28.0), 0, TAU, 20, Color(1, 1, 1, 0.12), 0.8, true)
+	draw_line(gc - Vector2(gr, 0), gc + Vector2(gr, 0), Color(1, 1, 1, 0.16), 0.8)
+	draw_line(gc - Vector2(0, gr), gc + Vector2(0, gr), Color(1, 1, 1, 0.16), 0.8)
+
+	var sc_g := gr / 24.0
+	if _g_trail.size() >= 2:
+		for ti in range(1, _g_trail.size()):
+			draw_line(gc + _g_trail[ti - 1] * sc_g, gc + _g_trail[ti] * sc_g, Color(1.0, 204 / 255.0, 48 / 255.0, 0.45), 1.5 * kb, true)
+	var g_pt := gc + Vector2(clampf(car.g_lat / 2.8 * 24.0, -24.0, 24.0), clampf(-car.g_long / 2.8 * 24.0, -24.0, 24.0)) * sc_g
+	draw_line(gc, g_pt, Color(1, 1, 1, 0.45), 1.2 * kb, true)
+	var g_tot := Vector2(car.g_lat, car.g_long).length()
+	var g_col := Color("#ff4b5c") if g_tot > 1.85 else (Color("#f2cc30") if g_tot > 1.1 else GREEN)
+	draw_circle(g_pt, 3.8 * kb, Color.WHITE)
+	draw_circle(g_pt, 2.8 * kb, g_col)
+
+	var gm_x := gc.x + gr + 7.0 * kb
+	_text(_bold, Vector2(gm_x, row_cy - 12.0 * kb), "FORÇA G", 8.0 * kb, Color(1, 1, 1, 0.55))
+	_text(_bold, Vector2(gm_x, row_cy - 1.0 * kb), "%.1fG" % g_tot, 14.0 * kb, WHITE)
+
+	# 3. Faixa inferior: VOLTA INVÁLIDA e/ou barra de Delta ao vivo
+	if show_delta:
+		y += main_h + 7.0 * kb
+		draw_line(Vector2(inner_x, y - 3.5 * kb), Vector2(inner_x + inner_w, y - 3.5 * kb), Color(1, 1, 1, 0.1), 1.0)
+		var dx := inner_x
+		var dw := inner_w
+		if invalid:
+			var pulse := 0.79 + 0.21 * sin(_time * 5.2)
+			var inv_w := 98.0 * kb
+			_box(Rect2(dx, y + 2 * kb, inv_w, 18.0 * kb), Color(1.0, 75 / 255.0, 92 / 255.0, 0.25 * pulse), Color(1.0, 75 / 255.0, 92 / 255.0, 0.78 * pulse), 1.0, 3.0 * kb)
+			_text(_bold, Vector2(dx, y + 4.5 * kb), "VOLTA INVÁLIDA", 10.5 * kb, Color(1.0, 128 / 255.0, 139 / 255.0, pulse), HORIZONTAL_ALIGNMENT_CENTER, inv_w)
+			dx += inv_w + 8.0 * kb
+			dw -= inv_w + 8.0 * kb
+		if not is_nan(timer.delta) and dw > 30.0 * kb:
+			var d := timer.delta
+			var dr := Rect2(dx, y + 2 * kb, dw, 18.0 * kb)
+			_box(dr, Color(1, 1, 1, 0.07), Color(0, 0, 0, 0), 0.0, 3.0 * kb)
+			var half := dr.size.x * 0.5
+			var bw2 := minf(1.0, absf(d)) * half
+			var dcx := dr.position.x + half
+			var alpha := 0.55 if invalid else 0.85
+			if d < 0.0:
+				draw_rect(Rect2(dcx - bw2, dr.position.y, bw2, dr.size.y), Color(GREEN, alpha))
+			else:
+				draw_rect(Rect2(dcx, dr.position.y, bw2, dr.size.y), Color(1.0, 70 / 255.0, 60 / 255.0, alpha))
+			draw_line(Vector2(dcx, dr.position.y), Vector2(dcx, dr.end.y), Color(1, 1, 1, 0.38), 1.0)
+			var ds := ("−" if d < 0.0 else "+") + "%.2f" % absf(d)
+			_text(_bold, Vector2(dr.position.x, dr.position.y + 1.5 * kb), ds, 13.5 * kb, WHITE, HORIZONTAL_ALIGNMENT_CENTER, dr.size.x)
+
+
+# ------------------------------------------------------------------ mostrador LMU circular + pneus
 
 func _polar(c: Vector2, deg: float, r: float) -> Vector2:
 	return c + Vector2(cos(deg_to_rad(deg)), sin(deg_to_rad(deg))) * r
@@ -510,15 +1188,13 @@ func _draw_cluster(pos: Vector2, k: float) -> void:
 
 
 func _draw_gauge(pos: Vector2, k: float) -> void:
-	var u := GAUGE * k / 200.0  # unidades do viewBox 200 → px
+	var u := GAUGE * k / 200.0
 	var c := pos + Vector2(100, 100) * u
 	var lim: float = car.p.limiter
-	# sombra e disco azul-marinho
 	draw_circle(c + Vector2(0, 4 * u), 99 * u, Color(0, 0, 0, 0.3))
 	draw_circle(c, 99 * u, NAVY)
 	_arc(c, 99 * u, 0, 360, Color(1, 1, 1, 0.1), 1.2 * u)
 	draw_circle(c, 64 * u, Color(1, 1, 1, 0.025))
-	# trilho do giro, faixa vermelha perto do corte e arco de giro
 	_arc(c, GR * u, 150, 390, Color(1, 1, 1, 0.12), 10 * u)
 	var red0 := 150.0 + maxf(0.0, lim - 1000.0) / MAX_RPM * 240.0
 	_arc(c, (GR + 8) * u, red0, 390, Color(216 / 255.0, 52 / 255.0, 60 / 255.0, 0.9), 3 * u)
@@ -531,12 +1207,10 @@ func _draw_gauge(pos: Vector2, k: float) -> void:
 	elif car.rpm > lim - 700.0:
 		rpm_c = Color("#ff5148")
 	_arc(c, GR * u, 150, 150 + 240 * frac, rpm_c, 10 * u)
-	# pedais: arcos internos de 70°, enchendo de baixo para cima (freio à esquerda, acelerador à direita)
 	_arc(c, PR * u, 160, 230, Color(1, 1, 1, 0.08), 5 * u)
 	_arc(c, PR * u, 20, -50, Color(1, 1, 1, 0.08), 5 * u)
 	_arc(c, PR * u, 160, 160 + 70 * brake, Color("#ff4b5c"), 5 * u)
 	_arc(c, PR * u, 20, 20 - 70 * throttle, GREEN, 5 * u)
-	# marcha grande, velocidade e KM/H
 	var gear := "R" if car.gear < 0 else ("N" if car.gear == 0 else str(car.gear))
 	_text(_bold, pos + Vector2(0, 34 * k), gear, 96 * k, Color("#6aa8ff") if shift_now else WHITE, HORIZONTAL_ALIGNMENT_CENTER, GAUGE * k)
 	var kmh := str(roundi(absf(car.fwd_speed()) * 3.6))
@@ -550,7 +1224,6 @@ func _draw_tyres(bottom_left: Vector2, k: float, w: float) -> void:
 	var h := 110.0 * k
 	var r := Rect2(bottom_left - Vector2(0, h), Vector2(w, h))
 	draw_style_box(_tyres_panel_sb, r)
-	# contorno do carro entre os pneus e os 4 pneus (15×26, colunas a 26 de distância, linhas a 22)
 	var cx := r.position.x + w / 2.0
 	var top := r.position.y + 10 * k
 	var body := Rect2(cx - 13 * k, top, 26 * k, 74 * k)
@@ -563,7 +1236,6 @@ func _draw_tyres(bottom_left: Vector2, k: float, w: float) -> void:
 		var tsb := _tyre_sbs[i]
 		tsb.bg_color = tyre_color(_tyre_use[i])
 		draw_style_box(tsb, tr)
-	# ABS / TC / AUT
 	var abs_now := false
 	for wh in car.wheels:
 		abs_now = abs_now or wh.abs_active
@@ -596,7 +1268,7 @@ func _box(r: Rect2, bg: Color, border: Color, bw: float, radius := 0.0) -> void:
 	_ensure_styleboxes()
 	_box_sb.bg_color = bg
 	_box_sb.border_color = border
-	_box_sb.set_border_width_all(maxi(1, roundi(bw)))
+	_box_sb.set_border_width_all(maxi(1, roundi(bw)) if bw > 0.0 else 0)
 	_box_sb.set_corner_radius_all(roundi(radius))
 	draw_style_box(_box_sb, r)
 
@@ -604,10 +1276,8 @@ func _box(r: Rect2, bg: Color, border: Color, bw: float, radius := 0.0) -> void:
 func _draw_dash(pos: Vector2, ks: float) -> void:
 	var lim: float = car.p.limiter
 	var t := timer
-	# corpo preto 640×300
 	var body := Rect2(pos, Vector2(640, 300) * ks)
 	_box(body, Color("#121316"), Color("#000000"), 1 * ks, 14 * ks)
-	# 16 luzes de troca nos ~1900 rpm antes do ponto de troca; todas azuis piscando na hora de trocar
 	var shift_at := lim - 300.0
 	var shift_now := car.rpm > shift_at
 	var lit := ceili(clampf((car.rpm - (shift_at - 1900.0)) / 1900.0, 0.0, 1.0) * DASH_LEDS)
@@ -622,7 +1292,6 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 		if on:
 			draw_circle(c, led_w * 0.8, Color(col, 0.35))
 		draw_circle(c, led_w / 2.0, col if on else Color("#1b1d22"))
-	# luzes roxas dos lados: TC à esquerda, ABS à direita
 	var abs_now := false
 	for wh in car.wheels:
 		abs_now = abs_now or wh.abs_active
@@ -635,7 +1304,6 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 			if side[1]:
 				draw_circle(c, 10 * ks, Color(192 / 255.0, 43 / 255.0, 1.0, 0.35))
 			draw_circle(c, 7 * ks, Color("#c02bff") if side[1] else Color("#1b1d22"))
-	# tela: grade 52 | 108 | 1fr | 150 (colunas), 26 | 1fr | 64 (linhas), vão 6×8, padding 8×10
 	var scr := Rect2(pos + Vector2(42, 36) * ks, Vector2(640 - 84, 300 - 36 - 22) * ks)
 	_box(scr, Color("#0b0c0e"), Color("#24272c"), 1 * ks, 6 * ks)
 	var ix := scr.position.x + 10 * ks
@@ -648,7 +1316,6 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 	var rows_y := [iy, iy + (26 + 6) * ks, iy + ih - 64 * ks]
 	var mid_h := ih - (26 + 6 + 64 + 6) * ks
 	var gray := Color("#9aa1aa")
-	# linha de cima: TIME ATTACK (ou ARCADE) · PORSCHE · SECO
 	_text(_bold, Vector2(ix, iy + 4 * ks), "ARCADE 2×" if arcade else "TIME ATTACK", 15 * ks, Color("#ffb020") if arcade else Color("#ff3b3b"))
 	var brand := "P O R S C H E"
 	var bw := _text_w(_bold, brand, 24 * ks)
@@ -657,7 +1324,6 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 	var dry := Rect2(Vector2(ix + iw - dry_w, iy + 2 * ks), Vector2(dry_w, 22 * ks))
 	_box(dry, Color(0, 0, 0, 0), Color("#3fd18a"), 1.5 * ks, 3 * ks)
 	_text(_bold, dry.position + Vector2(8 * ks, 2 * ks), "SECO", 14 * ks, Color("#3fd18a"))
-	# coluna 1: chaves ABS / TC / AUT (laranja = ligada; cheia = atuando)
 	var keys := [["ABS", car.assists.abs, abs_now], ["TC", car.assists.tc, tc_now], ["AUT", car.assists.auto, false]]
 	for i in keys.size():
 		var kr := Rect2(Vector2(cx[0], rows_y[1] + i * 28 * ks), Vector2(52 * ks, 22 * ks))
@@ -668,7 +1334,6 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 		_text(_bold, kr.position + Vector2(4 * ks, 4 * ks), keys[i][0], 11 * ks, fc)
 		var st := "ON" if on else "OFF"
 		_text(_bold, Vector2(kr.end.x - 4 * ks - _text_w(_bold, st, 11 * ks), kr.position.y + 4 * ks), st, 11 * ks, Color.BLACK if act else (Color.WHITE if on else Color("#777777")))
-	# coluna 2: tabela
 	var tab := [["RPM", str(roundi(car.rpm / 10.0) * 10)], ["Freio diant.", "%d%%" % roundi(car.p.brake_bias * 100)],
 		["Lat. g", "%.2f" % absf(car.g_lat)], ["Long. g", "%.2f" % car.g_long], ["Volta", str(t.laps.size() + 1)]]
 	for i in tab.size():
@@ -676,7 +1341,6 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 		draw_rect(rr, Color("#2a2d33"))
 		_text(_font, rr.position + Vector2(6 * ks, 3 * ks), tab[i][0], 13 * ks, gray)
 		_text(_bold, Vector2(rr.end.x - 6 * ks - _text_w(_bold, tab[i][1], 13 * ks), rr.position.y + 3 * ks), tab[i][1], 13 * ks, WHITE)
-	# coluna 3: velocidade, marcha grande e barra de giro
 	var mw: float = cols[2] * ks
 	var mx: float = cx[2]
 	var spd := Rect2(Vector2(mx, rows_y[1]), Vector2(mw, 28 * ks))
@@ -691,7 +1355,6 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 	_text(_bold, Vector2(mx, gr.position.y + gr.size.y / 2.0 - 46 * ks), gear, 92 * ks, Color("#4aa3ff") if shift_now else WHITE, HORIZONTAL_ALIGNMENT_CENTER, mw)
 	var rb := Rect2(Vector2(mx, gr.end.y + 4 * ks), Vector2(mw, 6 * ks))
 	var rpm_frac := clampf((car.rpm - 3000.0) / (lim - 3000.0), 0.0, 1.0)
-	# degradê fixo verde → amarelo → vermelho → azul; a parte apagada cobre da direita
 	var segs := [[0.0, Color("#2fd06b")], [0.65, Color("#f1d12b")], [0.85, Color("#ff3b3b")], [1.0, Color("#4aa3ff")]]
 	for i in range(1, segs.size()):
 		var a: float = segs[i - 1][0]
@@ -703,7 +1366,6 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 			var col: Color = (segs[i - 1][1] as Color).lerp(segs[i][1], (j + 0.5) / n)
 			draw_rect(Rect2(rb.position.x + rb.size.x * f0, rb.position.y, rb.size.x * (f1 - f0) + 1, rb.size.y), col)
 	draw_rect(Rect2(rb.position.x + rb.size.x * rpm_frac, rb.position.y, rb.size.x * (1.0 - rpm_frac), rb.size.y), Color("#222222"))
-	# coluna 4: tempos
 	var d := t.delta
 	var dc := WHITE if is_nan(d) else (Color("#3fd18a") if d < 0.0 else Color("#ff4b4b"))
 	var ds := "--" if is_nan(d) else (("+" if d > 0.0 else ("−" if d < 0.0 else "")) + "%.2f" % absf(d))
@@ -732,7 +1394,6 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 			if col_i == 2:
 				by += br.size.y + 4 * ks
 				col_i = 0
-	# linha de baixo: CURVA · SETORES · pedais
 	var byy: float = rows_y[2]
 	_text(_font, Vector2(ix, byy + 12 * ks), "CURVA", 12 * ks, gray)
 	_text(_bold, Vector2(ix, byy + 28 * ks), section, 16 * ks, WHITE, HORIZONTAL_ALIGNMENT_LEFT, 160 * ks)
@@ -787,3 +1448,29 @@ func _draw_telemetry(pos: Vector2) -> void:
 	for l in lines:
 		_text(_mono, Vector2(pos.x + 10, y), l, fs, Color("#d8f3dc"))
 		y += fs * 1.45
+
+
+# ------------------------------------------------------------------ nós auxiliares do radar circular
+
+class _RadarClip extends Control:
+	var radius := 76.0
+	var center := Vector2(85, 85)
+
+	func set_circle(r: float, c: Vector2) -> void:
+		radius = r
+		center = c
+		queue_redraw()
+
+	func _draw() -> void:
+		draw_circle(center, radius, Color.WHITE)
+
+
+class _RadarView extends Control:
+	var hud: Hud
+
+	func _init(owner_hud: Hud) -> void:
+		hud = owner_hud
+
+	func _draw() -> void:
+		if hud != null:
+			hud._draw_radar_inside(self, size)

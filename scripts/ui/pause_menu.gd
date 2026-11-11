@@ -16,6 +16,7 @@ signal quality_changed(name: String)
 signal volume_changed(v: float)
 signal assist_changed(key: String, on: bool)
 signal touch_mode_changed(mode: String)
+signal hud_gauge_changed(style: String)
 signal recenter_tilt
 
 const MODES := ["sim", "arcade"]
@@ -45,6 +46,8 @@ const TOUCH_MODE_NOTES := {
 	"legacy": "Botões digitais clássicos ◀ ▶ à esquerda e pedais liga/desliga à direita",
 }
 const AIDS := [["abs", "ABS"], ["tc", "Controle de tração"], ["auto", "Câmbio automático"]]
+const GAUGE_STYLES := ["barra", "circular"]
+const GAUGE_NAMES := {"barra": "Barra Horizontal (Padrão)", "circular": "Circular Clássico"}
 const HELP := """Teclado: W/S ou ↑/↓ acelera e freia · A/D ou ←/→ esterça · E/Shift sobe marcha · Q/Ctrl reduz
 1 = ABS · 2 = controle de tração · G = câmbio automático · C = câmera · R = volta para o grid
 P = piloto automático · T = telemetria · F1 = qualidade · F12 = print · N = nick · Esc = este menu
@@ -66,6 +69,8 @@ var _qnote: Label
 var _vol: HSlider
 var _vol_lbl: Label
 var _aids := {}
+var _gbtn := {}
+var _current_gauge := "barra"
 var _touch_section: VBoxContainer
 var _tbtn := {}
 var _tnote: Label
@@ -231,6 +236,21 @@ func _build() -> void:
 		arow.add_child(cb)
 		_aids[a[0]] = cb
 
+	# estilo do mostrador do HUD
+	box.add_child(_field("Mostrador do HUD"))
+	var grow := HBoxContainer.new()
+	grow.add_theme_constant_override("separation", 8)
+	box.add_child(grow)
+	var ggroup := ButtonGroup.new()
+	for gs in GAUGE_STYLES:
+		var gb := _button(GAUGE_NAMES[gs], 15)
+		gb.toggle_mode = true
+		gb.button_group = ggroup
+		gb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		gb.pressed.connect(func(): _pick_gauge(gs))
+		grow.add_child(gb)
+		_gbtn[gs] = gb
+
 	# controles de toque no celular
 	_touch_section = VBoxContainer.new()
 	_touch_section.add_theme_constant_override("separation", 6)
@@ -328,7 +348,7 @@ func _button(t: String, size: int, primary := false) -> Button:
 # ------------------------------------------------------------------ estado
 
 ## abre com o estado atual do jogo
-func open(nick: String, quality: String, volume: float, assists: Dictionary, touch_mode := "padrao", is_touch := false, focus_nick := false, mode := "sim") -> void:
+func open(nick: String, quality: String, volume: float, assists: Dictionary, touch_mode := "padrao", is_touch := false, focus_nick := false, mode := "sim", hud_gauge := "barra") -> void:
 	_nick.text = nick
 	_current_mode = mode if mode in MODES else "sim"
 	for m in _mbtn:
@@ -341,6 +361,9 @@ func open(nick: String, quality: String, volume: float, assists: Dictionary, tou
 	_vol_lbl.text = "%d%%" % roundi(volume * 100)
 	for key in _aids:
 		_aids[key].set_pressed_no_signal(bool(assists.get(key, false)))
+	_current_gauge = hud_gauge if hud_gauge in GAUGE_STYLES else "barra"
+	for gs in _gbtn:
+		_gbtn[gs].set_pressed_no_signal(gs == _current_gauge)
 
 	_current_touch_mode = touch_mode
 	for tm in _tbtn:
@@ -446,6 +469,14 @@ func _on_volume(v: float) -> void:
 func _on_assist(key: String, on: bool) -> void:
 	Game.set_setting("assistencias", key, on)
 	assist_changed.emit(key, on)
+
+
+func _pick_gauge(gs: String) -> void:
+	if gs == _current_gauge:
+		return
+	_current_gauge = gs
+	Game.set_setting("hud", "mostrador", gs)
+	hud_gauge_changed.emit(gs)
 
 
 ## fecha por fora (Esc / Start / ☰ / Voltar, tratados no main.gd)

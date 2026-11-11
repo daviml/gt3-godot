@@ -304,6 +304,41 @@ func _build_ui() -> void:
 	title.position = Vector2(36, 26)
 	root.add_child(title)
 
+	# Piloto / Nick (canto superior esquerdo)
+	var pbox := HBoxContainer.new()
+	pbox.position = Vector2(36, 58)
+	pbox.add_theme_constant_override("separation", 8)
+	root.add_child(pbox)
+
+	var plbl := _label("PILOTO:", 14, Color(1, 1, 1, 0.55))
+	plbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	pbox.add_child(plbl)
+
+	var pedit := LineEdit.new()
+	pedit.custom_minimum_size = Vector2(160, 32)
+	pedit.text = Records.load_nick()
+	pedit.placeholder_text = "Seu nick"
+	pedit.max_length = 16
+	pedit.add_theme_font_size_override("font_size", 14)
+	var esb := StyleBoxFlat.new()
+	esb.bg_color = Color(1, 1, 1, 0.08)
+	esb.border_color = Color(1, 1, 1, 0.25)
+	esb.set_border_width_all(1)
+	esb.set_corner_radius_all(6)
+	esb.content_margin_left = 8
+	esb.content_margin_right = 8
+	pedit.add_theme_stylebox_override("normal", esb)
+	var esb_f := esb.duplicate()
+	esb_f.border_color = Color(1, 1, 1, 0.6)
+	pedit.add_theme_stylebox_override("focus", esb_f)
+	pedit.text_changed.connect(func(t: String):
+		Records.save_nick(t)
+	)
+	pedit.text_submitted.connect(func(_t: String):
+		pedit.release_focus()
+	)
+	pbox.add_child(pedit)
+
 	# seletor Simulador / Arcade (canto superior direito)
 	var mbox := VBoxContainer.new()
 	mbox.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -724,6 +759,9 @@ func _drive() -> void:
 	if _transitioning:
 		return
 	_transitioning = true
+	var cur_nick := Records.load_nick()
+	if cur_nick != "":
+		Records.save_nick(cur_nick)
 	if drive_btn:
 		drive_btn.text = "CARREGANDO..."
 		drive_btn.disabled = true

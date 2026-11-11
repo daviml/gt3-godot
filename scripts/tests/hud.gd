@@ -69,6 +69,35 @@ func _init() -> void:
 	hud2.set_view("capô")
 	check(not hud2.dash_on, "M4 não tem painel próprio")
 	check(hud._map_pts.size() > 500 and hud._map_pts[0] == hud._map_pts[hud._map_pts.size() - 1], "mapa: traçado fechado")
+	check(hud._corners.size() == 15, "radar detecta as 15 curvas de Interlagos")
+
+	print("melhorias de HUD (barra horizontal, radar, placa expansível)")
+	var old_gauge = Game.get_setting("hud", "mostrador", null)
+	var old_map = Game.get_setting("hud", "minimapa", null)
+	hud.set_gauge_style("circular")
+	check(hud.gauge_style == "circular" and String(Game.get_setting("hud", "mostrador", "")) == "circular", "mostrador alterna para circular e salva")
+	hud.set_gauge_style("barra")
+	check(hud.gauge_style == "barra", "mostrador retorna para barra horizontal")
+	check(hud.map_mode in ["dynamic", "circuit"], "minimapa em modo válido")
+	hud._toggle_map_mode()
+	var toggled_map := hud.map_mode
+	hud._toggle_map_mode()
+	check(hud.map_mode != toggled_map, "minimapa alterna entre RADAR e CIRCUITO")
+	check(not hud.board_expanded, "melhores tempos começa recolhido")
+	hud._toggle_board()
+	check(hud.board_expanded, "melhores tempos expande ao clicar")
+	car.g_lat = 1.4
+	car.g_long = -0.8
+	hud.update(0.02, 0.7, 0.0)
+	check(hud._g_trail.size() == 1, "radar de força G registra rastro")
+	if old_gauge != null:
+		Game.set_setting("hud", "mostrador", old_gauge)
+	else:
+		Game.erase_setting("hud", "mostrador")
+	if old_map != null:
+		Game.set_setting("hud", "minimapa", old_map)
+	else:
+		Game.erase_setting("hud", "minimapa")
 
 	print("ajustes do menu (user://jogo.cfg)")
 	var old_q = Game.get_setting("video", "qualidade", null)

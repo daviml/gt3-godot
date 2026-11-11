@@ -93,10 +93,13 @@ func _init_args() -> void:
 		if a.begins_with("--car="):
 			car_id = a.substr(6)
 		if a.begins_with("--nick="):
-			nick = a.substr(7)
-			Records.save_nick(nick)
+			nick = a.substr(7).strip_edges()
+			if nick != "":
+				Records.save_nick(nick)
 	if nick == "":
 		nick = Records.load_nick()
+	if nick == "":
+		nick = "Piloto"
 	# --touch mostra os botões de toque no PC (o mouse vira dedo)
 	input.touch = OS.has_feature("mobile") or "--touch" in _init_cli_args
 
@@ -290,6 +293,16 @@ func _build_hud() -> void:
 	hud.arcade = (mode == "arcade")
 	hud.best_sectors = best_sectors
 	hud.nick = nick
+	hud.menu_requested.connect(_toggle_pause)
+	hud.camera_requested.connect(func():
+		chase.next()
+		_toast("Câmera: " + chase.mode_name())
+	)
+	hud.reset_requested.connect(func():
+		if not autopilot:
+			_spawn()
+			chase.snap()
+	)
 	layer.add_child(hud)
 	var touch_mode_saved := String(Game.get_setting("controles", "modo_toque", "padrao"))
 	if not touch_mode_saved in TouchControls.MODES:
@@ -298,6 +311,7 @@ func _build_hud() -> void:
 	input.grip_scale = car.grip_scale
 	if input.touch:
 		touch = TouchControls.new()
+		touch.show_menu_btn = false
 		touch.mode = touch_mode_saved
 		touch.keys = input.touch_keys
 		touch.axes = input.touch_axes
@@ -320,6 +334,7 @@ func _build_hud() -> void:
 	menu.quality_changed.connect(_apply_quality)
 	menu.volume_changed.connect(_set_volume)
 	menu.assist_changed.connect(func(key: String, on: bool): car.assists[key] = on)
+	menu.hud_gauge_changed.connect(func(style: String): hud.set_gauge_style(style))
 	menu.touch_mode_changed.connect(func(tm: String):
 		input.touch_mode = tm
 		if touch:
@@ -358,7 +373,13 @@ func _spawn() -> void:
 
 
 func _refresh_records() -> void:
-	top_records = shared_records.slice(0, 8) if has_shared_records else Records.top(8, mode)
+	var local_all := Records.load_all(mode)
+	if has_shared_records and not shared_records.is_empty():
+		top_records = Records.merge_records(shared_records, local_all).slice(0, 8)
+	else:
+		top_records = Records.top(8, mode)
+	if hud:
+		hud.records = top_records
 
 
 func _apply_mode(m: String, reset_car := true) -> void:
@@ -413,22 +434,32 @@ func _on_lap(lap: LapTimer.Lap) -> void:
 				best_sectors[i] = minf(best_sectors[i], lap.sectors[i])
 	if autopilot:
 		return
-	var saved := Records.save_lap(nick, car_id, lap, lap_mode)
+	var clean_nick := nick.strip_edges()
+	if clean_nick == "":
+		clean_nick = Records.load_nick()
+		if clean_nick == "":
+			clean_nick = "Piloto"
+		nick = clean_nick
+		Records.save_nick(nick)
+		if hud:
+			hud.nick = nick
+	var saved := Records.save_lap(clean_nick, car_id, lap, lap_mode)
 	if saved:
 		_toast("Recorde pessoal: " + _fmt(lap.time))
 	elif not lap.valid:
 		_toast("Volta inválida (4 rodas fora)")
-	elif nick.strip_edges() == "":
-		_toast("Sem nick: aperte N para gravar seus recordes")
 	_refresh_records()
-	if lap.valid and nick.strip_edges() != "" and remote_records:
-		remote_records.post_lap(nick, car_id, lap, lap_mode, _on_remote_lap_posted)
+	if lap.valid and clean_nick != "" and remote_records:
+		remote_records.post_lap(clean_nick, car_id, lap, lap_mode, _on_remote_lap_posted)
 
 
 func _on_nick(t: String) -> void:
-	nick = t
+	nick = t.strip_edges()
+	if nick == "":
+		nick = "Piloto"
 	hud.nick = nick
 	Records.save_nick(nick)
+	_refresh_records()
 
 
 # ------------------------------------------------------------------ laço
@@ -563,6 +594,8 @@ func _set_paused(on: bool, focus_nick := false) -> void:
 	if on == paused and not (on and focus_nick):
 		return
 	paused = on
+	if hud:
+		hud.set_menu_open(on)
 	if touch:
 		touch.set_enabled(not on)
 	if speed_blur and on:
@@ -570,7 +603,7 @@ func _set_paused(on: bool, focus_nick := false) -> void:
 	if car_audio:
 		car_audio.set_paused(on)
 	if on:
-		menu.open(nick, quality_name, volume, car.assists, input.touch_mode, input.touch, focus_nick, mode)
+		menu.open(nick, quality_name, volume, car.assists, input.touch_mode, input.touch, focus_nick, mode, hud.gauge_style if hud else "barra")
 	elif menu.is_open:
 		menu.close()
 

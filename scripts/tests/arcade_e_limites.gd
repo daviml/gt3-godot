@@ -143,6 +143,8 @@ func _test_records_separation_and_api() -> void:
 	var top_arc := Records.top(8, "arcade")
 	check(top_sim.size() == 1 and top_sim[0].nick == "DaviSim", "ranking local sim separado do arcade")
 	check(top_arc.size() == 1 and top_arc[0].nick == "DaviArc", "ranking local arcade separado do sim")
+	var merged := Records.merge_records([{"nick": "Remoto", "carId": "bmw-m4-gt3", "time": 76.0}], [{"nick": "Local", "carId": "bmw-m4-gt3", "time": 75.0}])
+	check(merged.size() == 2 and merged[0].nick == "Local", "merge_records combina remoto e local mantendo menor tempo primeiro")
 
 	check(Records.ranking_url("sim").ends_with("/api/ranking?modo=godot-sim"), "URL ranking sim aponta para godot-sim")
 	check(Records.ranking_url("arcade").ends_with("/api/ranking?modo=godot-arcade"), "URL ranking arcade aponta para godot-arcade")
