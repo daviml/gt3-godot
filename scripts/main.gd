@@ -50,17 +50,36 @@ var bot: RefCounted
 var car_id := Game.car_id  # escolhido na garagem (scenes/garagem.tscn)
 var car_data: Dictionary
 var high := true
+var manual_setup := false
+var _init_cli_args: PackedStringArray
 # referência do iRacing de cada carro que tem uma: o piloto automático segue a volta real
 const REFS := {"porsche-992-gt3r": "interlagos-porsche", "audi-r8-lms-gt3": "interlagos-r8", "ford-mustang-gt3": "interlagos-mustang"}
 
 
 
 func _ready() -> void:
-	var args := OS.get_cmdline_user_args()
-	var is_mobile_init := OS.has_feature("mobile") or "--mobile" in args
+	_init_args()
+	if manual_setup:
+		set_physics_process(false)
+		set_process(false)
+		set_process_unhandled_input(false)
+		return
+	track = Track.new("res://data/track/track.json")
+	_build_env()
+	# pista e arredores exportados do jogo web (etapa 7): scripts/track/track_view.gd
+	track_view = TrackView.new()
+	add_child(track_view)
+	_build_car()
+	setup_step_hud_and_quality()
+	_apply_cli_post_setup()
+
+
+func _init_args() -> void:
+	_init_cli_args = OS.get_cmdline_user_args()
+	var is_mobile_init := OS.has_feature("mobile") or "--mobile" in _init_cli_args
 	Engine.max_physics_steps_per_frame = 2 if is_mobile_init else 4
-	autopilot = "--auto" in args
-	for a in args:
+	autopilot = "--auto" in _init_cli_args
+	for a in _init_cli_args:
 		if a.begins_with("--shot="):
 			shot_dir = a.substr(7)
 			autopilot = true
@@ -72,13 +91,22 @@ func _ready() -> void:
 	if nick == "":
 		nick = Records.load_nick()
 	# --touch mostra os botões de toque no PC (o mouse vira dedo)
-	input.touch = OS.has_feature("mobile") or "--touch" in args
-	track = Track.new("res://data/track/track.json")
-	_build_env()
-	# pista e arredores exportados do jogo web (etapa 7): scripts/track/track_view.gd
-	track_view = TrackView.new()
-	add_child(track_view)
-	_build_car()
+	input.touch = OS.has_feature("mobile") or "--touch" in _init_cli_args
+
+
+func setup_step_track(pre_track: Track) -> void:
+	track = pre_track if pre_track != null else Track.new("res://data/track/track.json")
+
+
+func setup_step_env(sky_tex: Texture2D = null) -> void:
+	_build_env(sky_tex)
+
+
+func setup_step_car(preloaded_streams: Dictionary = {}) -> void:
+	_build_car(preloaded_streams, true)
+
+
+func setup_step_hud_and_quality() -> void:
 	timer = LapTimer.new(track)
 	timer.on_lap = _on_lap
 	_build_hud()
@@ -101,16 +129,29 @@ func _ready() -> void:
 	else:
 		bot = Bot.new(track, car)
 	# No celular ou com flag --mobile, já inicia configurado para Mobile; o menu de pausa guarda a escolha
-	var is_mobile := OS.has_feature("mobile") or "--mobile" in args
-	var saved := String(Game.get_setting("video", "qualidade", ""))
-	_apply_quality("Leve" if "--mobile" in args else (saved if saved in PauseMenu.QUALITIES else ("Leve" if is_mobile else "Extremo")))
-	for a in args:
+	_apply_quality(Game.get_quality_name())
+	_update_car_view(1.0)
+	chase.snap()
+
+
+func _apply_cli_post_setup() -> void:
+	for a in _init_cli_args:
 		if a.begins_with("--cam="):
 			chase.mode = clampi(int(a.substr(6)), 0, 2)
 			fixed_cam = true
 		if a == "--menu":
 			# teste: abre o menu de pausa já na largada (os prints usam o tempo real)
 			_set_paused.call_deferred(true)
+
+
+func finish_loading() -> void:
+	set_physics_process(true)
+	set_process(true)
+	set_process_unhandled_input(true)
+	if car_audio:
+		car_audio.set_paused(paused)
+	chase.snap()
+	_apply_cli_post_setup()
 
 
 # modo de teste: --shot=<pasta> pilota sozinho, salva prints em alguns tempos e sai
@@ -134,13 +175,14 @@ func _shot_tick(dt: float) -> void:
 
 # ------------------------------------------------------------------ ambiente
 
-func _build_env() -> void:
+func _build_env(sky_tex: Texture2D = null) -> void:
 	var phi := (SUN_U - 0.5) * TAU
 	var sun_dir := Vector3(cos(phi) * cos(SUN_ELEV), sin(SUN_ELEV), sin(phi) * cos(SUN_ELEV))
 
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = load("res://shaders/sky.gdshader")
-	var sky_tex: Texture2D = load("res://assets/sky/ceu_2k.hdr")
+	if sky_tex == null:
+		sky_tex = load("res://assets/sky/ceu_2k.hdr")
 	sky_mat.set_shader_parameter("pano", sky_tex)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
@@ -195,17 +237,19 @@ func _build_env() -> void:
 
 # ------------------------------------------------------------------ carro
 
-func _build_car() -> void:
+func _build_car(preloaded_streams: Dictionary = {}, start_paused := false) -> void:
 	if not FileAccess.file_exists("res://data/cars/%s.json" % car_id):
 		push_warning("carro desconhecido: %s" % car_id)
 		car_id = "porsche-992-gt3r"
 	# visual do carro (modelo, materiais, rodas com pinça parada e desfoque): scripts/render/car_view.gd
-	car_view = CarView.new(car_id)
+	car_view = CarView.new(car_id, Game.get_quality_level() >= 2)
 	add_child(car_view)
 	car_data = car_view.data
 	car = Car.new(track, car_data.params)
 	# som do carro (etapa 11): motor engine-sim, turbo, pneu, superfícies e vento
-	car_audio = CarAudio.new(car, car_id)
+	car_audio = CarAudio.new(car, car_id, preloaded_streams)
+	if start_paused:
+		car_audio.is_audio_paused = true
 	add_child(car_audio)
 
 
@@ -449,7 +493,8 @@ func _to_garage() -> void:
 	paused = false
 	if car_audio:
 		car_audio.set_paused(true)
-	get_tree().change_scene_to_file("res://scenes/garagem.tscn")
+	Game.transition_target = "garage"
+	get_tree().change_scene_to_file("res://scenes/loading.tscn")
 
 
 func _toast(t: String) -> void:

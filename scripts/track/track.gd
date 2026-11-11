@@ -48,8 +48,8 @@ var lwalll := 0.0
 var lwallr := 0.0
 
 
-func _init(path: String) -> void:
-	var d: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+func _init(path := "", data: Dictionary = {}) -> void:
+	var d: Dictionary = data if not data.is_empty() else JSON.parse_string(FileAccess.get_file_as_string(path))
 	n = int(d.n)
 	var s: Array = d.s
 	var st := int(d.stride)

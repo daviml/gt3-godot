@@ -22,8 +22,12 @@ var details_label: Label
 var progress_bar: ProgressBar
 var is_downloading: bool = false
 var is_loading_game: bool = false
-var fake_progress: float = 0.0
 var next_version_to_save: int = CURRENT_CLIENT_VERSION
+var _initial_car_id: String = ""
+var _initial_car_glb: String = ""
+var _garagem_done: bool = false
+var _car_done: bool = false
+var _garagem_packed: PackedScene = null
 
 func _ready() -> void:
 	_setup_ui()
@@ -100,7 +104,7 @@ func _setup_ui() -> void:
 
 func _setup_network() -> void:
 	http_version = HTTPRequest.new()
-	http_version.timeout = 3.0 # Timeout rápido de 3s para não prender o jogador
+	http_version.timeout = 1.5 # Timeout rápido de 1.5s para não prender o jogador
 	add_child(http_version)
 	
 	http_download = HTTPRequest.new()
@@ -194,7 +198,6 @@ func _check_for_patches() -> void:
 			_download_patch(patch_url)
 		else:
 			status_label.text = "Jogo atualizado!"
-			await get_tree().create_timer(0.3).timeout
 			_finish_and_enter_game()
 	, CONNECT_ONE_SHOT)
 	
@@ -247,26 +250,49 @@ func _process(delta: float) -> void:
 		return
 
 	if is_loading_game:
-		var progress: Array = []
-		var status = ResourceLoader.load_threaded_get_status(GARAGEM_SCENE, progress)
-		
-		# Animação suave e contínua da barra de progresso durante o loading da garagem
-		fake_progress = minf(fake_progress + delta * 35.0, 95.0)
-		var real_pct: float = progress[0] * 100.0 if progress.size() > 0 else 0.0
-		progress_bar.value = maxf(fake_progress, real_pct)
-		
-		match status:
-			ResourceLoader.THREAD_LOAD_LOADED:
-				progress_bar.value = 100.0
-				is_loading_game = false
-				var packed_scene = ResourceLoader.load_threaded_get(GARAGEM_SCENE) as PackedScene
-				if packed_scene:
-					get_tree().change_scene_to_packed.call_deferred(packed_scene)
-				else:
-					get_tree().change_scene_to_file.call_deferred(GARAGEM_SCENE)
-			ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-				print("[Updater] Falha no carregamento assíncrono (%d). Fallback direto." % status)
-				is_loading_game = false
+		var gar_pct: float = 100.0 if _garagem_done else 0.0
+		var car_pct: float = 100.0 if _car_done else 0.0
+
+		if not _garagem_done:
+			var g_prog: Array = []
+			var g_status := ResourceLoader.load_threaded_get_status(GARAGEM_SCENE, g_prog)
+			if g_prog.size() > 0:
+				gar_pct = clampf(float(g_prog[0]) * 100.0, 0.0, 100.0)
+			match g_status:
+				ResourceLoader.THREAD_LOAD_LOADED:
+					_garagem_packed = ResourceLoader.load_threaded_get(GARAGEM_SCENE) as PackedScene
+					_garagem_done = true
+					gar_pct = 100.0
+				ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+					print("[Updater] Falha no carregamento assíncrono da garagem (%d). Fallback direto." % g_status)
+					_garagem_done = true
+					gar_pct = 100.0
+
+		if not _car_done:
+			var c_prog: Array = []
+			var c_status := ResourceLoader.load_threaded_get_status(_initial_car_glb, c_prog)
+			if c_prog.size() > 0:
+				car_pct = clampf(float(c_prog[0]) * 100.0, 0.0, 100.0)
+			match c_status:
+				ResourceLoader.THREAD_LOAD_LOADED:
+					var car_scene := ResourceLoader.load_threaded_get(_initial_car_glb) as PackedScene
+					Game.cache_car_scene(_initial_car_id, car_scene)
+					_car_done = true
+					car_pct = 100.0
+				ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+					print("[Updater] Falha ao pré-carregar carro inicial (%d): %s" % [c_status, _initial_car_glb])
+					_car_done = true
+					car_pct = 100.0
+
+		var combined_pct: float = gar_pct * 0.2 + car_pct * 0.8
+		progress_bar.value = maxf(progress_bar.value, minf(combined_pct, 100.0 if (_garagem_done and _car_done) else 99.0))
+
+		if _garagem_done and _car_done:
+			progress_bar.value = 100.0
+			is_loading_game = false
+			if _garagem_packed:
+				get_tree().change_scene_to_packed.call_deferred(_garagem_packed)
+			else:
 				get_tree().change_scene_to_file.call_deferred(GARAGEM_SCENE)
 
 func _load_existing_patch() -> void:
@@ -290,15 +316,37 @@ func _finish_and_enter_game() -> void:
 	# No editor ou comando com argumento de pista direta, pula a garagem
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--car=") or a.begins_with("--shot=") or a == "--auto":
+			is_loading_game = false
 			get_tree().change_scene_to_file.call_deferred("res://scenes/main.tscn")
 			return
 			
+	_initial_car_id = Game.car_id
+	_initial_car_glb = Game.get_car_glb_path(_initial_car_id)
+	var car_info := Game.get_car_info(_initial_car_id)
+	var car_name := String(car_info.get("name", _initial_car_id))
+
 	status_label.text = "Carregando garagem..."
 	progress_bar.visible = true
-	progress_bar.value = 15.0
-	details_label.visible = false
-	
+	progress_bar.value = 5.0
+	details_label.text = "Pré-carregando: %s" % car_name
+	details_label.visible = true
+
+	_garagem_done = false
+	_garagem_packed = null
 	var err = ResourceLoader.load_threaded_request(GARAGEM_SCENE, "", true)
 	if err != OK:
-		print("[Updater] Falha ao iniciar carregamento assíncrono (%d). Fallback direto." % err)
+		print("[Updater] Falha ao iniciar carregamento assíncrono da garagem (%d). Fallback direto." % err)
+		_garagem_done = true
+
+	if _initial_car_glb.is_empty() or Game.get_cached_car_scene(_initial_car_id) != null:
+		_car_done = true
+	else:
+		_car_done = false
+		var car_err = ResourceLoader.load_threaded_request(_initial_car_glb, "PackedScene", true)
+		if car_err != OK:
+			print("[Updater] Falha ao iniciar pré-carga do carro (%d): %s" % [car_err, _initial_car_glb])
+			_car_done = true
+
+	if _garagem_done and _car_done:
+		is_loading_game = false
 		get_tree().change_scene_to_file.call_deferred(GARAGEM_SCENE)

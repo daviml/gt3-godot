@@ -10,12 +10,32 @@ extends Node3D
 
 const TOP := 0.07          # altura do tampo do giratório
 const SPIN_RATE := 0.22    # rad/s do giratório
+const LOAD_DEBOUNCE := 0.10    # atraso curto em trocas rápidas para evitar disparar cargas intermediárias
+const RAPID_SWITCH_MS := 220   # janela para considerar troca rápida consecutiva
+const PREFETCH_DELAY := 0.25   # respiro antes de pré-carregar carros vizinhos
+
+class _SpinnerGraphic extends Control:
+	var angle := 0.0
+	var arc_color := Color(1, 1, 1, 0.92)
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(24, 24)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var c := size * 0.5
+		var r := minf(size.x, size.y) * 0.38
+		draw_arc(c, r, 0.0, TAU, 24, Color(1, 1, 1, 0.16), 2.5, true)
+		draw_arc(c, r, angle, angle + PI * 1.35, 18, arc_color, 2.5, true)
 
 var cars: Array
 var idx := 0
 var view: CarView
 var pivot: Node3D           # giratório (o carro vai em cima)
 var ring_mat: StandardMaterial3D
+var studio_env: Environment
+var key_light: DirectionalLight3D
+var studio_quality_level := 3
 var cam: Camera3D
 var cam_yaw := deg_to_rad(-35.0)
 var cam_pitch := deg_to_rad(11.0)
@@ -28,7 +48,23 @@ var name_lbl: Label
 var info_lbl: Label
 var idx_lbl: Label
 var drive_btn: Button
+var loading_overlay: PanelContainer
+var loading_spinner: _SpinnerGraphic
+var loading_lbl: Label
 var shot_dir := ""
+var manual_setup := false
+var _transitioning := false
+
+var _nav_dir := 1
+var _last_switch_ms := -1000
+var _pending_car_id := ""
+var _pending_glb := ""
+var _pending_delay := 0.0
+var _pending_requested := false
+var _prefetch_delay := 0.0
+var _prefetch_queue: Array[Dictionary] = []
+var _in_flight_prefetches: Dictionary = {}
+var _stale_loads: Dictionary = {}
 
 
 func _ready() -> void:
@@ -38,15 +74,37 @@ func _ready() -> void:
 			return
 		if a.begins_with("--vitrine="):
 			shot_dir = a.substr(10)
-	cars = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars.json"))
+	cars = Game.get_cars_list()
 	for i in cars.size():
 		if cars[i].id == Game.car_id:
 			idx = i
+	if manual_setup:
+		set_process(false)
+		set_process_unhandled_input(false)
+		return
 	_build_studio()
 	_build_ui()
 	_show(idx)
 	if shot_dir != "":
 		_vitrine.call_deferred()
+
+
+func setup_step_studio() -> void:
+	_build_studio()
+
+
+func setup_step_ui() -> void:
+	_build_ui()
+
+
+func setup_step_car() -> void:
+	_show(idx)
+
+
+func finish_loading() -> void:
+	set_process(true)
+	set_process_unhandled_input(true)
+	_process(0.0)
 
 
 # ------------------------------------------------------------------ estúdio
@@ -63,21 +121,41 @@ func _build_studio() -> void:
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 1.1
 	
-	# SSAO, SSR e Glow ajustados por plataforma (desligados no mobile para inicialização rápida e 60 FPS)
-	var is_mobile := OS.has_feature("mobile")
-	if not is_mobile:
-		env.ssao_enabled = true
+	# SSAO, SSR, Glow e resolução respeitam o preset gráfico salvo em user://jogo.cfg
+	studio_quality_level = Game.get_quality_level()
+	var is_mobile := Game.is_mobile_platform()
+	var vp := get_viewport()
+	if vp:
+		if studio_quality_level == 0:
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+			vp.scaling_3d_scale = 0.65
+			vp.msaa_3d = Viewport.MSAA_DISABLED
+		elif studio_quality_level == 1:
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR if is_mobile else Viewport.SCALING_3D_MODE_FSR
+			vp.scaling_3d_scale = 0.75
+			vp.fsr_sharpness = 0.2
+			vp.msaa_3d = Viewport.MSAA_DISABLED
+		elif studio_quality_level == 2:
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+			vp.scaling_3d_scale = 1.0
+			vp.msaa_3d = Viewport.MSAA_2X
+		else:
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+			vp.scaling_3d_scale = 1.0
+			vp.msaa_3d = Viewport.MSAA_4X
+
+	env.ssao_enabled = studio_quality_level >= 2
+	if env.ssao_enabled:
 		env.ssao_radius = 0.8
-		env.ssao_intensity = 2.0
-		env.ssr_enabled = true
+		env.ssao_intensity = 1.2 if studio_quality_level == 2 else 2.0
+	env.ssr_enabled = studio_quality_level >= 3
+	if env.ssr_enabled:
 		env.ssr_max_steps = 64
-		env.glow_enabled = true
-		env.glow_intensity = 0.4
+	env.glow_enabled = studio_quality_level >= 2
+	if env.glow_enabled:
+		env.glow_intensity = 0.3 if studio_quality_level == 2 else 0.4
 		env.glow_bloom = 0.03
-	else:
-		env.ssao_enabled = false
-		env.ssr_enabled = false
-		env.glow_enabled = false
+	studio_env = env
 		
 	env.adjustment_enabled = true
 	env.adjustment_contrast = 1.06
@@ -168,9 +246,10 @@ func _build_studio() -> void:
 		add_child(s)
 
 	var key := DirectionalLight3D.new()
+	key_light = key
 	key.light_energy = 1.3
 	key.light_color = Color(1.0, 0.97, 0.93)
-	key.shadow_enabled = true
+	key.shadow_enabled = studio_quality_level >= 1
 	key.shadow_blur = 2.0
 	key.light_angular_distance = 6.0
 	key.directional_shadow_max_distance = 25.0
@@ -243,7 +322,10 @@ func _build_ui() -> void:
 	prev.offset_right = 120
 	prev.offset_top = -50
 	prev.offset_bottom = 50
-	prev.pressed.connect(func(): _show(idx - 1))
+	prev.pressed.connect(func():
+		_nav_dir = -1
+		_show(idx - 1)
+	)
 	root.add_child(prev)
 	var nxt := _button("▶", 44)
 	nxt.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
@@ -251,7 +333,10 @@ func _build_ui() -> void:
 	nxt.offset_right = -30
 	nxt.offset_top = -50
 	nxt.offset_bottom = 50
-	nxt.pressed.connect(func(): _show(idx + 1))
+	nxt.pressed.connect(func():
+		_nav_dir = 1
+		_show(idx + 1)
+	)
 	root.add_child(nxt)
 	var go := _button("PILOTAR", 28)
 	drive_btn = go
@@ -269,6 +354,36 @@ func _build_ui() -> void:
 	help.offset_top = -48
 	help.offset_bottom = -24
 	root.add_child(help)
+
+	# Indicador discreto e não-bloqueante sobre a plataforma enquanto o carro carrega em segundo plano
+	loading_overlay = PanelContainer.new()
+	loading_overlay.set_anchors_preset(Control.PRESET_CENTER)
+	loading_overlay.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	loading_overlay.grow_vertical = Control.GROW_DIRECTION_BOTH
+	loading_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	loading_overlay.visible = false
+	var lsb := StyleBoxFlat.new()
+	lsb.bg_color = Color(0.05, 0.06, 0.08, 0.78)
+	lsb.border_color = Color(1, 1, 1, 0.18)
+	lsb.set_border_width_all(1)
+	lsb.set_corner_radius_all(12)
+	lsb.content_margin_left = 18
+	lsb.content_margin_right = 18
+	lsb.content_margin_top = 10
+	lsb.content_margin_bottom = 10
+	loading_overlay.add_theme_stylebox_override("panel", lsb)
+	root.add_child(loading_overlay)
+
+	var lbox := HBoxContainer.new()
+	lbox.add_theme_constant_override("separation", 10)
+	lbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	loading_overlay.add_child(lbox)
+
+	loading_spinner = _SpinnerGraphic.new()
+	lbox.add_child(loading_spinner)
+
+	loading_lbl = _label("Carregando carro...", 18, Color(1, 1, 1, 0.92))
+	lbox.add_child(loading_lbl)
 
 
 func _label(t: String, size: int, c: Color) -> Label:
@@ -297,12 +412,114 @@ func _button(t: String, size: int) -> Button:
 
 # ------------------------------------------------------------------ carro
 
-func _show(i: int) -> void:
+func _show(i: int, sync := false) -> void:
+	if cars.is_empty():
+		return
+	var now_ms := Time.get_ticks_msec()
+	var rapid_switch := (now_ms - _last_switch_ms) < RAPID_SWITCH_MS
+	_last_switch_ms = now_ms
+
 	idx = posmod(i, cars.size())
 	var c: Dictionary = cars[idx]
+	var car_id: String = c.id
+
+	# Atualiza UI, anel luminoso e especificações na hora (sem esperar GLB)
+	var col := Color(c.color)
+	if ring_mat:
+		ring_mat.albedo_color = col
+		ring_mat.emission = col
+		ring_mat.emission_energy_multiplier = 2.5
+	if name_lbl:
+		name_lbl.text = c.name
+	if idx_lbl:
+		idx_lbl.text = "%d / %d" % [idx + 1, cars.size()]
+	var d := Game.get_car_data(car_id)
+	if info_lbl and d.has("params"):
+		info_lbl.text = _info(c, d.params)
+
+	# Se já estamos aguardando exatamente este carro em modo assíncrono, não reinicia
+	if _pending_car_id == car_id and not sync:
+		return
+
+	# Ignora/descarta carga pendente anterior se o usuário trocou para outro carro
+	if _pending_car_id != "" and _pending_car_id != car_id:
+		if _pending_requested and _pending_glb != "":
+			_stale_loads[_pending_glb] = true
+		_pending_car_id = ""
+		_pending_glb = ""
+		_pending_requested = false
+		_pending_delay = 0.0
+	_prefetch_queue.clear()
+	_prefetch_delay = PREFETCH_DELAY
+
+	if view:
+		if view.id == car_id and _pending_car_id == "":
+			_set_loading_indicator(false)
+			_schedule_neighbor_prefetch()
+			return
+		view.queue_free()
+		view = null
+
+	var cached := Game.get_cached_car_scene(car_id)
+	if cached != null:
+		_pending_car_id = ""
+		_pending_glb = ""
+		_pending_requested = false
+		_mount_car(car_id, cached)
+		_set_loading_indicator(false)
+		return
+
+	if sync:
+		_pending_car_id = ""
+		_pending_glb = ""
+		_pending_requested = false
+		_mount_car(car_id, Game.load_car_scene(car_id))
+		_set_loading_indicator(false)
+		return
+
+	var glb := Game.get_car_glb_path(car_id)
+	if glb == "":
+		return
+
+	var st := ResourceLoader.load_threaded_get_status(glb)
+	if st == ResourceLoader.THREAD_LOAD_LOADED:
+		var scene := ResourceLoader.load_threaded_get(glb) as PackedScene
+		_in_flight_prefetches.erase(glb)
+		_stale_loads.erase(glb)
+		if scene != null:
+			_pending_car_id = ""
+			_pending_glb = ""
+			_pending_requested = false
+			_mount_car(car_id, scene)
+			_set_loading_indicator(false)
+			return
+
+	_pending_car_id = car_id
+	_pending_glb = glb
+	_set_loading_indicator(true, col)
+
+	if _stale_loads.has(glb):
+		_stale_loads.erase(glb)
+		_pending_requested = true
+		_pending_delay = 0.0
+	elif _in_flight_prefetches.has(glb) or st == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		_in_flight_prefetches.erase(glb)
+		_pending_requested = true
+		_pending_delay = 0.0
+	else:
+		_pending_requested = false
+		_pending_delay = LOAD_DEBOUNCE if rapid_switch else 0.0
+		if _pending_delay <= 0.0:
+			_start_pending_request()
+
+
+func _mount_car(car_id: String, scene: PackedScene = null) -> void:
+	if scene != null:
+		Game.cache_car_scene(car_id, scene)
 	if view:
 		view.queue_free()
-	view = CarView.new(c.id)
+		view = null
+	view = CarView.new(car_id, shot_dir != "")
 	pivot.add_child(view)
 	var p: Dictionary = view.data.params
 	var mw: Array = view.data.model.wheels
@@ -310,13 +527,139 @@ func _show(i: int) -> void:
 	# CG da física acima do tampo, carro centrado no giratório
 	view.position = Vector3(0, p.cgHeight + TOP, -(view.offset.z + mid))
 	view.set_rest_pose(steer_pose)
-	var col := Color(c.color)
-	ring_mat.albedo_color = col
-	ring_mat.emission = col
-	ring_mat.emission_energy_multiplier = 2.5
-	name_lbl.text = c.name
-	info_lbl.text = _info(c, p)
-	idx_lbl.text = "%d / %d" % [idx + 1, cars.size()]
+	_schedule_neighbor_prefetch()
+
+
+func _set_loading_indicator(on: bool, accent := Color.WHITE) -> void:
+	if loading_overlay:
+		loading_overlay.visible = on
+	if loading_spinner and on:
+		loading_spinner.arc_color = accent.lightened(0.25)
+		loading_spinner.queue_redraw()
+
+
+func _neighbor_indices() -> Array[int]:
+	var n := cars.size()
+	if n <= 1:
+		return []
+	var primary := posmod(idx + _nav_dir, n)
+	if Game.is_mobile_platform() or n == 2:
+		return [primary]
+	var secondary := posmod(idx - _nav_dir, n)
+	return [primary, secondary]
+
+
+func _schedule_neighbor_prefetch() -> void:
+	_prefetch_queue.clear()
+	if shot_dir != "" or cars.size() <= 1:
+		return
+	for ni in _neighbor_indices():
+		var nid: String = cars[ni].id
+		if nid == "" or Game.has_cached_car_scene(nid):
+			continue
+		var glb := Game.get_car_glb_path(nid)
+		if glb != "":
+			_prefetch_queue.append({"id": nid, "glb": glb})
+	_prefetch_delay = PREFETCH_DELAY
+
+
+func _cache_neighbor(pid: String, scene: PackedScene) -> void:
+	Game.cache_car_scene(pid, scene)
+	var cur_id: String = cars[idx].id if idx >= 0 and idx < cars.size() else ""
+	if cur_id != "" and Game.has_cached_car_scene(cur_id):
+		Game.get_cached_car_scene(cur_id)
+
+
+func _start_pending_request() -> void:
+	if _pending_glb == "":
+		return
+	var st := ResourceLoader.load_threaded_get_status(_pending_glb)
+	if st == ResourceLoader.THREAD_LOAD_LOADED or st == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		_pending_requested = true
+		return
+	var err := ResourceLoader.load_threaded_request(_pending_glb, "PackedScene", true)
+	if err == OK:
+		_pending_requested = true
+	else:
+		var target_id := _pending_car_id
+		_pending_car_id = ""
+		_pending_glb = ""
+		_pending_requested = false
+		_set_loading_indicator(false)
+		_mount_car(target_id, Game.load_car_scene(target_id))
+
+
+func _process_async_loading(dt: float) -> void:
+	if not _stale_loads.is_empty():
+		for glb in _stale_loads.keys():
+			var st := ResourceLoader.load_threaded_get_status(glb)
+			if st == ResourceLoader.THREAD_LOAD_LOADED:
+				ResourceLoader.load_threaded_get(glb)
+				_stale_loads.erase(glb)
+			elif st == ResourceLoader.THREAD_LOAD_FAILED or st == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				_stale_loads.erase(glb)
+
+	if _pending_car_id != "":
+		if not _pending_requested:
+			_pending_delay -= dt
+			if _pending_delay <= 0.0:
+				_start_pending_request()
+		if _pending_requested and _pending_glb != "":
+			var st := ResourceLoader.load_threaded_get_status(_pending_glb)
+			match st:
+				ResourceLoader.THREAD_LOAD_LOADED:
+					var scene := ResourceLoader.load_threaded_get(_pending_glb) as PackedScene
+					var target_id := _pending_car_id
+					_pending_car_id = ""
+					_pending_glb = ""
+					_pending_requested = false
+					_set_loading_indicator(false)
+					_mount_car(target_id, scene if scene != null else Game.load_car_scene(target_id))
+				ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+					var target_id := _pending_car_id
+					_pending_car_id = ""
+					_pending_glb = ""
+					_pending_requested = false
+					_set_loading_indicator(false)
+					_mount_car(target_id, Game.load_car_scene(target_id))
+
+	if _pending_car_id == "" and not _prefetch_queue.is_empty():
+		_prefetch_delay -= dt
+		if _prefetch_delay <= 0.0:
+			while not _prefetch_queue.is_empty():
+				var item: Dictionary = _prefetch_queue.pop_front()
+				var pid: String = item.id
+				var glb: String = item.glb
+				if Game.has_cached_car_scene(pid) or _in_flight_prefetches.has(glb):
+					continue
+				if _stale_loads.has(glb):
+					_stale_loads.erase(glb)
+				var st := ResourceLoader.load_threaded_get_status(glb)
+				if st == ResourceLoader.THREAD_LOAD_LOADED:
+					var scene := ResourceLoader.load_threaded_get(glb) as PackedScene
+					if scene != null:
+						_cache_neighbor(pid, scene)
+				elif st == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+					_in_flight_prefetches[glb] = pid
+				else:
+					var err := ResourceLoader.load_threaded_request(glb, "PackedScene", true)
+					if err == OK:
+						_in_flight_prefetches[glb] = pid
+
+	if not _in_flight_prefetches.is_empty():
+		var valid_neighbors := {}
+		for ni in _neighbor_indices():
+			valid_neighbors[cars[ni].id] = true
+		for glb in _in_flight_prefetches.keys():
+			var st := ResourceLoader.load_threaded_get_status(glb)
+			if st == ResourceLoader.THREAD_LOAD_LOADED:
+				var pid: String = _in_flight_prefetches[glb]
+				_in_flight_prefetches.erase(glb)
+				var scene := ResourceLoader.load_threaded_get(glb) as PackedScene
+				if scene != null and valid_neighbors.has(pid):
+					_cache_neighbor(pid, scene)
+			elif st == ResourceLoader.THREAD_LOAD_FAILED or st == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				_in_flight_prefetches.erase(glb)
 
 
 func _info(c: Dictionary, p: Dictionary) -> String:
@@ -327,12 +670,16 @@ func _info(c: Dictionary, p: Dictionary) -> String:
 
 
 func _drive() -> void:
+	if _transitioning:
+		return
+	_transitioning = true
 	if drive_btn:
 		drive_btn.text = "CARREGANDO..."
 		drive_btn.disabled = true
 	Game.save_car(cars[idx].id)
 	Game.from_garage = true
-	get_tree().change_scene_to_file("res://scenes/main.tscn")
+	Game.transition_target = "track"
+	get_tree().change_scene_to_file("res://scenes/loading.tscn")
 
 
 # ------------------------------------------------------------------ laço e entrada
@@ -345,14 +692,20 @@ func _process(dt: float) -> void:
 	if shot_dir == "":
 		cam.global_position = target + Vector3(sin(cam_yaw) * cos(cam_pitch), sin(cam_pitch), cos(cam_yaw) * cos(cam_pitch)) * cam_dist
 		cam.look_at(target, Vector3.UP)
+	if loading_overlay and loading_overlay.visible and loading_spinner:
+		loading_spinner.angle = fmod(loading_spinner.angle + dt * 6.0, TAU)
+		loading_spinner.queue_redraw()
+	_process_async_loading(dt)
 
 
 func _unhandled_input(e: InputEvent) -> void:
 	if e is InputEventKey and e.pressed and not e.echo:
 		match e.keycode:
 			KEY_LEFT, KEY_A:
+				_nav_dir = -1
 				_show(idx - 1)
 			KEY_RIGHT, KEY_D:
+				_nav_dir = 1
 				_show(idx + 1)
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 				_drive()
@@ -361,8 +714,10 @@ func _unhandled_input(e: InputEvent) -> void:
 	elif e is InputEventJoypadButton and e.pressed:
 		match e.button_index:
 			JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_LEFT_SHOULDER:
+				_nav_dir = -1
 				_show(idx - 1)
 			JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_RIGHT_SHOULDER:
+				_nav_dir = 1
 				_show(idx + 1)
 			JOY_BUTTON_A, JOY_BUTTON_START:
 				_drive()
@@ -395,7 +750,7 @@ func _snap(name: String) -> void:
 func _vitrine() -> void:
 	DirAccess.make_dir_recursive_absolute(shot_dir)
 	for i in cars.size():
-		_show(i)
+		_show(i, true)
 		var id: String = cars[i].id
 		pivot.rotation.y = 0.0
 		cam.global_position = Vector3(-4.6, 1.7, -5.4)

@@ -66,20 +66,20 @@ Objetivo: eliminar os gargalos de carregamento e renderização para deixar o jo
 ### Fase 2 — Páginas de Load e Cache Compartilhado (`Game` + `LoadingScreen`)
 *Objetivo: eliminar congelamentos em todas as transições com barra de progresso real e reaproveitamento de memória.*
 
-- [ ] **2.1 Criar cena reutilizável de Load (`scenes/loading.tscn` + `scripts/ui/loading_screen.gd`):**
+- [x] **2.1 Criar cena reutilizável de Load (`scenes/loading.tscn` + `scripts/ui/loading_screen.gd`):**
   - Tela limpa com nome da pista/carro escolhido, barra de progresso (0–100%), label da etapa atual e dica/estado sem bloquear o loop de renderização.
   - Suporte a fila de carregamento assíncrono (`ResourceLoader.load_threaded_request`) + execução fatiada de etapas síncronas leves em múltiplos frames (`await get_tree().process_frame` entre etapas).
-- [ ] **2.2 Cache de `PackedScene` de carros em `scripts/game.gd`:**
+- [x] **2.2 Cache de `PackedScene` de carros em `scripts/game.gd`:**
   - Manter cache LRU pequeno (carro atual + vizinhos no Desktop; carro atual + 1 no Mobile) para evitar recarregar o `.glb` do disco ao ir da **Garagem → Pista** ou voltar ao mesmo carro.
-- [ ] **2.3 Otimizar abertura do jogo em `scripts/ui/updater.gd`:**
+- [x] **2.3 Otimizar abertura do jogo em `scripts/ui/updater.gd`:**
   - Reduzir timeout de rede para `1.5s`, remover o `await create_timer(0.3)` artificial quando atualizado e pré-carregar de forma assíncrona o `.glb` do `Game.car_id` inicial junto com a barra de progresso do updater, só abrindo a garagem quando o carro inicial já estiver pronto.
-- [ ] **2.4 Página de Load na transição Garagem → Pista (`garagem.gd._drive()`):**
+- [x] **2.4 Página de Load na transição Garagem → Pista (`garagem.gd._drive()`):**
   - Substituir `get_tree().change_scene_to_file("res://scenes/main.tscn")` direto pela transição via `loading.tscn`:
     1. `0–45%`: `load_threaded_request` de `cenario.glb` e leitura de JSONs (`track.json`, `arvores_pos.json`, `torres.json`).
     2. `45–65%`: pré-carga dos áudios do carro selecionado (`CarAudio`) e céu.
     3. `65–90%`: instanciação progressiva entre frames (`TrackView`, `SurroundingsView`, `CarView` aproveitando o cache).
     4. `90–100%`: warmup de 1–2 frames para compilação de shaders antes de liberar a câmera no grid.
-- [ ] **2.5 Página de Load na transição Pista → Garagem (`main.gd._to_garage()`):**
+- [x] **2.5 Página de Load na transição Pista → Garagem (`main.gd._to_garage()`):**
   - Usar a tela de load para descarregar a pista, limpar recursos e preparar o estúdio + carro selecionado sem congelar a UI.
 
 ---
@@ -87,12 +87,12 @@ Objetivo: eliminar os gargalos de carregamento e renderização para deixar o jo
 ### Fase 3 — Garagem Instantânea e Responsiva (`garagem.gd` + `car_view.gd`)
 *Objetivo: passar de um carro para outro sem travamentos.*
 
-- [ ] **3.1 Pré-carregamento assíncrono dos carros vizinhos (`idx - 1`, `idx + 1`):**
+- [x] **3.1 Pré-carregamento assíncrono dos carros vizinhos (`idx - 1`, `idx + 1`):**
   - Assim que um carro é exibido, disparar `ResourceLoader.load_threaded_request` em segundo plano para o próximo e o anterior da lista.
   - Se o usuário trocar rapidamente várias vezes (`◀` / `▶`), cancelar/ignorar cargas antigas e carregar apenas o índice final desejado.
-- [ ] **3.2 Indicador de carregamento não-bloqueante na Garagem:**
+- [x] **3.2 Indicador de carregamento não-bloqueante na Garagem:**
   - Se o carro escolhido ainda estiver carregando em thread separada, manter a câmera/UI responsivas e exibir um overlay/spinner discreto ("Carregando carro...") sobre a plataforma até concluir.
-- [ ] **3.3 Enxugar o setup do carro e estúdio na Garagem:**
+- [x] **3.3 Enxugar o setup do carro e estúdio na Garagem:**
   - Adicionar opção `enable_blur := false` em `CarView` para não instanciar as 24 malhas translúcidas de `ghosts` nem duplicar materiais `blur_XX` na garagem (nem nos presets `Mínimo`/`Leve`).
   - Respeitar o preset gráfico salvo (`user://jogo.cfg`) também dentro de `garagem.gd._build_studio()` (não forçar `SSAO`/`SSR`/`Glow` se o usuário escolheu `Mínimo` ou `Leve`).
 

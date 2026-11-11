@@ -3,11 +3,128 @@ class_name Game
 extends RefCounted
 
 const CFG := "user://jogo.cfg"
+const CAR_CACHE_MAX_DESKTOP := 3
+const CAR_CACHE_MAX_MOBILE := 2
+const QUALITY_LEVELS := {"Mínimo": 0, "Leve": 1, "Médio": 2, "Extremo": 3}
 
 ## carro escolhido na garagem (o main.gd usa; --car=<id> na linha de comando tem prioridade)
 static var car_id := _load_car()
 ## a pista foi aberta pela garagem: Esc volta para ela em vez de fechar o jogo
 static var from_garage := false
+## alvo da próxima transição via scenes/loading.tscn ("track" ou "garage")
+static var transition_target := ""
+
+static var _car_scene_cache: Dictionary = {}
+static var _car_scene_order: Array[String] = []
+static var _car_data_cache: Dictionary = {}
+static var _cars_list_cache: Array = []
+
+
+static func is_mobile_platform() -> bool:
+	return OS.has_feature("mobile") or "--mobile" in OS.get_cmdline_user_args()
+
+
+static func get_quality_name() -> String:
+	var args := OS.get_cmdline_user_args()
+	var is_mobile := is_mobile_platform()
+	if "--mobile" in args:
+		return "Leve"
+	var saved := String(get_setting("video", "qualidade", ""))
+	if QUALITY_LEVELS.has(saved):
+		return saved
+	return "Leve" if is_mobile else "Extremo"
+
+
+static func get_quality_level(name := "") -> int:
+	var q_name := name if name != "" else get_quality_name()
+	return int(QUALITY_LEVELS.get(q_name, 1 if is_mobile_platform() else 3))
+
+
+static func get_cars_list() -> Array:
+	if _cars_list_cache.is_empty():
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars.json"))
+		if parsed is Array:
+			_cars_list_cache = parsed
+	return _cars_list_cache
+
+
+static func get_car_info(id: String) -> Dictionary:
+	for c in get_cars_list():
+		if c is Dictionary and c.get("id", "") == id:
+			return c
+	return {}
+
+
+static func get_car_data(id: String) -> Dictionary:
+	if _car_data_cache.has(id):
+		return _car_data_cache[id]
+	var path := "res://data/cars/%s.json" % id
+	if not FileAccess.file_exists(path):
+		return {}
+	var parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if parsed is Dictionary:
+		_car_data_cache[id] = parsed
+		return parsed
+	return {}
+
+
+static func get_car_glb_path(id: String) -> String:
+	var d := get_car_data(id)
+	var model = d.get("model", {})
+	if model is Dictionary:
+		return String(model.get("glb", ""))
+	return ""
+
+
+static func has_cached_car_scene(id: String) -> bool:
+	return _car_scene_cache.has(id)
+
+
+static func get_cached_car_scene(id: String) -> PackedScene:
+	if not _car_scene_cache.has(id):
+		return null
+	_car_scene_order.erase(id)
+	_car_scene_order.append(id)
+	return _car_scene_cache[id] as PackedScene
+
+
+static func cache_car_scene(id: String, scene: PackedScene) -> void:
+	if id == "" or scene == null:
+		return
+	if _car_scene_cache.has(id):
+		_car_scene_order.erase(id)
+	else:
+		var limit := CAR_CACHE_MAX_MOBILE if is_mobile_platform() else CAR_CACHE_MAX_DESKTOP
+		while _car_scene_order.size() >= limit:
+			var oldest: String = _car_scene_order.pop_front()
+			_car_scene_cache.erase(oldest)
+	_car_scene_cache[id] = scene
+	_car_scene_order.append(id)
+
+
+static func load_car_scene(id: String) -> PackedScene:
+	var cached := get_cached_car_scene(id)
+	if cached != null:
+		return cached
+	var path := get_car_glb_path(id)
+	if path == "":
+		return null
+	var scene := ResourceLoader.load(path) as PackedScene
+	if scene != null:
+		cache_car_scene(id, scene)
+	return scene
+
+
+static func clear_car_cache(keep_id := "") -> void:
+	if keep_id != "" and _car_scene_cache.has(keep_id):
+		var kept: PackedScene = _car_scene_cache[keep_id]
+		_car_scene_cache.clear()
+		_car_scene_order.clear()
+		_car_scene_cache[keep_id] = kept
+		_car_scene_order.append(keep_id)
+	else:
+		_car_scene_cache.clear()
+		_car_scene_order.clear()
 
 
 static func _load_car() -> String:

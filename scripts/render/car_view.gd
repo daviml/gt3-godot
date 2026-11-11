@@ -28,19 +28,29 @@ var spins: Array[Node3D] = []       # gira com a roda
 var ghosts: Array = []              # por roda: cópias translúcidas do miolo para o desfoque
 var _scale: Array[Vector3] = []
 var _rest: Array[Vector3] = []      # centro da roda no modelo (garagem)
-## desfoque das rodas (6 cópias translúcidas por roda): desligado no preset Leve
-var blur_enabled := true
+## desfoque das rodas (6 cópias translúcidas por roda): desativado na garagem e nos presets Mínimo/Leve
+var blur_enabled := false:
+	set(v):
+		if blur_enabled == v:
+			return
+		blur_enabled = v
+		if blur_enabled:
+			_ensure_ghosts()
+		else:
+			_hide_ghosts()
+var _blur_sources: Array[MeshInstance3D] = []
 
 
-func _init(car_id := "") -> void:
+func _init(car_id := "", enable_blur := false) -> void:
 	if car_id != "":
-		setup(car_id)
+		setup(car_id, enable_blur)
 
 
-func setup(car_id: String) -> void:
+func setup(car_id: String, enable_blur := false) -> void:
 	id = car_id
-	data = JSON.parse_string(FileAccess.get_file_as_string("res://data/cars/%s.json" % id))
-	model = (load(data.model.glb) as PackedScene).instantiate()
+	blur_enabled = enable_blur
+	data = Game.get_car_data(id)
+	model = Game.load_car_scene(id).instantiate()
 	add_child(model)
 	# alinha o eixo dianteiro do modelo com o da física e o chão do modelo com o chão em repouso
 	var p: Dictionary = data.params
@@ -82,6 +92,7 @@ func _build_wheel(suf: String) -> void:
 	if wn == null:
 		spins.append(null)
 		ghosts.append([])
+		_blur_sources.append(null)
 		_scale.append(Vector3.ONE)
 		_rest.append(Vector3.ZERO)
 		return
@@ -102,26 +113,45 @@ func _build_wheel(suf: String) -> void:
 		cal.reparent(hub, false)
 		cal.transform = Transform3D(Basis.from_scale(sc), Vector3.ZERO)
 	# desfoque: cópias do miolo da roda, translúcidas, espalhadas no arco que a roda percorre num quadro
-	var list := []
 	var blur := wn.find_child("blur_" + suf, false, false) as MeshInstance3D
 	if blur:
 		blur.visible = false
-		for g in GHOSTS:
-			var mi := MeshInstance3D.new()
-			mi.mesh = blur.mesh
-			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			for s in blur.mesh.get_surface_count():
-				var m := blur.get_active_material(s)
-				if m is BaseMaterial3D:
-					var t := (m as BaseMaterial3D).duplicate() as BaseMaterial3D
-					t.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-					t.albedo_color.a *= 1.0 / (GHOSTS + 1)
-					t.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
-					mi.set_surface_override_material(s, t)
-			mi.visible = false
-			hub.add_child(mi)
-			list.append(mi)
-	ghosts.append(list)
+	_blur_sources.append(blur)
+	ghosts.append(_create_wheel_ghosts(hub, blur) if blur_enabled else [])
+
+
+func _create_wheel_ghosts(hub: Node3D, blur: MeshInstance3D) -> Array:
+	var list := []
+	if blur == null or hub == null:
+		return list
+	for g in GHOSTS:
+		var mi := MeshInstance3D.new()
+		mi.mesh = blur.mesh
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		for s in blur.mesh.get_surface_count():
+			var m := blur.get_active_material(s)
+			if m is BaseMaterial3D:
+				var t := (m as BaseMaterial3D).duplicate() as BaseMaterial3D
+				t.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+				t.albedo_color.a *= 1.0 / (GHOSTS + 1)
+				t.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+				mi.set_surface_override_material(s, t)
+		mi.visible = false
+		hub.add_child(mi)
+		list.append(mi)
+	return list
+
+
+func _ensure_ghosts() -> void:
+	for k in mini(ghosts.size(), _blur_sources.size()):
+		if (ghosts[k] as Array).is_empty() and _blur_sources[k] != null and hubs[k] != null:
+			ghosts[k] = _create_wheel_ghosts(hubs[k], _blur_sources[k])
+
+
+func _hide_ghosts() -> void:
+	for list in ghosts:
+		for mi in list:
+			(mi as MeshInstance3D).visible = false
 
 
 ## Posição do chassi e de cada roda a partir da física com interpolação sub-frame (main.gd).

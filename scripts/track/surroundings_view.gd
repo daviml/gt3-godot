@@ -14,6 +14,8 @@ const HORIZON := "res://data/track/horizonte.json"
 const HORIZON_TEX := "res://assets/track/horizonte.png"
 
 var towers := 0
+var preloaded_towers: Array = []
+var preloaded_horizon: Dictionary = {}
 
 
 func _init() -> void:
@@ -169,7 +171,8 @@ func _range(g: GeometryInstance3D, end: float) -> void:
 
 
 func _build_towers() -> void:
-	var a: Array = JSON.parse_string(FileAccess.get_file_as_string(TOWERS))
+	var a: Array = preloaded_towers if not preloaded_towers.is_empty() else JSON.parse_string(FileAccess.get_file_as_string(TOWERS))
+	preloaded_towers = []
 	towers = a.size() / 8
 	# caixa de 1 m com a base em y = 0 (como o BoxGeometry().translate(0, 0.5, 0) do web): o shader mede a
 	# altura do andar a partir da base
@@ -202,7 +205,8 @@ func _build_towers() -> void:
 
 
 func _build_horizon() -> void:
-	var h: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(HORIZON))
+	var h: Dictionary = preloaded_horizon if not preloaded_horizon.is_empty() else JSON.parse_string(FileAccess.get_file_as_string(HORIZON))
+	preloaded_horizon = {}
 	var r: float = h.radius
 	var half: float = h.height / 2.0
 	var n: int = h.segments

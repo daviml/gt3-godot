@@ -55,12 +55,41 @@ var fx_streams: Dictionary = {}
 var oneshot_pool: Array[AudioStreamPlayer] = []
 var oneshot_pool_idx := 0
 const POOL_SIZE := 8
+var _preloaded_streams: Dictionary = {}
+static var _sounds_data_cache: Dictionary = {}
 
 
-func _init(p_car: Car = null, p_car_id: String = "porsche-992-gt3r") -> void:
+static func get_sounds_data() -> Dictionary:
+	if _sounds_data_cache.is_empty():
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(SOUNDS_JSON))
+		if parsed is Dictionary:
+			_sounds_data_cache = parsed
+	return _sounds_data_cache
+
+
+static func get_preload_paths(p_car_id: String) -> Array[String]:
+	var paths: Array[String] = []
+	var car_json := Game.get_car_data(p_car_id)
+	var spec: Dictionary = car_json.get("sound", {"bank": "tsp", "turbo": false})
+	var sounds_data := get_sounds_data()
+	var banks: Dictionary = sounds_data.get("banks", {})
+	var fx_data: Dictionary = sounds_data.get("fx", {})
+	for k in fx_data:
+		var p: String = fx_data[k]
+		if ResourceLoader.exists(p) and not p in paths:
+			paths.append(p)
+	var bank_name: String = spec.get("bank", "tsp")
+	for item in banks.get(bank_name, []):
+		var p: String = item.file
+		if ResourceLoader.exists(p) and not p in paths:
+			paths.append(p)
+	return paths
+
+
+func _init(p_car: Car = null, p_car_id: String = "porsche-992-gt3r", preloaded_streams: Dictionary = {}) -> void:
 	_ensure_buses()
 	if p_car != null:
-		setup(p_car, p_car_id)
+		setup(p_car, p_car_id, preloaded_streams)
 
 
 func _ready() -> void:
@@ -69,17 +98,17 @@ func _ready() -> void:
 
 
 ## Inicializa configuração do carro e dados sonoros
-func setup(p_car: Car, p_car_id: String) -> void:
+func setup(p_car: Car, p_car_id: String, preloaded_streams: Dictionary = {}) -> void:
 	_ensure_buses()
 	car = p_car
 	car_id = p_car_id
+	_preloaded_streams = preloaded_streams
 	if car and car.p:
 		limiter_rpm = float(car.p.get("limiter", 8500.0))
 
 	# Carrega sound_spec do carro
-	var car_path := "res://data/cars/%s.json" % car_id
-	if FileAccess.file_exists(car_path):
-		var car_json: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(car_path))
+	var car_json := Game.get_car_data(car_id)
+	if not car_json.is_empty():
 		sound_spec = car_json.get("sound", {"bank": "tsp", "turbo": false})
 	else:
 		sound_spec = {"bank": "tsp", "turbo": false}
@@ -122,16 +151,17 @@ func _build_nodes() -> void:
 	fx_streams.clear()
 	oneshot_pool.clear()
 
-	var sounds_json_str := FileAccess.get_file_as_string(SOUNDS_JSON)
-	var sounds_data: Dictionary = JSON.parse_string(sounds_json_str)
+	var sounds_data: Dictionary = get_sounds_data()
 	var banks: Dictionary = sounds_data.get("banks", {})
 	var fx_data: Dictionary = sounds_data.get("fx", {})
 
 	# Pré-carrega efeitos FX
 	for k in fx_data:
 		var path: String = fx_data[k]
-		if ResourceLoader.exists(path):
-			var stream: AudioStreamWAV = load(path)
+		var stream: AudioStreamWAV = _preloaded_streams.get(path) as AudioStreamWAV
+		if stream == null and ResourceLoader.exists(path):
+			stream = load(path)
+		if stream != null:
 			fx_streams[k] = stream
 
 	# 1. Loops do Banco de Motor
@@ -140,8 +170,10 @@ func _build_nodes() -> void:
 	for item in bank_files:
 		var path: String = item.file
 		var rpm: float = float(item.rpm)
-		if ResourceLoader.exists(path):
-			var wav: AudioStreamWAV = load(path)
+		var wav: AudioStreamWAV = _preloaded_streams.get(path) as AudioStreamWAV
+		if wav == null and ResourceLoader.exists(path):
+			wav = load(path)
+		if wav != null:
 			wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
 			var player := AudioStreamPlayer.new()
 			player.stream = wav
@@ -234,6 +266,8 @@ func _start_loops() -> void:
 		wind_player.play(randf() * 0.5)
 	if turbo_player:
 		turbo_player.play(randf() * 0.5)
+	if is_audio_paused:
+		set_paused(true)
 
 
 ## Toca um efeito sonoro pontual do pool de FX

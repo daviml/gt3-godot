@@ -20,6 +20,7 @@ var meshes := 0
 var trees := 0
 var surroundings: SurroundingsView
 var detail_level := 2
+var manual_setup := false
 var _cache := {}
 var _shader_mats: Array[ShaderMaterial] = []
 var _name_re := RegEx.create_from_string("^o(-?\\d+)_s(\\d)")
@@ -30,15 +31,30 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	var scene: PackedScene = load(GLB)
+	if manual_setup:
+		return
+	build_scene()
+	build_trees()
+	build_surroundings()
+	set_detail(detail_level)
+
+
+func build_scene(scene: PackedScene = null) -> void:
+	if scene == null:
+		scene = load(GLB)
 	var root := scene.instantiate()
 	add_child(root)
 	_fix(root)
-	_build_trees()
+
+
+func build_surroundings(towers_data: Array = [], horizon_data: Dictionary = {}) -> void:
 	# torres residenciais e horizonte (etapa 9): scripts/track/surroundings_view.gd
 	surroundings = SurroundingsView.new()
+	if not towers_data.is_empty():
+		surroundings.preloaded_towers = towers_data
+	if not horizon_data.is_empty():
+		surroundings.preloaded_horizon = horizon_data
 	add_child(surroundings)
-	set_detail(detail_level)
 
 
 func set_detail(level: int) -> void:
@@ -138,8 +154,8 @@ func _tex(file: String) -> Texture2D:
 
 # ------------------------------------------------------------------ árvores (impostores do web)
 
-func _build_trees() -> void:
-	var a: Array = JSON.parse_string(FileAccess.get_file_as_string(TREES))
+func build_trees(data: Array = []) -> void:
+	var a: Array = data if not data.is_empty() else JSON.parse_string(FileAccess.get_file_as_string(TREES))
 	trees = a.size() / 7
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
