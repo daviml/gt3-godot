@@ -771,9 +771,9 @@ func _set_progress(pct: float, label: String) -> void:
 	if _stage_lbl and label != "":
 		_stage_lbl.text = label
 	if _sector_lbls.size() == 3:
-		var thresholds := [0.25, 0.55, 0.85]
+		var thresholds: Array[float] = [0.25, 0.55, 0.85]
 		for i in 3:
-			var active := _progress_frac >= thresholds[i]
+			var active: bool = _progress_frac >= thresholds[i]
 			_sector_lbls[i].add_theme_color_override(
 				"font_color",
 				_accent_ui if active else Color(1, 1, 1, 0.32)
