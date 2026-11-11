@@ -11,12 +11,19 @@ signal resumed
 signal garage
 signal quit
 signal nick_changed(nick: String)
+signal mode_changed(mode: String)
 signal quality_changed(name: String)
 signal volume_changed(v: float)
 signal assist_changed(key: String, on: bool)
 signal touch_mode_changed(mode: String)
 signal recenter_tilt
 
+const MODES := ["sim", "arcade"]
+const MODE_NAMES := {"sim": "Simulador", "arcade": "Arcade (2× grip)"}
+const MODE_NOTES := {
+	"sim": "Física realista GT3 (aderência 1,0×) · ranking próprio",
+	"arcade": "Pneus com 2,0× mais aderência e carros não capotam · ranking próprio",
+}
 const QUALITIES := ["Mínimo", "Leve", "Médio", "Extremo"]
 const QUALITY_NOTE := {
 	"Mínimo": "Máximo FPS (PC fraco/celular): resolução <=720p, sem sombras, materiais e árvores leves",
@@ -48,8 +55,12 @@ var is_open := false
 var _s := 1.0
 var _root: Control
 var _card: PanelContainer
+var _sub: Label
 var _fps: Label
 var _nick: LineEdit
+var _mbtn := {}
+var _mnote: Label
+var _current_mode := "sim"
 var _qbtn := {}
 var _qnote: Label
 var _vol: HSlider
@@ -132,9 +143,9 @@ func _build() -> void:
 	var head := HBoxContainer.new()
 	box.add_child(head)
 	head.add_child(_label("GT3 Time Attack", 24, Color.WHITE, true))
-	var sub := _label("Interlagos", 15, Color(1, 1, 1, 0.6))
-	sub.size_flags_vertical = Control.SIZE_SHRINK_END
-	head.add_child(sub)
+	_sub = _label("Interlagos", 15, Color(1, 1, 1, 0.6))
+	_sub.size_flags_vertical = Control.SIZE_SHRINK_END
+	head.add_child(_sub)
 	var sp := Control.new()
 	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(sp)
@@ -151,6 +162,24 @@ func _build() -> void:
 	_nick.text_submitted.connect(func(_t): _resume_pressed())
 	_nick.text_changed.connect(func(t): nick_changed.emit(t.strip_edges()))
 	box.add_child(_nick)
+
+	# modo de condução
+	box.add_child(_field("Modo"))
+	var mrow := HBoxContainer.new()
+	mrow.add_theme_constant_override("separation", 8)
+	box.add_child(mrow)
+	var mgroup := ButtonGroup.new()
+	for m in MODES:
+		var mb := _button(MODE_NAMES[m], 16)
+		mb.toggle_mode = true
+		mb.button_group = mgroup
+		mb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		mb.pressed.connect(func(): _pick_mode(m))
+		mrow.add_child(mb)
+		_mbtn[m] = mb
+	_mnote = _label("", 12, Color(1, 1, 1, 0.7))
+	_mnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	box.add_child(_mnote)
 
 	# qualidade
 	box.add_child(_field("Gráficos"))
@@ -299,8 +328,12 @@ func _button(t: String, size: int, primary := false) -> Button:
 # ------------------------------------------------------------------ estado
 
 ## abre com o estado atual do jogo
-func open(nick: String, quality: String, volume: float, assists: Dictionary, touch_mode := "padrao", is_touch := false, focus_nick := false) -> void:
+func open(nick: String, quality: String, volume: float, assists: Dictionary, touch_mode := "padrao", is_touch := false, focus_nick := false, mode := "sim") -> void:
 	_nick.text = nick
+	_current_mode = mode if mode in MODES else "sim"
+	for m in _mbtn:
+		_mbtn[m].set_pressed_no_signal(m == _current_mode)
+	_note_mode(_current_mode)
 	for q in _qbtn:
 		_qbtn[q].button_pressed = q == quality
 	_note_quality(quality)
@@ -354,6 +387,23 @@ func update_fps(fps: int) -> void:
 		if _qbtn[k].button_pressed:
 			q = k
 	_note_quality(q, avg)
+
+
+func _pick_mode(m: String) -> void:
+	if m == _current_mode:
+		return
+	_current_mode = m
+	Game.set_mode(m)
+	_note_mode(m)
+	mode_changed.emit(m)
+
+
+func _note_mode(m: String) -> void:
+	if _sub:
+		_sub.text = "Interlagos · Arcade" if m == "arcade" else "Interlagos"
+		_sub.add_theme_color_override("font_color", Color("#ffb020") if m == "arcade" else Color(1, 1, 1, 0.6))
+	if _mnote and MODE_NOTES.has(m):
+		_mnote.text = MODE_NOTES[m]
 
 
 func _pick_quality(q: String) -> void:

@@ -140,6 +140,7 @@ func update(dt: float, car: Car) -> void:
 		current = 0.0
 		sectors = []
 		valid = true
+		_off_time = 0.0
 		_trace = _new_trace()
 		_trace[0] = 0.0
 	_last_s = s

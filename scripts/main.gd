@@ -40,10 +40,16 @@ var touch: TouchControls
 var paused := false
 var timer: LapTimer
 var nick := ""
+## modo de condução atual ("sim" ou "arcade")
+var mode := Game.mode
 ## melhores setores da sessão, de todas as voltas válidas (roxo no painel)
 var best_sectors: Array[float] = []
-## recordes deste PC (Records.top), atualizados a cada volta
+## recordes exibidos no painel (remoto quando disponível, senão Records.top local)
 var top_records: Array = []
+var shared_records: Array = []
+var has_shared_records := false
+var remote_records: Records.RemoteClient
+var _was_valid := true
 var time := 0.0
 var autopilot := false
 var bot: RefCounted
@@ -75,6 +81,7 @@ func _ready() -> void:
 
 
 func _init_args() -> void:
+	mode = Game.mode
 	_init_cli_args = OS.get_cmdline_user_args()
 	var is_mobile_init := OS.has_feature("mobile") or "--mobile" in _init_cli_args
 	Engine.max_physics_steps_per_frame = 2 if is_mobile_init else 4
@@ -109,8 +116,9 @@ func setup_step_car(preloaded_streams: Dictionary = {}) -> void:
 func setup_step_hud_and_quality() -> void:
 	timer = LapTimer.new(track)
 	timer.on_lap = _on_lap
+	remote_records = Records.RemoteClient.new()
+	add_child(remote_records)
 	_build_hud()
-	top_records = Records.top(8)
 	# assistências e volume guardados no menu de pausa (user://jogo.cfg)
 	for key in ["abs", "tc", "auto"]:
 		car.assists[key] = bool(Game.get_setting("assistencias", key, car.assists[key]))
@@ -118,6 +126,7 @@ func setup_step_hud_and_quality() -> void:
 	# no celular e no piloto automático o câmbio é automático, como no web
 	if autopilot or input.touch:
 		car.assists.auto = true
+	_apply_mode(mode, false)
 	_spawn()
 	if REFS.has(car_id):
 		# malha de giro: segue o traçado real do iRacing sem passar da zebra (Porsche 1:35,9 e Mustang 1:33,6 válidas).
@@ -278,6 +287,7 @@ func _build_hud() -> void:
 	add_child(layer)
 	# HUD estilo LMU: mostrador, pneus, tempos, melhores tempos, mapa, FPS (scripts/ui/hud.gd)
 	hud = Hud.new(car, timer, track, car_id, input.touch)
+	hud.arcade = (mode == "arcade")
 	hud.best_sectors = best_sectors
 	hud.nick = nick
 	layer.add_child(hud)
@@ -301,6 +311,12 @@ func _build_hud() -> void:
 	menu.garage.connect(_to_garage)
 	menu.quit.connect(func(): get_tree().quit())
 	menu.nick_changed.connect(_on_nick)
+	menu.mode_changed.connect(func(m: String):
+		_apply_mode(m, not autopilot)
+		if autopilot and timer:
+			timer.reset()
+		_toast("Modo: " + String(Game.MODE_NAMES.get(m, m)))
+	)
 	menu.quality_changed.connect(_apply_quality)
 	menu.volume_changed.connect(_set_volume)
 	menu.assist_changed.connect(func(key: String, on: bool): car.assists[key] = on)
@@ -336,12 +352,59 @@ func _fmt(t: float) -> String:
 func _spawn() -> void:
 	car.reset_at(track.index_at(-120.0))
 	timer.reset()
+	_was_valid = true
 	if car_audio:
 		car_audio.reset()
 
 
+func _refresh_records() -> void:
+	top_records = shared_records.slice(0, 8) if has_shared_records else Records.top(8, mode)
+
+
+func _apply_mode(m: String, reset_car := true) -> void:
+	Game.set_mode(m)
+	mode = Game.mode
+	car.grip_scale = Game.get_grip_scale()
+	input.grip_scale = car.grip_scale
+	if hud:
+		hud.arcade = (mode == "arcade")
+	best_sectors = []
+	if hud:
+		hud.best_sectors = best_sectors
+	shared_records = []
+	has_shared_records = false
+	_refresh_records()
+	if remote_records:
+		remote_records.fetch_ranking(mode, _on_remote_ranking)
+	if reset_car:
+		_spawn()
+		if chase:
+			chase.snap()
+
+
+func _on_remote_ranking(ok: bool, voltas: Array, r_mode: String) -> void:
+	if not ok or r_mode != mode:
+		return
+	shared_records = voltas
+	has_shared_records = true
+	_refresh_records()
+
+
+func _on_remote_lap_posted(ok: bool, is_record: bool, voltas: Array, r_mode: String) -> void:
+	if not ok or r_mode != mode:
+		return
+	shared_records = voltas
+	has_shared_records = true
+	_refresh_records()
+	if is_record and not voltas.is_empty():
+		var best_rec: Dictionary = voltas[0]
+		if String(best_rec.get("nick", "")) == nick.strip_edges() and String(best_rec.get("carId", "")) == car_id:
+			_toast("Novo recorde geral (%s): %s" % [Game.MODE_NAMES.get(mode, mode), _fmt(float(best_rec.get("time", 0.0)))])
+
+
 ## Volta fechada por você (não pelo piloto automático): vira recorde se for a melhor desse nick nesse carro.
 func _on_lap(lap: LapTimer.Lap) -> void:
+	var lap_mode := mode
 	if lap.valid:
 		for i in 3:
 			if i >= best_sectors.size():
@@ -350,13 +413,16 @@ func _on_lap(lap: LapTimer.Lap) -> void:
 				best_sectors[i] = minf(best_sectors[i], lap.sectors[i])
 	if autopilot:
 		return
-	if Records.save_lap(nick, car_id, lap):
+	var saved := Records.save_lap(nick, car_id, lap, lap_mode)
+	if saved:
 		_toast("Recorde pessoal: " + _fmt(lap.time))
-		top_records = Records.top(8)
 	elif not lap.valid:
 		_toast("Volta inválida (4 rodas fora)")
-	elif nick == "":
+	elif nick.strip_edges() == "":
 		_toast("Sem nick: aperte N para gravar seus recordes")
+	_refresh_records()
+	if lap.valid and nick.strip_edges() != "" and remote_records:
+		remote_records.post_lap(nick, car_id, lap, lap_mode, _on_remote_lap_posted)
 
 
 func _on_nick(t: String) -> void:
@@ -390,6 +456,15 @@ func _physics_process(dt: float) -> void:
 	car.step(dt, inp[0], inp[1], inp[2], inp[3], inp[4])
 	time += dt
 	timer.update(dt, car)
+	if timer.current >= 0.0:
+		if _was_valid and not timer.valid:
+			_toast("Volta inválida (4 rodas fora)")
+		_was_valid = timer.valid
+	else:
+		_was_valid = true
+	if car.pos.y < track.lcenter.y - 20.0:
+		_spawn()
+		chase.snap()
 
 
 func _process(dt: float) -> void:
@@ -495,7 +570,7 @@ func _set_paused(on: bool, focus_nick := false) -> void:
 	if car_audio:
 		car_audio.set_paused(on)
 	if on:
-		menu.open(nick, quality_name, volume, car.assists, input.touch_mode, input.touch, focus_nick)
+		menu.open(nick, quality_name, volume, car.assists, input.touch_mode, input.touch, focus_nick, mode)
 	elif menu.is_open:
 		menu.close()
 

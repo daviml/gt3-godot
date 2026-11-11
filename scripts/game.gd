@@ -6,9 +6,14 @@ const CFG := "user://jogo.cfg"
 const CAR_CACHE_MAX_DESKTOP := 3
 const CAR_CACHE_MAX_MOBILE := 2
 const QUALITY_LEVELS := {"Mínimo": 0, "Leve": 1, "Médio": 2, "Extremo": 3}
+const MODES := ["sim", "arcade"]
+const MODE_NAMES := {"sim": "Simulador", "arcade": "Arcade"}
+const MODE_GRIP := {"sim": 1.0, "arcade": 2.0}
 
 ## carro escolhido na garagem (o main.gd usa; --car=<id> na linha de comando tem prioridade)
 static var car_id := _load_car()
+## modo de condução atual ("sim" ou "arcade"; --arcade / --sim na linha de comando têm prioridade)
+static var mode := _load_mode()
 ## a pista foi aberta pela garagem: Esc volta para ela em vez de fechar o jogo
 static var from_garage := false
 ## alvo da próxima transição via scenes/loading.tscn ("track" ou "garage")
@@ -177,3 +182,28 @@ static func erase_setting(section: String, key: String) -> void:
 		return
 	c.erase_section_key(section, key)
 	c.save(CFG)
+
+
+static func _load_mode() -> String:
+	var args := OS.get_cmdline_user_args()
+	if "--arcade" in args:
+		return "arcade"
+	if "--sim" in args:
+		return "sim"
+	var saved := String(get_setting("jogo", "modo", "sim"))
+	return saved if saved in MODES else "sim"
+
+
+static func is_arcade() -> bool:
+	return mode == "arcade"
+
+
+static func get_grip_scale() -> float:
+	return float(MODE_GRIP.get(mode, 1.0))
+
+
+static func set_mode(m: String) -> void:
+	if not (m in MODES):
+		m = "sim"
+	mode = m
+	set_setting("jogo", "modo", m)

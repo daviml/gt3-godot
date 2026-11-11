@@ -33,6 +33,7 @@ var car: Car
 var timer: LapTimer
 var track: Track
 var touch := false
+var arcade := false
 var nick := ""
 ## [{nick, carId, time}] em ordem crescente
 var records: Array = []
@@ -354,8 +355,9 @@ func _draw_board(pos: Vector2, sc: float) -> void:
 	_panel(Rect2(pos, Vector2(w, h)), sc)
 	_text(_bold, pos + Vector2(12 * sc, 7 * sc), "MELHORES TEMPOS", 12 * sc, Color(1, 1, 1, 0.92))
 	var dim := Color(1, 1, 1, 0.45)
-	var tw := _text_w(_font, "INTERLAGOS", 12 * sc)
-	_text(_font, pos + Vector2(w - 12 * sc - tw, 7 * sc), "INTERLAGOS", 12 * sc, dim)
+	var track_lbl := "INTERLAGOS · ARCADE" if arcade else "INTERLAGOS"
+	var tw := _text_w(_font, track_lbl, 12 * sc)
+	_text(_font, pos + Vector2(w - 12 * sc - tw, 7 * sc), track_lbl, 12 * sc, ACCENT if arcade else dim)
 	var y := pos.y + 28 * sc
 	if records.is_empty():
 		_text(_font, Vector2(pos.x + 12 * sc, y + 6 * sc), "Nenhuma volta válida ainda", 13 * sc, Color(1, 1, 1, 0.5))
@@ -646,8 +648,8 @@ func _draw_dash(pos: Vector2, ks: float) -> void:
 	var rows_y := [iy, iy + (26 + 6) * ks, iy + ih - 64 * ks]
 	var mid_h := ih - (26 + 6 + 64 + 6) * ks
 	var gray := Color("#9aa1aa")
-	# linha de cima: TIME ATTACK · PORSCHE · SECO
-	_text(_bold, Vector2(ix, iy + 4 * ks), "TIME ATTACK", 15 * ks, Color("#ff3b3b"))
+	# linha de cima: TIME ATTACK (ou ARCADE) · PORSCHE · SECO
+	_text(_bold, Vector2(ix, iy + 4 * ks), "ARCADE 2×" if arcade else "TIME ATTACK", 15 * ks, Color("#ffb020") if arcade else Color("#ff3b3b"))
 	var brand := "P O R S C H E"
 	var bw := _text_w(_bold, brand, 24 * ks)
 	draw_string_outline(_bold, Vector2(ix + iw / 2.0 - bw / 2.0, iy + _bold.get_ascent(roundi(24 * ks))), brand, HORIZONTAL_ALIGNMENT_LEFT, -1, roundi(24 * ks), 1, Color("#8a9099"))
@@ -773,7 +775,8 @@ func _draw_telemetry(pos: Vector2) -> void:
 		var w := car.wheels[i]
 		lines.append("%s  Fz %5.2f kN  κ %6.3f  α %5.1f°  susp %3d mm  %s" % [names[i], w.fz / 1000.0, w.kappa, rad_to_deg(w.alpha),
 			int(w.comp * 1000), Ground.NAMES[w.surface] if w.contact else "ar"])
-	lines.append("%d fps  %s  %s" % [fps, quality, "piloto automático" if autopilot else ""])
+	var mode_txt := "arcade %.1f×" % car.grip_scale if arcade else "simulador"
+	lines.append("%d fps  %s  %s  %s" % [fps, quality, mode_txt, "piloto automático" if autopilot else ""])
 	var fs := 13
 	var h := lines.size() * fs * 1.45 + 16
 	var w := 0.0

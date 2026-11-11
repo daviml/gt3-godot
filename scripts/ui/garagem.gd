@@ -48,6 +48,8 @@ var name_lbl: Label
 var info_lbl: Label
 var idx_lbl: Label
 var drive_btn: Button
+var mode_btns := {}
+var mode_note: Label
 var loading_overlay: PanelContainer
 var loading_spinner: _SpinnerGraphic
 var loading_lbl: Label
@@ -302,6 +304,34 @@ func _build_ui() -> void:
 	title.position = Vector2(36, 26)
 	root.add_child(title)
 
+	# seletor Simulador / Arcade (canto superior direito)
+	var mbox := VBoxContainer.new()
+	mbox.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	mbox.offset_left = -356
+	mbox.offset_right = -36
+	mbox.offset_top = 24
+	mbox.offset_bottom = 104
+	mbox.add_theme_constant_override("separation", 6)
+	root.add_child(mbox)
+	var mrow := HBoxContainer.new()
+	mrow.add_theme_constant_override("separation", 8)
+	mrow.alignment = BoxContainer.ALIGNMENT_END
+	mbox.add_child(mrow)
+	var mgroup := ButtonGroup.new()
+	for entry in [["sim", "Simulador"], ["arcade", "Arcade (2×)"]]:
+		var m_id: String = entry[0]
+		var mb := _button(entry[1], 16)
+		mb.toggle_mode = true
+		mb.button_group = mgroup
+		mb.custom_minimum_size = Vector2(148, 40)
+		mb.pressed.connect(func(): _pick_mode(m_id))
+		mrow.add_child(mb)
+		mode_btns[m_id] = mb
+	mode_note = _label("", 13, Color(1, 1, 1, 0.6))
+	mode_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	mbox.add_child(mode_note)
+	_sync_mode_ui()
+
 	var box := VBoxContainer.new()
 	box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
 	box.offset_left = -500
@@ -410,6 +440,25 @@ func _button(t: String, size: int) -> Button:
 		sb.set_corner_radius_all(10)
 		b.add_theme_stylebox_override(st, sb)
 	return b
+
+
+func _pick_mode(m: String) -> void:
+	Game.set_mode(m)
+	_sync_mode_ui()
+
+
+func _sync_mode_ui() -> void:
+	var m := Game.mode
+	for k in mode_btns:
+		var mb: Button = mode_btns[k]
+		mb.set_pressed_no_signal(k == m)
+	if mode_note:
+		if m == "arcade":
+			mode_note.text = "2,0× aderência · sem capotar · ranking Arcade"
+			mode_note.add_theme_color_override("font_color", Color("#ffb020"))
+		else:
+			mode_note.text = "Física realista GT3 (1,0×) · ranking Simulador"
+			mode_note.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
 
 
 # ------------------------------------------------------------------ carro
