@@ -54,6 +54,11 @@ func _split_crowd(n: Node) -> void:
 	if not (n is MeshInstance3D and _is_crowd(n)):
 		return
 	var mi := n as MeshInstance3D
+	var local_aabb := mi.get_aabb()
+	if maxf(local_aabb.size.x, local_aabb.size.z) <= CROWD_CELL * 1.5:
+		# Já veio pré-fatiada em blocos de 120 m pelo tools/cenario/cenario.ts
+		crowd_blocks += 1
+		return
 	var xf := mi.global_transform
 	var cells := {}  # Vector2i -> ArrayMesh
 	for s in mi.mesh.get_surface_count():

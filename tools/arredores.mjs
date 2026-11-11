@@ -15,7 +15,15 @@ const out = p => {
 };
 const server = await createServer({ configFile: fileURLToPath(new URL('cenario/vite.config.ts', import.meta.url)), server: { port: 5198 } });
 await server.listen();
-const browser = await chromium.launch({ args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
+let browser;
+const launchArgs = ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'];
+for (const opts of [{}, { channel: 'chrome' }, { channel: 'msedge' }]) {
+  try {
+    browser = await chromium.launch({ args: launchArgs, ...opts });
+    break;
+  } catch {}
+}
+if (!browser) browser = await chromium.launch({ args: launchArgs });
 try {
   const page = await browser.newPage();
   page.on('console', m => console.log('  [página]', m.text()));

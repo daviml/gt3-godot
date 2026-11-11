@@ -186,6 +186,50 @@ async function run() {
     count('juntadas', list.length - 1);
   }
 
+  // Fatiar a torcida em blocos de 120 m fora do runtime (elimina o _split_crowd em GDScript ao abrir a pista)
+  const CROWD_CELL = 120;
+  const crowdMeshes: THREE.Mesh[] = [];
+  scene.updateMatrixWorld(true);
+  scene.traverse(o => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh || Array.isArray(m.material)) return;
+    if ((m.material as THREE.Material).name === 'torcida') crowdMeshes.push(m);
+  });
+  for (const cm of crowdMeshes) {
+    const geo = cm.geometry.clone().applyMatrix4(cm.matrixWorld);
+    const g = geo.index ? geo.toNonIndexed() : geo;
+    const pos = g.getAttribute('position') as THREE.BufferAttribute;
+    const attrs = Object.keys(g.attributes);
+    const buckets = new Map<string, number[]>();
+    for (let t = 0; t + 2 < pos.count; t += 3) {
+      const cx = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3;
+      const cz = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3;
+      const key = `${Math.floor(cx / CROWD_CELL)},${Math.floor(cz / CROWD_CELL)}`;
+      let list = buckets.get(key);
+      if (!list) buckets.set(key, (list = []));
+      list.push(t, t + 1, t + 2);
+    }
+    const parent = cm.parent ?? scene;
+    parent.remove(cm);
+    for (const [key, verts] of buckets) {
+      const sub = new THREE.BufferGeometry();
+      for (const k of attrs) {
+        const src = g.getAttribute(k) as THREE.BufferAttribute;
+        const sz = src.itemSize;
+        const arr = new Float32Array(verts.length * sz);
+        for (let i = 0; i < verts.length; i++) {
+          const vi = verts[i];
+          for (let e = 0; e < sz; e++) arr[i * sz + e] = src.array[vi * sz + e];
+        }
+        sub.setAttribute(k, new THREE.BufferAttribute(arr, sz));
+      }
+      const block = new THREE.Mesh(sub, cm.material);
+      block.name = `${cm.name}_c_${key.replace(',', '_')}`;
+      parent.add(block);
+      count('blocos_torcida');
+    }
+  }
+
   const glb = (await new GLTFExporter().parseAsync(scene, { binary: true, maxTextureSize: 2048 })) as ArrayBuffer;
   const bytes = new Uint8Array(glb);
   let bin = '';

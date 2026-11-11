@@ -140,8 +140,7 @@ func _build_env() -> void:
 
 	var sky_mat := ShaderMaterial.new()
 	sky_mat.shader = load("res://shaders/sky.gdshader")
-	# HDRI em meio-float carregado de forma segura no Android e PC
-	var sky_tex := _load_sky_tex("res://assets/sky/ceu_2k.hdr")
+	var sky_tex: Texture2D = load("res://assets/sky/ceu_2k.hdr")
 	sky_mat.set_shader_parameter("pano", sky_tex)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
@@ -583,30 +582,3 @@ func _screenshot() -> void:
 	var path := "%s/godot-gt3-%d.png" % [dir, Time.get_unix_time_from_system()]
 	img.save_png(path)
 	print("print: ", path)
-
-
-static func _load_sky_tex(path: String) -> ImageTexture:
-	var img := Image.load_from_file(path)
-	if img and not img.is_empty():
-		img.convert(Image.FORMAT_RGBAH)
-		return ImageTexture.create_from_image(img)
-		
-	var user_cache := "user://ceu_cache.hdr"
-	if not FileAccess.file_exists(user_cache) and FileAccess.file_exists(path):
-		var bytes := FileAccess.get_file_as_bytes(path)
-		if bytes.size() > 0:
-			var f := FileAccess.open(user_cache, FileAccess.WRITE)
-			if f:
-				f.store_buffer(bytes)
-				f.close()
-				
-	if FileAccess.file_exists(user_cache):
-		var abs_path := ProjectSettings.globalize_path(user_cache)
-		img = Image.load_from_file(abs_path)
-		if img and not img.is_empty():
-			img.convert(Image.FORMAT_RGBAH)
-			return ImageTexture.create_from_image(img)
-			
-	img = Image.create(16, 16, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0.2, 0.35, 0.55))
-	return ImageTexture.create_from_image(img)

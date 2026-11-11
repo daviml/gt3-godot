@@ -23,7 +23,7 @@ import { CARS, carParams, modelMeta } from '../../gt3-time-attack/src/cars';
 import { trackSections } from '../../gt3-time-attack/src/render/osmScenery';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression, EXTTextureWebP, KHRMeshQuantization } from '@gltf-transform/extensions';
-import { dequantize, textureCompress } from '@gltf-transform/functions';
+import { compressTexture, dedup, dequantize, listTextureSlots, prune, weld } from '@gltf-transform/functions';
 import { MeshoptDecoder } from 'meshoptimizer';
 import sharp from 'sharp';
 import { fixNormals, splitWheels } from './car_fix';
@@ -166,17 +166,41 @@ if (!onlyCars) for (const f of readdirSync(web('public/sounds/fx'))) if (f.endsW
 const creditos = web('public/sounds/CREDITOS.md');
 if (existsSync(creditos)) copyFileSync(creditos, out('assets/sounds/CREDITOS.md'));
 
-// ---------- modelos (GLB com meshopt + webp → GLB simples com PNG)
+// ---------- modelos (GLB com meshopt + webp → GLB enxuto para o Godot)
 await MeshoptDecoder.ready;
 const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ 'meshopt.decoder': MeshoptDecoder });
 const DROP = [EXTMeshoptCompression.EXTENSION_NAME, EXTTextureWebP.EXTENSION_NAME, KHRMeshQuantization.EXTENSION_NAME];
+const AUX_SLOTS = new Set(['normalTexture', 'metallicRoughnessTexture', 'occlusionTexture']);
 for (const c of CARS) {
   const doc = await io.read(web(`public/models/${c.id}.glb`));
-  await doc.transform(dequantize(), textureCompress({ encoder: sharp, targetFormat: 'png' }));
+  await doc.transform(dequantize(), weld(), dedup(), prune());
+  for (const tex of doc.getRoot().listTextures()) {
+    const imgBuf = tex.getImage();
+    if (!imgBuf) continue;
+    const slots = listTextureSlots(doc, tex);
+    const meta = await sharp(imgBuf).metadata();
+    let needsAlpha = false;
+    if (meta.hasAlpha) {
+      const st = await sharp(imgBuf).stats();
+      needsAlpha = (st.channels[3]?.min ?? 255) < 250;
+    }
+    const isAuxOnly = slots.length > 0 && slots.every(s => AUX_SLOTS.has(s));
+    if (isAuxOnly) {
+      await compressTexture(tex, { encoder: sharp, targetFormat: 'png', effort: 85, resize: [512, 512] });
+      if (meta.hasAlpha && !needsAlpha && tex.getImage()) {
+        tex.setImage(await sharp(tex.getImage()!).removeAlpha().png({ compressionLevel: 9, effort: 8 }).toBuffer());
+      }
+    } else if (!needsAlpha) {
+      await compressTexture(tex, { encoder: sharp, targetFormat: 'jpeg', quality: 90, chromaSubsampling: '4:4:4', resize: [1024, 1024] });
+    } else {
+      await compressTexture(tex, { encoder: sharp, targetFormat: 'png', effort: 85, resize: [1024, 1024] });
+    }
+  }
   for (const ext of doc.getRoot().listExtensionsUsed()) if (DROP.includes(ext.extensionName)) ext.dispose();
   // correções da etapa 6 (car_fix.ts): normais invertidas e pinça separada da roda
   const flipped = fixNormals(doc);
   const wheels = splitWheels(doc, modelMeta(c.id)!.wheels.map(w => w.r));
+  await doc.transform(prune());
   await io.write(out(`assets/cars/${c.id}/${c.id}.glb`), doc);
   console.log('  carro', c.id, flipped.length ? `normais invertidas: ${flipped.join(', ')}` : '');
   for (const w of wheels) console.log('    ', w);
