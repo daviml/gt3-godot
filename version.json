@@ -1,6 +1,6 @@
 {
-  "version": 5,
+  "version": 6,
   "base_data_url": "https://github.com/daviml/gt3-godot/releases/download/v1.0/base_data.pck",
   "patch_url": "",
-  "changelog": "Versao 1.4: APK standalone completo atualizado com protecao de versao."
+  "changelog": "Versao 1.5: Carregamento assincrono da garagem, sem tela cinza e estudio otimizado."
 }

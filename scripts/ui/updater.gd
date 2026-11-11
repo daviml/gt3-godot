@@ -3,10 +3,11 @@ extends Control
 ## Auto-Updater do GT3 Time Attack
 ## Verifica se há novidades e baixa apenas o patch leve (2~4 MB). Se estiver offline ou atualizado, entra direto no jogo!
 
-const CURRENT_CLIENT_VERSION: int = 5
+const CURRENT_CLIENT_VERSION: int = 6
 const VERSION_URL: String = "https://raw.githubusercontent.com/daviml/gt3-godot/main/version.json"
 const PATCH_PCK_PATH: String = "user://patch.pck"
 const LOCAL_VERSION_PATH: String = "user://installed_version.json"
+const GARAGEM_SCENE: String = "res://scenes/garagem.tscn"
 
 const HTTP_HEADERS: PackedStringArray = [
 	"User-Agent: GT3TimeAttack-Mobile/1.0",
@@ -20,6 +21,8 @@ var status_label: Label
 var details_label: Label
 var progress_bar: ProgressBar
 var is_downloading: bool = false
+var is_loading_game: bool = false
+var fake_progress: float = 0.0
 var next_version_to_save: int = CURRENT_CLIENT_VERSION
 
 func _ready() -> void:
@@ -231,19 +234,40 @@ func _download_patch(url: String) -> void:
 	if err != OK:
 		_finish_and_enter_game()
 
-func _process(_delta: float) -> void:
-	if not is_downloading or not is_instance_valid(http_download):
+func _process(delta: float) -> void:
+	if is_downloading and is_instance_valid(http_download):
+		var downloaded: int = http_download.get_downloaded_bytes()
+		var total: int = http_download.get_body_size()
+		if total > 0:
+			var pct: float = (float(downloaded) / float(total)) * 100.0
+			progress_bar.value = pct
+			var down_mb: float = float(downloaded) / (1024.0 * 1024.0)
+			var total_mb: float = float(total) / (1024.0 * 1024.0)
+			details_label.text = "%.1f MB / %.1f MB (%.0f%%)" % [down_mb, total_mb, pct]
 		return
+
+	if is_loading_game:
+		var progress: Array = []
+		var status = ResourceLoader.load_threaded_get_status(GARAGEM_SCENE, progress)
 		
-	var downloaded: int = http_download.get_downloaded_bytes()
-	var total: int = http_download.get_body_size()
-	
-	if total > 0:
-		var pct: float = (float(downloaded) / float(total)) * 100.0
-		progress_bar.value = pct
-		var down_mb: float = float(downloaded) / (1024.0 * 1024.0)
-		var total_mb: float = float(total) / (1024.0 * 1024.0)
-		details_label.text = "%.1f MB / %.1f MB (%.0f%%)" % [down_mb, total_mb, pct]
+		# Animação suave e contínua da barra de progresso durante o loading da garagem
+		fake_progress = minf(fake_progress + delta * 35.0, 95.0)
+		var real_pct: float = progress[0] * 100.0 if progress.size() > 0 else 0.0
+		progress_bar.value = maxf(fake_progress, real_pct)
+		
+		match status:
+			ResourceLoader.THREAD_LOAD_LOADED:
+				progress_bar.value = 100.0
+				is_loading_game = false
+				var packed_scene = ResourceLoader.load_threaded_get(GARAGEM_SCENE) as PackedScene
+				if packed_scene:
+					get_tree().change_scene_to_packed.call_deferred(packed_scene)
+				else:
+					get_tree().change_scene_to_file.call_deferred(GARAGEM_SCENE)
+			ResourceLoader.THREAD_LOAD_FAILED, ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				print("[Updater] Falha no carregamento assíncrono (%d). Fallback direto." % status)
+				is_loading_game = false
+				get_tree().change_scene_to_file.call_deferred(GARAGEM_SCENE)
 
 func _load_existing_patch() -> void:
 	if FileAccess.file_exists(PATCH_PCK_PATH):
@@ -257,5 +281,24 @@ func _load_existing_patch() -> void:
 			DirAccess.remove_absolute(PATCH_PCK_PATH)
 
 func _finish_and_enter_game() -> void:
+	if is_loading_game:
+		return
+	is_loading_game = true
+	
 	_load_existing_patch()
-	get_tree().change_scene_to_file.call_deferred("res://scenes/garagem.tscn")
+	
+	# No editor ou comando com argumento de pista direta, pula a garagem
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--car=") or a.begins_with("--shot=") or a == "--auto":
+			get_tree().change_scene_to_file.call_deferred("res://scenes/main.tscn")
+			return
+			
+	status_label.text = "Carregando garagem..."
+	progress_bar.visible = true
+	progress_bar.value = 15.0
+	details_label.visible = false
+	
+	var err = ResourceLoader.load_threaded_request(GARAGEM_SCENE, "", true)
+	if err != OK:
+		print("[Updater] Falha ao iniciar carregamento assíncrono (%d). Fallback direto." % err)
+		get_tree().change_scene_to_file.call_deferred(GARAGEM_SCENE)

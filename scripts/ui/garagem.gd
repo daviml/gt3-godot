@@ -27,6 +27,7 @@ var steer_pose := 0.22      # rodas da frente esterçadas, pose de vitrine
 var name_lbl: Label
 var info_lbl: Label
 var idx_lbl: Label
+var drive_btn: Button
 var shot_dir := ""
 
 
@@ -54,28 +55,30 @@ func _build_studio() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color(0.03, 0.033, 0.04)
-	# luz ambiente do mesmo céu da pista (fraca); o reflexo vem da sonda, que enxerga as faixas de luz
-	var sky_mat := ShaderMaterial.new()
-	sky_mat.shader = load("res://shaders/sky.gdshader")
-	var sky_tex := _load_sky_tex("res://assets/sky/ceu_2k.hdr")
-	sky_mat.set_shader_parameter("pano", sky_tex)
-	var sky := Sky.new()
-	sky.sky_material = sky_mat
-	sky.radiance_size = Sky.RADIANCE_SIZE_128
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 0.25
-	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
+	# iluminação ambiente de estúdio suave; o reflexo realista vem da sonda (ReflectionProbe)
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.15, 0.17, 0.22)
+	env.ambient_light_energy = 0.35
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 1.1
-	env.ssao_enabled = true
-	env.ssao_radius = 0.8
-	env.ssao_intensity = 2.0
-	env.ssr_enabled = true
-	env.ssr_max_steps = 64
-	env.glow_enabled = true
-	env.glow_intensity = 0.4
-	env.glow_bloom = 0.03
+	
+	# SSAO, SSR e Glow ajustados por plataforma (desligados no mobile para inicialização rápida e 60 FPS)
+	var is_mobile := OS.has_feature("mobile")
+	if not is_mobile:
+		env.ssao_enabled = true
+		env.ssao_radius = 0.8
+		env.ssao_intensity = 2.0
+		env.ssr_enabled = true
+		env.ssr_max_steps = 64
+		env.glow_enabled = true
+		env.glow_intensity = 0.4
+		env.glow_bloom = 0.03
+	else:
+		env.ssao_enabled = false
+		env.ssr_enabled = false
+		env.glow_enabled = false
+		
 	env.adjustment_enabled = true
 	env.adjustment_contrast = 1.06
 	env.adjustment_saturation = 1.05
@@ -251,6 +254,7 @@ func _build_ui() -> void:
 	nxt.pressed.connect(func(): _show(idx + 1))
 	root.add_child(nxt)
 	var go := _button("PILOTAR", 28)
+	drive_btn = go
 	go.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	go.offset_left = -270
 	go.offset_right = -36
@@ -313,12 +317,6 @@ func _show(i: int) -> void:
 	name_lbl.text = c.name
 	info_lbl.text = _info(c, p)
 	idx_lbl.text = "%d / %d" % [idx + 1, cars.size()]
-	# carrega os vizinhos em segundo plano: trocar de carro fica rápido
-	for d in [-1, 1]:
-		var n: Dictionary = cars[posmod(idx + d, cars.size())]
-		var glb := "res://assets/cars/%s/%s.glb" % [n.id, n.id]
-		if ResourceLoader.load_threaded_get_status(glb) == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-			ResourceLoader.load_threaded_request(glb)
 
 
 func _info(c: Dictionary, p: Dictionary) -> String:
@@ -329,6 +327,9 @@ func _info(c: Dictionary, p: Dictionary) -> String:
 
 
 func _drive() -> void:
+	if drive_btn:
+		drive_btn.text = "CARREGANDO..."
+		drive_btn.disabled = true
 	Game.save_car(cars[idx].id)
 	Game.from_garage = true
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
@@ -412,30 +413,3 @@ func _vitrine() -> void:
 			await _snap("%s_%s" % [id, pose[2]])
 		print("vitrine ", id)
 	get_tree().quit()
-
-
-static func _load_sky_tex(path: String) -> ImageTexture:
-	var img := Image.load_from_file(path)
-	if img and not img.is_empty():
-		img.convert(Image.FORMAT_RGBAH)
-		return ImageTexture.create_from_image(img)
-		
-	var user_cache := "user://ceu_cache.hdr"
-	if not FileAccess.file_exists(user_cache) and FileAccess.file_exists(path):
-		var bytes := FileAccess.get_file_as_bytes(path)
-		if bytes.size() > 0:
-			var f := FileAccess.open(user_cache, FileAccess.WRITE)
-			if f:
-				f.store_buffer(bytes)
-				f.close()
-				
-	if FileAccess.file_exists(user_cache):
-		var abs_path := ProjectSettings.globalize_path(user_cache)
-		img = Image.load_from_file(abs_path)
-		if img and not img.is_empty():
-			img.convert(Image.FORMAT_RGBAH)
-			return ImageTexture.create_from_image(img)
-			
-	img = Image.create(16, 16, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0.04, 0.05, 0.07))
-	return ImageTexture.create_from_image(img)
