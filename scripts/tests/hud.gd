@@ -77,7 +77,7 @@ func _init() -> void:
 	Game.set_setting("audio", "volume", 0.35)
 	check(String(Game.get_setting("video", "qualidade", "")) == "Médio", "qualidade gravada e lida")
 	check(absf(float(Game.get_setting("audio", "volume", 0.0)) - 0.35) < 1e-6, "volume gravado e lido")
-	check("Médio" in PauseMenu.QUALITIES and PauseMenu.QUALITIES.size() == 3, "3 presets: Leve / Médio / Extremo")
+	check("Mínimo" in PauseMenu.QUALITIES and "Médio" in PauseMenu.QUALITIES and PauseMenu.QUALITIES.size() == 4, "4 presets: Mínimo / Leve / Médio / Extremo")
 	# devolve o que estava
 	if old_q != null:
 		Game.set_setting("video", "qualidade", old_q)

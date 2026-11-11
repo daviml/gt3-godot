@@ -101,18 +101,18 @@ Objetivo: eliminar os gargalos de carregamento e renderização para deixar o jo
 ### Fase 4 — Otimização de FPS no Preset `Mínimo` (GPU, Shaders, CPU e Física)
 *Objetivo: atingir FPS alto e estável no `Mínimo` tanto no Windows quanto no Android.*
 
-- [ ] **4.1 GPU e Renderização no `Mínimo` (`main.gd._set_quality` + shaders):**
+- [x] **4.1 GPU e Renderização no `Mínimo` (`main.gd._set_quality` + shaders):**
   - Ajustar `get_viewport().mesh_lod_threshold` por preset (ex.: `6.0` no `Mínimo`, `3.0` no `Leve`, `1.0` no `Médio`/`Extremo`).
   - Adicionar `uniform bool fast_mode = false` em `shaders/impostor.gdshader` para pular as 2 leituras de `normal_atlas` e cálculos de normal no `Mínimo`/`Leve`.
   - Reduzir o alcance das árvores em `SurroundingsView.DETAIL[0]` (`Mínimo`) de `600.0` m para `250.0`–`350.0` m.
   - No preset `Mínimo`, simplificar materiais do `CarView` e `TrackView` (desativar `clearcoat_enabled`, `normal_enabled` e filtragem anisotrópica pesada) e reduzir `sky.radiance_size` para `RADIANCE_SIZE_64`.
   - Estender `visibility_range_end` em `TrackView._fix()` também para malhas secundárias sem sombra (placas, cones, detalhes de arquibancada/pit) com alcance reduzido no `Mínimo` (`250–350 m`).
   - Limitar resolução 3D efetiva no `Mínimo` em telas HiDPI/4K no Desktop e avaliar opção de fallback/renderizador `gl_compatibility` para GPUs/drivers muito fracos.
-- [ ] **4.2 CPU — Otimização do HUD (`scripts/ui/hud.gd`):**
+- [x] **4.2 CPU — Otimização do HUD (`scripts/ui/hud.gd`):**
   - Remover todas as alocações de `StyleBoxFlat.new()` de dentro de `_draw()` (`_draw_fps`, `_draw_tyres`, `_draw_dash`), pré-alocando e reutilizando os `StyleBoxFlat`s no `_ready()`.
   - Pré-calcular os pontos transformados do minimapa em `_layout()` (em vez de alocar `PackedVector2Array` e recalcular todos os pontos da pista em `_draw_map()` a cada quadro).
   - Limitar a taxa de redesenho do HUD no `Mínimo` (ou globalmente para `30 Hz` nos painéis de texto) em vez de redesenhar ~100 strings via `SystemFont` a 60–144 FPS no Desktop.
-- [ ] **4.3 CPU — Física e Áudio (`car.gd`, `track.gd`, `car_audio.gd`):**
+- [x] **4.3 CPU — Física e Áudio (`car.gd`, `track.gd`, `car_audio.gd`):**
   - Permitir `max_sub = 4` (`240 Hz`) no preset `Mínimo` mesmo no Desktop (além do mobile), e reduzir buscas redundantes em `Track.locate()`/`_nearest()` aproveitando o `hint` já calculado no centro do carro.
   - Em `CarAudio.update()`, pausar/parar (`stream_paused = true`) loops cujo ganho seja efetivamente zero (`<= 0.001`: `grass_player`, `gravel_player`, `tyre_player` e loops de motor fora da janela ativa), evitando mixagem e cálculos contínuos de áudio em silêncio.
 

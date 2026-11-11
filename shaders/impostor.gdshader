@@ -3,6 +3,7 @@
 shader_type spatial;
 render_mode cull_disabled;
 
+uniform bool fast_mode = false;
 uniform sampler2D color_atlas : source_color, filter_linear_mipmap, repeat_disable;
 uniform sampler2D normal_atlas : filter_linear_mipmap, repeat_disable;
 
@@ -44,9 +45,11 @@ void fragment() {
 	vec3 leaf = tc.rgb;
 	leaf = mix(vec3(dot(leaf, vec3(0.3, 0.59, 0.11))), leaf, 1.3) * vec3(0.86, 1.04, 0.8);
 	ALBEDO = leaf * shade * 1.25;
-	vec3 nt = mix(texture(normal_atlas, uv0).xyz, texture(normal_atlas, uv1).xyz, blend) * 2.0 - 1.0;
-	vec3 nw = normalize(v_right * nt.x + vec3(0.0, 1.0, 0.0) * (nt.y + 0.35) + v_tocam * nt.z);
-	NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
+	if (!fast_mode) {
+		vec3 nt = mix(texture(normal_atlas, uv0).xyz, texture(normal_atlas, uv1).xyz, blend) * 2.0 - 1.0;
+		vec3 nw = normalize(v_right * nt.x + vec3(0.0, 1.0, 0.0) * (nt.y + 0.35) + v_tocam * nt.z);
+		NORMAL = normalize((VIEW_MATRIX * vec4(nw, 0.0)).xyz);
+	}
 	ROUGHNESS = 0.9;
 	SPECULAR = 0.2;
 }

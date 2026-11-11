@@ -186,7 +186,8 @@ func _build_env(sky_tex: Texture2D = null) -> void:
 	sky_mat.set_shader_parameter("pano", sky_tex)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
-	sky.radiance_size = Sky.RADIANCE_SIZE_256
+	var q_lvl := Game.get_quality_level()
+	sky.radiance_size = Sky.RADIANCE_SIZE_64 if q_lvl == 0 else (Sky.RADIANCE_SIZE_128 if q_lvl == 1 else Sky.RADIANCE_SIZE_256)
 
 	env = Environment.new()
 	env.background_mode = Environment.BG_SKY
@@ -195,12 +196,13 @@ func _build_env(sky_tex: Texture2D = null) -> void:
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 1.05
-	env.ssao_enabled = true
-	env.ssao_radius = 1.2
-	env.ssao_intensity = 1.6
-	env.ssil_enabled = true
-	env.ssr_enabled = true
-	env.ssr_max_steps = 48
+	if not Game.is_compatibility_renderer():
+		env.ssao_enabled = true
+		env.ssao_radius = 1.2
+		env.ssao_intensity = 1.6
+		env.ssil_enabled = true
+		env.ssr_enabled = true
+		env.ssr_max_steps = 48
 	env.glow_enabled = true
 	env.glow_intensity = 0.35
 	env.glow_bloom = 0.04
@@ -242,7 +244,8 @@ func _build_car(preloaded_streams: Dictionary = {}, start_paused := false) -> vo
 		push_warning("carro desconhecido: %s" % car_id)
 		car_id = "porsche-992-gt3r"
 	# visual do carro (modelo, materiais, rodas com pinça parada e desfoque): scripts/render/car_view.gd
-	car_view = CarView.new(car_id, Game.get_quality_level() >= 2)
+	var q_lvl := Game.get_quality_level()
+	car_view = CarView.new(car_id, q_lvl >= 2, q_lvl == 0)
 	add_child(car_view)
 	car_data = car_view.data
 	car = Car.new(track, car_data.params)
@@ -313,6 +316,14 @@ func _build_hud() -> void:
 		_toast("Volante calibrado")
 	)
 	add_child(menu)
+	get_viewport().size_changed.connect(_on_viewport_resized)
+
+
+func _on_viewport_resized() -> void:
+	if quality_name == "Mínimo":
+		var vp := get_viewport()
+		if vp:
+			vp.scaling_3d_scale = Game.get_minimal_3d_scale(vp)
 
 
 func _fmt(t: float) -> String:
@@ -526,18 +537,19 @@ func _apply_quality(name: String) -> void:
 func _set_quality(level: int) -> void:
 	high = level > 1
 	var vp := get_viewport()
-	var is_mobile := OS.has_feature("mobile")
+	var is_mobile := Game.is_mobile_platform()
+	var is_compat := Game.is_compatibility_renderer()
 
-	# 1. Resolução interna e upscaling
-	# No mobile em Mínimo, usamos Bilinear nativo a 65% (elimina passes de compute shader de FSR
-	# que quebram o pipeline de tile memory (TBDR) e sobrecarregam GPU mobile)
-	# No Leve, 75% Bilinear no mobile / FSR no desktop
+	# 1. Resolução interna, upscaling e LOD de malhas
+	# No Mínimo, usamos Bilinear nativo limitado a <=720p efetivo em telas HiDPI/4K (e 0.65x em 1080p)
+	# No Leve, 75% Bilinear no mobile/Compatibility ou FSR no desktop
+	vp.mesh_lod_threshold = 6.0 if level == 0 else (3.0 if level == 1 else 1.0)
 	if level == 0:
 		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
-		vp.scaling_3d_scale = 0.65
+		vp.scaling_3d_scale = Game.get_minimal_3d_scale(vp)
 		vp.msaa_3d = Viewport.MSAA_DISABLED
 	elif level == 1:
-		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR if is_mobile else Viewport.SCALING_3D_MODE_FSR
+		vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR if (is_mobile or is_compat) else Viewport.SCALING_3D_MODE_FSR
 		vp.scaling_3d_scale = 0.75
 		vp.fsr_sharpness = 0.2
 		vp.msaa_3d = Viewport.MSAA_DISABLED
@@ -550,19 +562,18 @@ func _set_quality(level: int) -> void:
 		vp.scaling_3d_scale = 1.0
 		vp.msaa_3d = Viewport.MSAA_4X
 
-	# 2. Ambiente e efeitos pós-processamento
+	# 2. Ambiente, céu e efeitos pós-processamento
 	if env:
-		env.ssao_enabled = level >= 2
-		if level == 2:
-			env.ssao_radius = 1.0
-			env.ssao_intensity = 1.0
-		elif level == 3:
-			env.ssao_radius = 1.2
-			env.ssao_intensity = 1.6
+		if env.sky:
+			env.sky.radiance_size = Sky.RADIANCE_SIZE_64 if level == 0 else (Sky.RADIANCE_SIZE_128 if level == 1 else Sky.RADIANCE_SIZE_256)
+		env.ssao_enabled = (level >= 2) and not is_compat
+		if env.ssao_enabled:
+			env.ssao_radius = 1.0 if level == 2 else 1.2
+			env.ssao_intensity = 1.0 if level == 2 else 1.6
 
-		env.ssil_enabled = level == 3
-		env.ssr_enabled = level == 3
-		if level == 3:
+		env.ssil_enabled = (level == 3) and not is_compat
+		env.ssr_enabled = (level == 3) and not is_compat
+		if env.ssr_enabled:
 			env.ssr_max_steps = 48
 
 		# Glow desligado em Mínimo e Leve (crítico para taxa de quadros e temperatura no celular)
@@ -616,9 +627,17 @@ func _set_quality(level: int) -> void:
 		speed_blur.enabled = level >= 2
 		speed_blur.max_strength = 0.8 if level == 2 else 1.0
 
-	# 7. Desfoque das rodas (24 malhas transparentes desativadas em Mínimo e Leve)
+	# 7. Desfoque das rodas e simplificação de materiais do carro
 	if car_view:
 		car_view.blur_enabled = level >= 2
+		car_view.simple_materials = level == 0
+
+	# 8. Física e HUD por orçamento (Mínimo limita sub-passos a 4 / 240 Hz mesmo no Desktop)
+	if car:
+		car.max_sub_steps = 4 if (level == 0 or is_mobile) else 8
+	Engine.max_physics_steps_per_frame = 2 if (level == 0 or is_mobile) else 4
+	if hud:
+		hud.quality_level = level
 
 
 func _screenshot() -> void:

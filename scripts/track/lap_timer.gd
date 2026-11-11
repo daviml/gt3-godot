@@ -89,7 +89,7 @@ func all_wheels_out(car: Car) -> bool:
 		var w: Car.Wheel = car.wheels[k]
 		if not w.contact:
 			continue
-		track.locate(w.cpoint, car.hint)
+		track.locate(w.cpoint, car.hint, Track.WIN_NEAR)
 		var limit := (track.lwl + track.lkl) if track.ld < 0.0 else (track.lwr + track.lkr)
 		_wheel_in[k] = absf(track.ld) - TIRE_HALF_WIDTH <= limit
 	return not (_wheel_in[0] or _wheel_in[1] or _wheel_in[2] or _wheel_in[3])

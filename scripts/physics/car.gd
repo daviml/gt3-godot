@@ -46,6 +46,8 @@ class Wheel:
 var ground: Ground
 var assists := {"abs": true, "tc": true, "auto": false, "brake_reverse": false}
 var grip_scale: float = 1.0
+## Máximo de sub-passos por tick de 60 Hz (4 no mobile/Mínimo = 240 Hz; 8 no Desktop = 480 Hz)
+var max_sub_steps := 4 if OS.has_feature("mobile") else 8
 var pos := Vector3.ZERO
 var rot := Quaternion.IDENTITY
 var prev_pos := Vector3.ZERO
@@ -339,7 +341,7 @@ func step(dt: float, steer_in: float, throttle_in: float, brake_in: float, shift
 	# No mobile, limitamos o número máximo de sub-passos por tick a 4 (240 Hz a 60 Hz),
 	# o que reduz o custo de CPU pela metade com 100% de estabilidade.
 	if dt > SUB_DT * 1.5:
-		var max_sub := 4 if OS.has_feature("mobile") else 8
+		var max_sub := max_sub_steps
 		var n_steps := clampi(int(roundf(dt / SUB_DT)), 1, max_sub)
 		var sub_dt := dt / float(n_steps)
 		for s in n_steps:
@@ -511,9 +513,11 @@ func _single_step(dt: float, steer_in: float, throttle_in: float, brake_in: floa
 	# nenhum canto pode estar colidindo, dispensando 6 queries pesadas por sub-passo.
 	var track_obj := ground as Track
 	var near_wall := true
-	if track_obj != null:
-		var lat := absf(track_obj.ld)
-		var wall_dist := minf(track_obj.lwalll, track_obj.lwallr)
+	if track_obj != null and hint >= 0:
+		var off := pos - track_obj.P[hint]
+		var r_h := track_obj.R[hint]
+		var lat := absf(off.x * r_h.x + off.z * r_h.z)
+		var wall_dist := minf(track_obj.wall_l[hint], track_obj.wall_r[hint])
 		if lat < wall_dist - 3.5:
 			near_wall = false
 

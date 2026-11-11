@@ -15,6 +15,8 @@ extends Node3D
 const GLB := "res://assets/track/cenario.glb"
 const TREES := "res://data/track/arvores_pos.json"
 const CHUNK := 250.0
+const CULL_SECONDARY_MIN := 300.0
+const CULL_SHADOW_DEFAULT := 550.0
 
 var meshes := 0
 var trees := 0
@@ -23,6 +25,8 @@ var detail_level := 2
 var manual_setup := false
 var _cache := {}
 var _shader_mats: Array[ShaderMaterial] = []
+var _base_mats: Array[Dictionary] = []
+var _cull_meshes: Array[Dictionary] = []
 var _name_re := RegEx.create_from_string("^o(-?\\d+)_s(\\d)")
 
 
@@ -60,9 +64,22 @@ func build_surroundings(towers_data: Array = [], horizon_data: Dictionary = {}) 
 func set_detail(level: int) -> void:
 	detail_level = level
 	var fast: bool = level <= 1
+	var minimal: bool = level == 0
 	for mat in _shader_mats:
-		if mat:
+		if mat and mat.resource_name != "fachada":
 			mat.set_shader_parameter("fast_mode", fast)
+	for entry in _base_mats:
+		var m: BaseMaterial3D = entry.mat
+		if m:
+			m.normal_enabled = false if minimal else bool(entry.normal)
+			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS if minimal else int(entry.filter)
+	for entry in _cull_meshes:
+		var mi: MeshInstance3D = entry.mi
+		if mi:
+			if minimal:
+				mi.visibility_range_end = CULL_SECONDARY_MIN
+			else:
+				mi.visibility_range_end = CULL_SHADOW_DEFAULT if entry.shadow else 0.0
 	if surroundings:
 		surroundings.set_detail(level)
 
@@ -78,17 +95,26 @@ func _fix(n: Node) -> void:
 			order = int(m.get_string(1))
 			shadow = m.get_string(2) == "1"
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		# Otimização de Distância de Visão (Culling / HLOD):
-		# Detalhes pequenos não precisam ser renderizados a longas distâncias
-		if shadow and order == 0:
-			# Postes, alambrado, cones, placas secundárias (sem esmaecer para evitar overdraw em mobile)
-			mi.visibility_range_end = 550.0
-			mi.visibility_range_end_margin = 0.0
-			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+		var is_primary_surface := false
 		for s in mi.mesh.get_surface_count():
 			var mat := mi.mesh.surface_get_material(s)
 			if mat:
+				var mat_name := String(mat.resource_name)
+				if mat_name in ["asfalto", "grama", "pinta", "torcida"]:
+					is_primary_surface = true
 				mi.set_surface_override_material(s, _material(mat, order))
+		# Otimização de Distância de Visão (Culling / HLOD):
+		# Detalhes secundários (postes, alambrado, cones, placas, detalhes de pit/arquibancada)
+		# são cortados mais perto no Mínimo (300 m) e com sombra até 550 m nos demais presets.
+		var ext := mi.get_aabb().size
+		if order == 0 and not is_primary_surface and maxf(ext.x, ext.z) <= 450.0:
+			_cull_meshes.append({"mi": mi, "shadow": shadow})
+			mi.visibility_range_end_margin = 0.0
+			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+			if detail_level == 0:
+				mi.visibility_range_end = CULL_SECONDARY_MIN
+			else:
+				mi.visibility_range_end = CULL_SHADOW_DEFAULT if shadow else 0.0
 	for c in n.get_children():
 		_fix(c)
 
@@ -134,6 +160,9 @@ func _material(src: Material, order: int) -> Material:
 			# desativando depth write com transparência simples reduz custo de GPU
 			d.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
 		out = d
+	if out is BaseMaterial3D:
+		var obm := out as BaseMaterial3D
+		_base_mats.append({"mat": obm, "normal": obm.normal_enabled, "filter": obm.texture_filter})
 	_cache[key] = out
 	return out
 
@@ -164,9 +193,12 @@ func build_trees(data: Array = []) -> void:
 		st.add_vertex(v)
 	var quad := st.commit()
 	var mat := ShaderMaterial.new()
+	mat.resource_name = "impostor"
 	mat.shader = load("res://shaders/impostor.gdshader")
 	mat.set_shader_parameter("color_atlas", load("res://assets/trees/arvores_cor.png"))
 	mat.set_shader_parameter("normal_atlas", load("res://assets/trees/arvores_normal.png"))
+	mat.set_shader_parameter("fast_mode", detail_level <= 1)
+	_shader_mats.append(mat)
 	# blocos de 250 m, cada um com a sua caixa: a câmera só desenha os blocos que vê (o cartão gira no shader,
 	# então a caixa ganha a margem do maior tamanho de árvore)
 	var cells := {}

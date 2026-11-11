@@ -19,8 +19,8 @@ signal recenter_tilt
 
 const QUALITIES := ["Mínimo", "Leve", "Médio", "Extremo"]
 const QUALITY_NOTE := {
-	"Mínimo": "Máximo FPS no celular: FSR 0.70x, sem sombras de sol, sem pós-processamento",
-	"Leve": "Recomendado para Galaxy S22: 60 FPS com FSR 0.80x, sombra curta, sem glow",
+	"Mínimo": "Máximo FPS (PC fraco/celular): resolução <=720p, sem sombras, materiais e árvores leves",
+	"Leve": "Recomendado para Galaxy S22: 60 FPS com escala 0.75x, sombra curta, sem glow",
 	"Médio": "Celular topo com refrigeração ou PC intermediário: resolução nativa, sombras e SSAO",
 	"Extremo": "PC com placa de vídeo dedicada: SSAO, SSIL, SSR e sombras em 4 cortes",
 }

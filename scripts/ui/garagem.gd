@@ -124,14 +124,16 @@ func _build_studio() -> void:
 	# SSAO, SSR, Glow e resolução respeitam o preset gráfico salvo em user://jogo.cfg
 	studio_quality_level = Game.get_quality_level()
 	var is_mobile := Game.is_mobile_platform()
+	var is_compat := Game.is_compatibility_renderer()
 	var vp := get_viewport()
 	if vp:
+		vp.mesh_lod_threshold = 6.0 if studio_quality_level == 0 else (3.0 if studio_quality_level == 1 else 1.0)
 		if studio_quality_level == 0:
 			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
-			vp.scaling_3d_scale = 0.65
+			vp.scaling_3d_scale = Game.get_minimal_3d_scale(vp)
 			vp.msaa_3d = Viewport.MSAA_DISABLED
 		elif studio_quality_level == 1:
-			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR if is_mobile else Viewport.SCALING_3D_MODE_FSR
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR if (is_mobile or is_compat) else Viewport.SCALING_3D_MODE_FSR
 			vp.scaling_3d_scale = 0.75
 			vp.fsr_sharpness = 0.2
 			vp.msaa_3d = Viewport.MSAA_DISABLED
@@ -144,11 +146,11 @@ func _build_studio() -> void:
 			vp.scaling_3d_scale = 1.0
 			vp.msaa_3d = Viewport.MSAA_4X
 
-	env.ssao_enabled = studio_quality_level >= 2
+	env.ssao_enabled = (studio_quality_level >= 2) and not is_compat
 	if env.ssao_enabled:
 		env.ssao_radius = 0.8
 		env.ssao_intensity = 1.2 if studio_quality_level == 2 else 2.0
-	env.ssr_enabled = studio_quality_level >= 3
+	env.ssr_enabled = (studio_quality_level >= 3) and not is_compat
 	if env.ssr_enabled:
 		env.ssr_max_steps = 64
 	env.glow_enabled = studio_quality_level >= 2
@@ -519,7 +521,7 @@ func _mount_car(car_id: String, scene: PackedScene = null) -> void:
 	if view:
 		view.queue_free()
 		view = null
-	view = CarView.new(car_id, shot_dir != "")
+	view = CarView.new(car_id, shot_dir != "", studio_quality_level == 0)
 	pivot.add_child(view)
 	var p: Dictionary = view.data.params
 	var mw: Array = view.data.model.wheels

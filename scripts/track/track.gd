@@ -96,9 +96,9 @@ func nearest(p: Vector3, hint: int) -> int:
 	return _nearest(p, hint, 12)
 
 
-## nearest com janela de busca ±win em torno do hint. Rodas e cantos da carroceria ficam a menos de 3 m do
-## centro do carro (o hint), então ±WIN_NEAR amostras (8 m) bastam e a física fica ~2x mais barata no celular.
-const WIN_NEAR := 4
+## nearest com janela de busca ±win em torno do hint. Rodas e cantos da carroceria ficam a menos de 2,6 m do
+## centro do carro (o hint), então ±WIN_NEAR amostras (4 m) bastam e reduzem buscas na física.
+const WIN_NEAR := 2
 
 func _nearest(p: Vector3, hint: int, win: int) -> int:
 	var best := -1
@@ -110,12 +110,28 @@ func _nearest(p: Vector3, hint: int, win: int) -> int:
 			if dd < bd:
 				bd = dd; best = i
 		return best
-	for k in range(-win, win + 1):
+	var w0 := mini(win, 3)
+	var best_k := 0
+	for k in range(-w0, w0 + 1):
 		var i := (hint + k + n) % n
 		var q := P[i]
 		var dd := (q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z)
 		if dd < bd:
-			bd = dd; best = i
+			bd = dd; best = i; best_k = k
+	# Só expande a busca se o mínimo caiu na borda da janela curta (±3 amostras = ±6 m)
+	if win > w0 and (best_k == -w0 or best_k == w0):
+		for k in range(-win, -w0):
+			var i := (hint + k + n) % n
+			var q := P[i]
+			var dd := (q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z)
+			if dd < bd:
+				bd = dd; best = i
+		for k in range(w0 + 1, win + 1):
+			var i := (hint + k + n) % n
+			var q := P[i]
+			var dd := (q.x - p.x) * (q.x - p.x) + (q.z - p.z) * (q.z - p.z)
+			if dd < bd:
+				bd = dd; best = i
 	return best
 
 

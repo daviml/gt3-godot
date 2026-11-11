@@ -49,6 +49,7 @@ var toast_text := ""
 var toast_t := 0.0
 var fps := 0
 var quality := ""
+var quality_level := 2
 var autopilot := false
 
 var _font: Font
@@ -63,12 +64,24 @@ var _k := 1.0
 var _kp := 1.0
 var _shorts := {}
 var _colors := {}
-# mapa: pontos da pista em px do mapa (170×150) e transformação
+# mapa: pontos da pista em px do mapa (170×150) e cache já transformado para a tela
 var _map_pts := PackedVector2Array()
 var _map_scale := 1.0
 var _map_min := Vector2.ZERO
 var _map_off := Vector2.ZERO
 var _map_finish: Array = []
+var _map_pos := Vector2.ZERO
+var _map_origin := Vector2.ZERO
+var _map_draw_pts := PackedVector2Array()
+var _map_finish_draw: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO]
+var _map_layout_sc := -1.0
+# StyleBoxes e buffers pré-alocados (sem alocação por quadro em _draw)
+var _fps_sb: StyleBoxFlat
+var _tyres_panel_sb: StyleBoxFlat
+var _tyres_body_sb: StyleBoxFlat
+var _tyre_sbs: Array[StyleBoxFlat] = []
+var _box_sb: StyleBoxFlat
+var _panel_pts := PackedVector2Array()
 
 
 func _init(c: Car, t: LapTimer, tr: Track, car_id: String, is_touch: bool) -> void:
@@ -92,8 +105,33 @@ func _ready() -> void:
 	_bold = _sys_font(700)
 	_mono = SystemFont.new()
 	(_mono as SystemFont).font_names = PackedStringArray(["Consolas", "Droid Sans Mono", "monospace"])
+	_ensure_styleboxes()
 	get_viewport().size_changed.connect(_layout)
 	_layout()
+
+
+func _ensure_styleboxes() -> void:
+	if _fps_sb == null:
+		_fps_sb = StyleBoxFlat.new()
+		_fps_sb.bg_color = Color(0, 0, 0, 0.45)
+	if _tyres_panel_sb == null:
+		_tyres_panel_sb = StyleBoxFlat.new()
+		_tyres_panel_sb.bg_color = Color(13 / 255.0, 24 / 255.0, 46 / 255.0, 0.86)
+		_tyres_panel_sb.shadow_color = Color(0, 0, 0, 0.35)
+	if _tyres_body_sb == null:
+		_tyres_body_sb = StyleBoxFlat.new()
+		_tyres_body_sb.bg_color = Color(0, 0, 0, 0)
+		_tyres_body_sb.border_color = Color(1, 1, 1, 0.28)
+	if _tyre_sbs.is_empty():
+		for _i in 4:
+			var tsb := StyleBoxFlat.new()
+			tsb.border_color = Color(0, 0, 0, 0.25)
+			tsb.set_border_width_all(1)
+			_tyre_sbs.append(tsb)
+	if _box_sb == null:
+		_box_sb = StyleBoxFlat.new()
+	if _panel_pts.size() != 5:
+		_panel_pts.resize(5)
 
 
 ## fonte do sistema no estilo condensado dos sims (Bahnschrift no Windows; Roboto no Android)
@@ -105,6 +143,7 @@ static func _sys_font(weight: int) -> Font:
 
 
 func _layout() -> void:
+	_ensure_styleboxes()
 	var s := get_viewport_rect().size
 	if touch:
 		_k = maxf(0.34, minf(1.15, minf(s.y / 860.0, s.x / 1760.0)))
@@ -112,6 +151,40 @@ func _layout() -> void:
 	else:
 		_k = maxf(0.62, minf(1.15, s.y / 860.0))
 		_kp = maxf(_k, minf(1.67, 1.67 * minf(s.x / 2552.0, s.y / 1268.0)))
+
+	var fps_sc := clampf(s.y / 860.0, 0.75, 1.1)
+	_fps_sb.set_corner_radius_all(roundi(9 * fps_sc))
+
+	_tyres_panel_sb.set_corner_radius_all(roundi(10 * _k))
+	_tyres_panel_sb.shadow_size = roundi(6 * _k)
+	_tyres_panel_sb.shadow_offset = Vector2(0, 4 * _k)
+	_tyres_body_sb.set_border_width_all(maxi(1, roundi(2 * _k)))
+	_tyres_body_sb.corner_radius_top_left = roundi(12 * _k)
+	_tyres_body_sb.corner_radius_top_right = roundi(12 * _k)
+	_tyres_body_sb.corner_radius_bottom_left = roundi(8 * _k)
+	_tyres_body_sb.corner_radius_bottom_right = roundi(8 * _k)
+	var tyre_rad := roundi(4 * _k)
+	for tsb in _tyre_sbs:
+		tsb.set_corner_radius_all(tyre_rad)
+
+	var ins := _insets()
+	var timing_w := 250.0 * _kp
+	var tr := Vector2(s.x - ins.size.x - 14 - timing_w, 14 + ins.position.y)
+	var map_size := Vector2(186, 180) * _kp
+	var map_pos := Vector2(tr.x - 8 * _kp - map_size.x, tr.y) if touch else Vector2(14 + ins.position.x, s.y - ins.size.y - 14 - map_size.y)
+	_update_map_layout(map_pos, _kp)
+
+
+func _update_map_layout(pos: Vector2, sc: float) -> void:
+	_map_pos = pos
+	_map_layout_sc = sc
+	_map_origin = pos + Vector2(8 * sc, 26 * sc)
+	_map_draw_pts.resize(_map_pts.size())
+	for i in _map_pts.size():
+		_map_draw_pts[i] = _map_origin + _map_pts[i] * sc
+	if _map_finish.size() >= 2:
+		_map_finish_draw[0] = _map_origin + _map_finish[0] * sc
+		_map_finish_draw[1] = _map_origin + _map_finish[1] * sc
 
 
 ## câmera atual: o painel do Porsche só aparece na de capô (nas de fora ele tampava a traseira do carro)
@@ -122,6 +195,8 @@ func set_view(mode: String) -> void:
 func toast(t: String) -> void:
 	toast_text = t
 	toast_t = 1.6
+	_redraw_t = 1.0
+	queue_redraw()
 
 
 ## uso filtrado de cada pneu (0 = solto, 1 = no limite), pelo slip combinado em relação ao pico
@@ -168,9 +243,11 @@ func update(dt: float, thr: float, brk: float) -> void:
 		_fps_since = 0.0
 	toast_t -= dt
 	section = track.section_at(timer.s)
-	# celular: redesenha o HUD a 30 Hz (são ~100 textos por quadro na CPU, que esquenta e derruba o clock)
+	# Limita o redesenho do HUD a 30 Hz no mobile e nos presets Mínimo/Leve (60 Hz em Médio/Extremo),
+	# evitando redesenhar ~100 strings via SystemFont em monitores de alta taxa de atualização.
 	_redraw_t += dt
-	if not touch or _redraw_t >= 1.0 / 30.0:
+	var interval := (1.0 / 30.0) if (touch or quality_level <= 1) else (1.0 / 60.0)
+	if _redraw_t >= interval:
 		_redraw_t = 0.0
 		queue_redraw()
 
@@ -224,9 +301,14 @@ func _insets() -> Rect2:
 ## painel LMU: vidro escuro, filete de cor no topo e canto inferior direito cortado
 func _panel(r: Rect2, sc: float) -> void:
 	var cut := 10.0 * sc
-	var pts := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), Vector2(r.end.x, r.end.y - cut),
-		Vector2(r.end.x - cut, r.end.y), Vector2(r.position.x, r.end.y)])
-	draw_colored_polygon(pts, Color(14 / 255.0, 17 / 255.0, 22 / 255.0, 0.78))
+	if _panel_pts.size() != 5:
+		_panel_pts.resize(5)
+	_panel_pts[0] = r.position
+	_panel_pts[1] = Vector2(r.end.x, r.position.y)
+	_panel_pts[2] = Vector2(r.end.x, r.end.y - cut)
+	_panel_pts[3] = Vector2(r.end.x - cut, r.end.y)
+	_panel_pts[4] = Vector2(r.position.x, r.end.y)
+	draw_colored_polygon(_panel_pts, Color(14 / 255.0, 17 / 255.0, 22 / 255.0, 0.78))
 	draw_rect(Rect2(r.position, Vector2(r.size.x, 2 * sc)), ACCENT)
 
 
@@ -241,15 +323,13 @@ func _text_w(f: Font, t: String, size: float) -> float:
 
 
 func _draw_fps(top_center: Vector2) -> void:
+	_ensure_styleboxes()
 	var sc := clampf(get_viewport_rect().size.y / 860.0, 0.75, 1.1)
 	var fs := 12.0 * sc
 	var t := "%d FPS" % fps
 	var w := _text_w(_bold, t, fs) + 16 * sc
 	var r := Rect2(top_center - Vector2(w / 2.0, 0), Vector2(w, 18 * sc))
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0, 0, 0, 0.45)
-	sb.set_corner_radius_all(roundi(9 * sc))
-	draw_style_box(sb, r)
+	draw_style_box(_fps_sb, r)
 	var c := GREEN if fps >= 55 else (Color("#ffb020") if fps >= 30 else RED)
 	_text(_bold, r.position + Vector2(8 * sc, 2 * sc), t, fs, c)
 
@@ -399,15 +479,12 @@ func _draw_map(pos: Vector2, sc: float) -> void:
 	var h := 180.0 * sc
 	_panel(Rect2(pos, Vector2(w, h)), sc)
 	_text(_bold, pos + Vector2(12 * sc, 7 * sc), "MAPA", 12 * sc, Color(1, 1, 1, 0.92))
-	var o := pos + Vector2(8 * sc, 26 * sc)
-	var pts := PackedVector2Array()
-	pts.resize(_map_pts.size())
-	for i in _map_pts.size():
-		pts[i] = o + _map_pts[i] * sc
-	draw_polyline(pts, Color(0, 0, 0, 0.6), 7 * sc, true)
-	draw_polyline(pts, Color(235 / 255.0, 238 / 255.0, 242 / 255.0, 0.9), 3.5 * sc, true)
-	draw_line(o + _map_finish[0] * sc, o + _map_finish[1] * sc, Color("#e5483b"), 2.5 * sc, true)
-	var c := o + _to_map(car.pos) * sc
+	if _map_draw_pts.size() != _map_pts.size() or _map_pos != pos or _map_layout_sc != sc:
+		_update_map_layout(pos, sc)
+	draw_polyline(_map_draw_pts, Color(0, 0, 0, 0.6), 7 * sc, true)
+	draw_polyline(_map_draw_pts, Color(235 / 255.0, 238 / 255.0, 242 / 255.0, 0.9), 3.5 * sc, true)
+	draw_line(_map_finish_draw[0], _map_finish_draw[1], Color("#e5483b"), 2.5 * sc, true)
+	var c := _map_origin + _to_map(car.pos) * sc
 	draw_circle(c, 5.5 * sc, Color.BLACK)
 	draw_circle(c, 4.0 * sc, car_color)
 
@@ -467,38 +544,22 @@ func _draw_gauge(pos: Vector2, k: float) -> void:
 
 ## bloco dos 4 pneus (cor pelo slip) com ABS / TC / AUT embaixo; pos = canto inferior esquerdo
 func _draw_tyres(bottom_left: Vector2, k: float, w: float) -> void:
+	_ensure_styleboxes()
 	var h := 110.0 * k
 	var r := Rect2(bottom_left - Vector2(0, h), Vector2(w, h))
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(13 / 255.0, 24 / 255.0, 46 / 255.0, 0.86)
-	sb.set_corner_radius_all(roundi(10 * k))
-	sb.shadow_color = Color(0, 0, 0, 0.35)
-	sb.shadow_size = roundi(6 * k)
-	sb.shadow_offset = Vector2(0, 4 * k)
-	draw_style_box(sb, r)
+	draw_style_box(_tyres_panel_sb, r)
 	# contorno do carro entre os pneus e os 4 pneus (15×26, colunas a 26 de distância, linhas a 22)
 	var cx := r.position.x + w / 2.0
 	var top := r.position.y + 10 * k
 	var body := Rect2(cx - 13 * k, top, 26 * k, 74 * k)
-	var bsb := StyleBoxFlat.new()
-	bsb.bg_color = Color(0, 0, 0, 0)
-	bsb.border_color = Color(1, 1, 1, 0.28)
-	bsb.set_border_width_all(maxi(1, roundi(2 * k)))
-	bsb.corner_radius_top_left = roundi(12 * k)
-	bsb.corner_radius_top_right = roundi(12 * k)
-	bsb.corner_radius_bottom_left = roundi(8 * k)
-	bsb.corner_radius_bottom_right = roundi(8 * k)
-	draw_style_box(bsb, body)
+	draw_style_box(_tyres_body_sb, body)
 	draw_rect(Rect2(cx - 11 * k, top + 36 * k, 22 * k, 2 * k), Color(1, 1, 1, 0.18))
 	for i in 4:
 		var col := i % 2
 		var row := i / 2
 		var tr := Rect2(cx + (-20.5 * k if col == 0 else 5.5 * k), top + 4 * k + row * 48 * k, 15 * k, 26 * k)
-		var tsb := StyleBoxFlat.new()
+		var tsb := _tyre_sbs[i]
 		tsb.bg_color = tyre_color(_tyre_use[i])
-		tsb.border_color = Color(0, 0, 0, 0.25)
-		tsb.set_border_width_all(1)
-		tsb.set_corner_radius_all(roundi(4 * k))
 		draw_style_box(tsb, tr)
 	# ABS / TC / AUT
 	var abs_now := false
@@ -530,12 +591,12 @@ static func _led_color(i: int) -> Color:
 
 
 func _box(r: Rect2, bg: Color, border: Color, bw: float, radius := 0.0) -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = bg
-	sb.border_color = border
-	sb.set_border_width_all(maxi(1, roundi(bw)))
-	sb.set_corner_radius_all(roundi(radius))
-	draw_style_box(sb, r)
+	_ensure_styleboxes()
+	_box_sb.bg_color = bg
+	_box_sb.border_color = border
+	_box_sb.set_border_width_all(maxi(1, roundi(bw)))
+	_box_sb.set_corner_radius_all(roundi(radius))
+	draw_style_box(_box_sb, r)
 
 
 func _draw_dash(pos: Vector2, ks: float) -> void:

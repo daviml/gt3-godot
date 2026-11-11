@@ -174,12 +174,7 @@ func _build_nodes() -> void:
 		if wav == null and ResourceLoader.exists(path):
 			wav = load(path)
 		if wav != null:
-			wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-			var player := AudioStreamPlayer.new()
-			player.stream = wav
-			player.bus = "Engine"
-			player.volume_db = -80.0
-			add_child(player)
+			var player := _create_loop_player(wav, "Engine")
 			engine_loops.append({
 				"rpm": rpm,
 				"player": player,
@@ -193,53 +188,23 @@ func _build_nodes() -> void:
 
 	# 2. FX Contínuo: Pneus cantando
 	if fx_streams.has("tire_squeal_10"):
-		var wav: AudioStreamWAV = fx_streams["tire_squeal_10"]
-		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		tyre_player = AudioStreamPlayer.new()
-		tyre_player.stream = wav
-		tyre_player.bus = "Tires"
-		tyre_player.volume_db = -80.0
-		add_child(tyre_player)
+		tyre_player = _create_loop_player(fx_streams["tire_squeal_10"], "Tires")
 
 	# 3. FX Contínuo: Grama
 	if fx_streams.has("grass_10"):
-		var wav: AudioStreamWAV = fx_streams["grass_10"]
-		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		grass_player = AudioStreamPlayer.new()
-		grass_player.stream = wav
-		grass_player.bus = "Surface"
-		grass_player.volume_db = -80.0
-		add_child(grass_player)
+		grass_player = _create_loop_player(fx_streams["grass_10"], "Surface")
 
 	# 4. FX Contínuo: Brita / Escape
 	if fx_streams.has("gravel_10"):
-		var wav: AudioStreamWAV = fx_streams["gravel_10"]
-		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		gravel_player = AudioStreamPlayer.new()
-		gravel_player.stream = wav
-		gravel_player.bus = "Surface"
-		gravel_player.volume_db = -80.0
-		add_child(gravel_player)
+		gravel_player = _create_loop_player(fx_streams["gravel_10"], "Surface")
 
 	# 5. FX Contínuo: Vento
 	if fx_streams.has("wind"):
-		var wav: AudioStreamWAV = fx_streams["wind"]
-		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		wind_player = AudioStreamPlayer.new()
-		wind_player.stream = wav
-		wind_player.bus = "Wind"
-		wind_player.volume_db = -80.0
-		add_child(wind_player)
+		wind_player = _create_loop_player(fx_streams["wind"], "Wind")
 
 	# 6. FX Contínuo: Turbo Spool (se o carro tiver turbo)
 	if sound_spec.get("turbo", false) and fx_streams.has("turbo5"):
-		var wav: AudioStreamWAV = fx_streams["turbo5"]
-		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		turbo_player = AudioStreamPlayer.new()
-		turbo_player.stream = wav
-		turbo_player.bus = "FX"
-		turbo_player.volume_db = -80.0
-		add_child(turbo_player)
+		turbo_player = _create_loop_player(fx_streams["turbo5"], "FX")
 
 	# 7. Pool de One-Shots (trocas de marcha, alívio de turbo, batidas na zebra)
 	for i in POOL_SIZE:
@@ -249,25 +214,48 @@ func _build_nodes() -> void:
 		oneshot_pool.append(p)
 
 
-## Inicia todos os loops com fases desincronizadas para prevenir cancelamento de fase
+func _create_loop_player(wav: AudioStreamWAV, bus_name: String) -> AudioStreamPlayer:
+	wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+	wav.loop_begin = 0
+	if wav.loop_end <= 0:
+		# Godot não faz loop ao definir LOOP_FORWARD em runtime sem loop_end preenchido
+		wav.loop_end = maxi(1, int(round(wav.get_length() * float(wav.mix_rate))))
+	var pl := AudioStreamPlayer.new()
+	pl.stream = wav
+	pl.bus = bus_name
+	pl.volume_db = -80.0
+	add_child(pl)
+	return pl
+
+
+## Inicia todos os loops com fases desincronizadas para prevenir cancelamento de fase,
+## mas já pausados até terem ganho > 0.001 no update().
 func _start_loops() -> void:
 	for entry in engine_loops:
 		var p: AudioStreamPlayer = entry.player
 		var dur: float = entry.duration
-		p.play(randf() * maxf(0.1, dur))
+		p.play(randf() * maxf(0.05, dur * 0.8))
+		p.stream_paused = true
 
-	if tyre_player:
-		tyre_player.play(randf() * 0.5)
-	if grass_player:
-		grass_player.play(randf() * 0.5)
-	if gravel_player:
-		gravel_player.play(randf() * 0.5)
-	if wind_player:
-		wind_player.play(randf() * 0.5)
-	if turbo_player:
-		turbo_player.play(randf() * 0.5)
-	if is_audio_paused:
-		set_paused(true)
+	for pl in [tyre_player, grass_player, gravel_player, wind_player, turbo_player]:
+		if pl and pl.stream:
+			pl.play(randf() * minf(0.5, maxf(0.05, pl.stream.get_length() * 0.5)))
+			pl.stream_paused = true
+
+
+static func _pause_player(pl: AudioStreamPlayer) -> void:
+	if pl and not pl.stream_paused:
+		pl.volume_db = -80.0
+		if pl.playing:
+			pl.stream_paused = true
+
+
+static func _play_player(pl: AudioStreamPlayer, gain: float) -> void:
+	pl.volume_db = linear_to_db(maxf(0.0001, gain))
+	if pl.stream_paused:
+		pl.stream_paused = false
+	elif not pl.playing and pl.is_inside_tree():
+		pl.play()
 
 
 ## Toca um efeito sonoro pontual do pool de FX
@@ -328,17 +316,25 @@ func update(dt: float) -> void:
 	var target_engine_gain := (0.42 + 0.58 * load) * chop
 	engine_overall_gain = lerpf(target_engine_gain, engine_overall_gain, exp(-safe_dt / 0.04))
 
+	var k_eng := exp(-safe_dt / 0.03)
 	for s in E:
+		var is_active := (s == a or s == b)
 		var target_w := w_a if s == a else (w_b if s == b else 0.0)
-		s.gain = lerpf(target_w, s.gain, exp(-safe_dt / 0.03))
-		if target_w > 0.001 or s.gain > 0.005:
+		var pl: AudioStreamPlayer = s.player
+		if not is_active and s.gain <= 0.001:
+			s.gain = 0.0
+			_pause_player(pl)
+			continue
+		s.gain = lerpf(target_w, s.gain, k_eng)
+		var loop_vol: float = s.gain * engine_overall_gain
+		if loop_vol > 0.001 or target_w > 0.001:
 			var target_pitch := rpm / float(s.rpm)
-			s.pitch = lerpf(target_pitch, s.pitch, exp(-safe_dt / 0.03))
-			var loop_vol: float = s.gain * engine_overall_gain
-			s.player.volume_db = linear_to_db(maxf(0.0001, loop_vol))
-			s.player.pitch_scale = s.pitch
+			s.pitch = lerpf(target_pitch, s.pitch, k_eng)
+			_play_player(pl, loop_vol)
+			pl.pitch_scale = s.pitch
 		else:
-			s.player.volume_db = -80.0
+			s.gain = 0.0
+			_pause_player(pl)
 
 	# -------------------------------------------------------------
 	# 2. Turbo e Válvula de Alívio (Blow-Off)
@@ -346,11 +342,19 @@ func update(dt: float) -> void:
 	if turbo_player:
 		var spool := pow(rpm / limiter_rpm, 2.0) * thr
 		var target_turbo_gain := spool * 0.18
-		var target_turbo_pitch := 0.6 + (rpm / limiter_rpm) * 0.9
-		turbo_gain = lerpf(target_turbo_gain, turbo_gain, exp(-safe_dt / 0.12))
-		turbo_pitch = lerpf(target_turbo_pitch, turbo_pitch, exp(-safe_dt / 0.10))
-		turbo_player.volume_db = linear_to_db(maxf(0.0001, turbo_gain)) if turbo_gain > 0.0005 else -80.0
-		turbo_player.pitch_scale = turbo_pitch
+		if target_turbo_gain <= 0.001 and turbo_gain <= 0.001:
+			turbo_gain = 0.0
+			_pause_player(turbo_player)
+		else:
+			var target_turbo_pitch := 0.6 + (rpm / limiter_rpm) * 0.9
+			turbo_gain = lerpf(target_turbo_gain, turbo_gain, exp(-safe_dt / 0.12))
+			turbo_pitch = lerpf(target_turbo_pitch, turbo_pitch, exp(-safe_dt / 0.10))
+			if turbo_gain <= 0.001 and target_turbo_gain <= 0.001:
+				turbo_gain = 0.0
+				_pause_player(turbo_player)
+			else:
+				_play_player(turbo_player, turbo_gain)
+				turbo_player.pitch_scale = turbo_pitch
 
 		# Válvula de alívio ao tirar o pé repentinamente em rotação média/alta
 		if last_throttle > 0.75 and thr < 0.25 and rpm > limiter_rpm * 0.55:
@@ -393,32 +397,66 @@ func update(dt: float) -> void:
 	# Pneu cantando
 	if tyre_player:
 		var target_tyre_gain := skid * moving * 0.45
-		var target_tyre_pitch := 0.85 + skid * 0.25
-		tyre_gain = lerpf(target_tyre_gain, tyre_gain, exp(-safe_dt / 0.05))
-		tyre_pitch = lerpf(target_tyre_pitch, tyre_pitch, exp(-safe_dt / 0.08))
-		tyre_player.volume_db = linear_to_db(maxf(0.0001, tyre_gain)) if tyre_gain > 0.0005 else -80.0
-		tyre_player.pitch_scale = tyre_pitch
+		if target_tyre_gain <= 0.001 and tyre_gain <= 0.001:
+			tyre_gain = 0.0
+			_pause_player(tyre_player)
+		else:
+			var target_tyre_pitch := 0.85 + skid * 0.25
+			tyre_gain = lerpf(target_tyre_gain, tyre_gain, exp(-safe_dt / 0.05))
+			tyre_pitch = lerpf(target_tyre_pitch, tyre_pitch, exp(-safe_dt / 0.08))
+			if tyre_gain <= 0.001 and target_tyre_gain <= 0.001:
+				tyre_gain = 0.0
+				_pause_player(tyre_player)
+			else:
+				_play_player(tyre_player, tyre_gain)
+				tyre_player.pitch_scale = tyre_pitch
 
-	# Grama
+	# Grama e Brita (mesmo fator exp)
+	var k_surf := exp(-safe_dt / 0.08) if (on_grass > 0.0 or grass_gain > 0.001 or on_gravel > 0.0 or gravel_gain > 0.001) else 0.0
+
 	if grass_player:
 		var target_grass_gain := on_grass * moving * 0.50
-		grass_gain = lerpf(target_grass_gain, grass_gain, exp(-safe_dt / 0.08))
-		grass_player.volume_db = linear_to_db(maxf(0.0001, grass_gain)) if grass_gain > 0.0005 else -80.0
+		if target_grass_gain <= 0.001 and grass_gain <= 0.001:
+			grass_gain = 0.0
+			_pause_player(grass_player)
+		else:
+			grass_gain = lerpf(target_grass_gain, grass_gain, k_surf)
+			if grass_gain <= 0.001 and target_grass_gain <= 0.001:
+				grass_gain = 0.0
+				_pause_player(grass_player)
+			else:
+				_play_player(grass_player, grass_gain)
 
-	# Brita / Escape
 	if gravel_player:
 		var target_gravel_gain := on_gravel * moving * 0.60
-		gravel_gain = lerpf(target_gravel_gain, gravel_gain, exp(-safe_dt / 0.08))
-		gravel_player.volume_db = linear_to_db(maxf(0.0001, gravel_gain)) if gravel_gain > 0.0005 else -80.0
+		if target_gravel_gain <= 0.001 and gravel_gain <= 0.001:
+			gravel_gain = 0.0
+			_pause_player(gravel_player)
+		else:
+			gravel_gain = lerpf(target_gravel_gain, gravel_gain, k_surf)
+			if gravel_gain <= 0.001 and target_gravel_gain <= 0.001:
+				gravel_gain = 0.0
+				_pause_player(gravel_player)
+			else:
+				_play_player(gravel_player, gravel_gain)
 
 	# Vento em alta velocidade
 	if wind_player:
 		var target_wind_gain := minf(0.35, pow(speed / 75.0, 2.0) * 0.35)
-		var target_wind_pitch := 0.70 + speed / 160.0
-		wind_gain = lerpf(target_wind_gain, wind_gain, exp(-safe_dt / 0.20))
-		wind_pitch = lerpf(target_wind_pitch, wind_pitch, exp(-safe_dt / 0.20))
-		wind_player.volume_db = linear_to_db(maxf(0.0001, wind_gain)) if wind_gain > 0.0005 else -80.0
-		wind_player.pitch_scale = wind_pitch
+		if target_wind_gain <= 0.001 and wind_gain <= 0.001:
+			wind_gain = 0.0
+			_pause_player(wind_player)
+		else:
+			var k_wind := exp(-safe_dt / 0.20)
+			var target_wind_pitch := 0.70 + speed / 160.0
+			wind_gain = lerpf(target_wind_gain, wind_gain, k_wind)
+			wind_pitch = lerpf(target_wind_pitch, wind_pitch, k_wind)
+			if wind_gain <= 0.001 and target_wind_gain <= 0.001:
+				wind_gain = 0.0
+				_pause_player(wind_player)
+			else:
+				_play_player(wind_player, wind_gain)
+				wind_player.pitch_scale = wind_pitch
 
 	# Batida na zebra a cada ~1.5 m
 	if on_kerb and speed > 3.0:
@@ -428,22 +466,22 @@ func update(dt: float) -> void:
 			play_oneshot("bump_front1", 0.25, 0.9 + randf() * 0.2)
 
 
-## Pausa ou despausa a emissão de sons
+## Pausa ou despausa a emissão de sons (mantém loops silenciosos pausados)
 func set_paused(p: bool) -> void:
 	is_audio_paused = p
 	for s in engine_loops:
 		var pl: AudioStreamPlayer = s.player
-		pl.stream_paused = p
+		pl.stream_paused = true if p else (float(s.gain) * engine_overall_gain <= 0.001)
 	if tyre_player:
-		tyre_player.stream_paused = p
+		tyre_player.stream_paused = true if p else (tyre_gain <= 0.001)
 	if grass_player:
-		grass_player.stream_paused = p
+		grass_player.stream_paused = true if p else (grass_gain <= 0.001)
 	if gravel_player:
-		gravel_player.stream_paused = p
+		gravel_player.stream_paused = true if p else (gravel_gain <= 0.001)
 	if wind_player:
-		wind_player.stream_paused = p
+		wind_player.stream_paused = true if p else (wind_gain <= 0.001)
 	if turbo_player:
-		turbo_player.stream_paused = p
+		turbo_player.stream_paused = true if p else (turbo_gain <= 0.001)
 
 
 ## Zera contadores de estado (ex: ao reiniciar volta com R)
@@ -452,3 +490,12 @@ func reset() -> void:
 	if car:
 		last_shift = car.shift_count
 	last_throttle = 0.0
+	tyre_gain = 0.0
+	grass_gain = 0.0
+	gravel_gain = 0.0
+	wind_gain = 0.0
+	turbo_gain = 0.0
+	for pl in [tyre_player, grass_player, gravel_player, wind_player, turbo_player]:
+		if pl:
+			pl.volume_db = -80.0
+			pl.stream_paused = true

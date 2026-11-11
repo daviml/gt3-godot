@@ -38,17 +38,26 @@ var blur_enabled := false:
 			_ensure_ghosts()
 		else:
 			_hide_ghosts()
+## materiais simplificados (sem clearcoat, normal map e anisotrópico) no preset Mínimo
+var simple_materials := false:
+	set(v):
+		if simple_materials == v:
+			return
+		simple_materials = v
+		_apply_material_mode()
 var _blur_sources: Array[MeshInstance3D] = []
+var _mat_states: Array[Dictionary] = []
 
 
-func _init(car_id := "", enable_blur := false) -> void:
+func _init(car_id := "", enable_blur := false, enable_simple := false) -> void:
 	if car_id != "":
-		setup(car_id, enable_blur)
+		setup(car_id, enable_blur, enable_simple)
 
 
-func setup(car_id: String, enable_blur := false) -> void:
+func setup(car_id: String, enable_blur := false, enable_simple := false) -> void:
 	id = car_id
 	blur_enabled = enable_blur
+	simple_materials = enable_simple
 	data = Game.get_car_data(id)
 	model = Game.load_car_scene(id).instantiate()
 	add_child(model)
@@ -58,7 +67,10 @@ func setup(car_id: String, enable_blur := false) -> void:
 	var front: float = (mw[0].z + mw[1].z) / 2.0
 	offset = Vector3(0, -p.cgHeight, -p.wheelbase * (1.0 - p.weightFront) - front)
 	model.position = offset
-	fix_materials(model, id)
+	_mat_states.clear()
+	fix_materials(model, id, _mat_states)
+	if simple_materials:
+		_apply_material_mode()
 	_build_blob_shadow(p)
 	for suf in WHEELS:
 		_build_wheel(suf)
@@ -193,19 +205,47 @@ func set_rest_pose(steer := 0.0, spin := 0.0, omega := 0.0) -> void:
 
 # ------------------------------------------------------------------ materiais (fixMetalness do carView.ts)
 
+func _apply_material_mode() -> void:
+	for entry in _mat_states:
+		var m: BaseMaterial3D = entry.mat
+		if not m:
+			continue
+		if simple_materials:
+			m.clearcoat_enabled = false
+			m.normal_enabled = false
+			m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+		else:
+			m.clearcoat_enabled = bool(entry.clearcoat)
+			m.normal_enabled = bool(entry.normal)
+			m.texture_filter = int(entry.filter)
+
+
 ## Muitos modelos do Sketchfab vêm com metalness = 1 em quase tudo, o que deixa o carro com cara de cromado.
 ## Corrige pelo nome do material: pintura vira verniz (clearcoat) sobre tinta, metal de verdade continua metal
 ## e o resto vira não metálico.
-static func fix_materials(n: Node, car_id: String) -> void:
+static func fix_materials(n: Node, car_id: String, states: Array = [], mat_cache: Dictionary = {}) -> void:
 	if n is MeshInstance3D:
 		var mi := n as MeshInstance3D
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		for s in mi.mesh.get_surface_count():
 			var m := mi.mesh.surface_get_material(s)
 			if m is BaseMaterial3D:
-				mi.set_surface_override_material(s, fix_material(m as BaseMaterial3D, car_id))
+				var key := m.get_instance_id()
+				var fixed: BaseMaterial3D
+				if mat_cache.has(key):
+					fixed = mat_cache[key] as BaseMaterial3D
+				else:
+					fixed = fix_material(m as BaseMaterial3D, car_id)
+					mat_cache[key] = fixed
+					states.append({
+						"mat": fixed,
+						"clearcoat": fixed.clearcoat_enabled,
+						"normal": fixed.normal_enabled,
+						"filter": fixed.texture_filter,
+					})
+				mi.set_surface_override_material(s, fixed)
 	for c in n.get_children():
-		fix_materials(c, car_id)
+		fix_materials(c, car_id, states, mat_cache)
 
 
 static func fix_material(src: BaseMaterial3D, car_id: String) -> BaseMaterial3D:

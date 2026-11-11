@@ -24,6 +24,21 @@ static func is_mobile_platform() -> bool:
 	return OS.has_feature("mobile") or "--mobile" in OS.get_cmdline_user_args()
 
 
+static func is_compatibility_renderer() -> bool:
+	return RenderingServer.get_current_rendering_method() == "gl_compatibility"
+
+
+static func get_minimal_3d_scale(vp: Viewport) -> float:
+	if vp == null:
+		return 0.65
+	var px_h := float(vp.size.y)
+	if px_h <= 0.0:
+		px_h = vp.get_visible_rect().size.y
+	if px_h > 1080.0:
+		return clampf(720.0 / px_h, 0.30, 0.65)
+	return 0.65
+
+
 static func get_quality_name() -> String:
 	var args := OS.get_cmdline_user_args()
 	var is_mobile := is_mobile_platform()
