@@ -804,29 +804,6 @@ func _draw_timing(pos: Vector2, sc: float) -> void:
 	y += 24 * sc
 	var last := t.last
 	row.call(y, "ÚLTIMA", LapTimer.format_time(last.time if last else -1.0), 19 * sc, WHITE if (last == null or last.valid) else RED, _font)
-		draw_rect(r, border, false, 1.0 * sc)
-		_text(_font, r.position + Vector2(6 * sc, 5 * sc), "S%d" % (i + 1), 11 * sc, Color(1, 1, 1, 0.5))
-		var tw := _text_w(_font, txt, 13 * sc)
-		_text(_font, Vector2(r.end.x - 6 * sc - tw, r.position.y + 3.5 * sc), txt, 13 * sc, WHITE)
-	y += 28 * sc
-	# delta: barra do centro para a esquerda (ganhando, verde) ou para a direita (perdendo, vermelho); cheia = 1 s
-	var dr := Rect2(pos.x + pad, y, w - 2 * pad, 18 * sc)
-	if not is_nan(t.delta):
-		var d := t.delta
-		draw_rect(dr, Color(1, 1, 1, 0.05))
-		var half := dr.size.x / 2.0
-		var bw2 := minf(1.0, absf(d)) * half
-		var cx := dr.position.x + half
-		if d < 0.0:
-			draw_rect(Rect2(cx - bw2, dr.position.y, bw2, dr.size.y), Color(GREEN, 0.75))
-		else:
-			draw_rect(Rect2(cx, dr.position.y, bw2, dr.size.y), Color(1.0, 70 / 255.0, 60 / 255.0, 0.75))
-		draw_line(Vector2(cx, dr.position.y), Vector2(cx, dr.end.y), Color(1, 1, 1, 0.35), 1.0)
-		var ds := ("−" if d < 0.0 else "+") + "%.2f" % absf(d)
-		_text(_bold, Vector2(dr.position.x, dr.position.y + 1 * sc), ds, 14 * sc, WHITE, HORIZONTAL_ALIGNMENT_CENTER, dr.size.x)
-	y += 24 * sc
-	var last := t.last
-	row.call(y, "ÚLTIMA", LapTimer.format_time(last.time if last else -1.0), 19 * sc, WHITE if (last == null or last.valid) else RED, _font)
 
 
 # ------------------------------------------------------------------ minimapa (RADAR dinâmico / CIRCUITO)

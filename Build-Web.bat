@@ -67,6 +67,8 @@ copy /Y "%TEMPLATE_DIR%\sw.js" "%DEPLOY_DIR%\sw.js" >nul
 copy /Y "%TEMPLATE_DIR%\vercel.json" "%DEPLOY_DIR%\vercel.json" >nul
 if exist "%TEMPLATE_DIR%\icon-192.png" copy /Y "%TEMPLATE_DIR%\icon-192.png" "%DEPLOY_DIR%\icon-192.png" >nul
 if exist "%TEMPLATE_DIR%\icon-512.png" copy /Y "%TEMPLATE_DIR%\icon-512.png" "%DEPLOY_DIR%\icon-512.png" >nul
+if exist "%TEMPLATE_DIR%\og.jpg" copy /Y "%TEMPLATE_DIR%\og.jpg" "%DEPLOY_DIR%\og.jpg" >nul
+if exist "%TEMPLATE_DIR%\og-image.jpg" copy /Y "%TEMPLATE_DIR%\og-image.jpg" "%DEPLOY_DIR%\og-image.jpg" >nul
 
 echo.
 echo ========================================================
