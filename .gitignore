@@ -15,3 +15,6 @@ assets/track/*.png.import
 # exportação (etapa 14)
 build/
 deploy/vercel/index.pck
+# instalador Windows
+Build-Windows.bat
+deploy/windows/
