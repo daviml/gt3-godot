@@ -404,7 +404,10 @@
 
 		async function fetchWithProgress(url, onChunk) {
 			const res = await fetch(url);
-			if (!res.ok) throw new Error(`HTTP ${res.status} ao baixar ${url}`);
+			if (!res.ok) {
+				if (res.status === 404) return null;
+				throw new Error(`HTTP ${res.status} ao baixar ${url}`);
+			}
 			const reader = res.body.getReader();
 			const chunks = [];
 			let received = 0;
@@ -441,7 +444,8 @@
 			} catch(e) {}
 
 			// Caso contrário, baixa os chunks particionados em paralelo
-			const parts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
+			const rawParts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
+			const parts = rawParts.filter((p) => p !== null);
 			let totalLen = 0;
 			for (const part of parts) totalLen += part.length;
 

@@ -45,6 +45,7 @@ powershell -NoProfile -Command ^
     "if (Test-Path $pck) {" ^
     "  Remove-Item '%DEPLOY_DIR%\index.pck.part*' -Force -ErrorAction SilentlyContinue;" ^
     "  $fs = [System.IO.File]::OpenRead($pck);" ^
+    "  $totalSize = $fs.Length;" ^
     "  $chunkSize = 45 * 1024 * 1024;" ^
     "  $buf = New-Object byte[] $chunkSize;" ^
     "  $idx = 0;" ^
@@ -58,6 +59,15 @@ powershell -NoProfile -Command ^
     "  $fs.Close();" ^
     "  Remove-Item $pck -Force;" ^
     "  Write-Host '  [OK] index.pck dividido em ' $idx ' partes (<45MB cada). Original removido para git seguro.';" ^
+    "  $htmlPath = '%OUT_HTML%';" ^
+    "  if (Test-Path $htmlPath) {" ^
+    "    $partsJson = (0..($idx-1) | ForEach-Object { '\"index.pck.part' + $_ + '\"' }) -join ', ';" ^
+    "    $html = [System.IO.File]::ReadAllText($htmlPath);" ^
+    "    $html = [System.Text.RegularExpressions.Regex]::Replace($html, 'const PCK_PARTS = \[[^\]]*\];', 'const PCK_PARTS = [' + $partsJson + '];');" ^
+    "    $html = [System.Text.RegularExpressions.Regex]::Replace($html, 'const ESTIMATED_PCK_SIZE = \d+;', 'const ESTIMATED_PCK_SIZE = ' + $totalSize + ';');" ^
+    "    [System.IO.File]::WriteAllText($htmlPath, $html);" ^
+    "    Write-Host '  [OK] index.html sincronizado com ' $idx ' partes e tamanho total ' $totalSize ' bytes.';" ^
+    "  }" ^
     "}"
 
 echo.

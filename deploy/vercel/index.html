@@ -41,7 +41,8 @@
 	<link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
 
 	<link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
-	<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+
 
 	<style>
 		* {
@@ -76,7 +77,7 @@
 			outline: none;
 		}
 
-		/* Bloqueador de OrientaÃ§Ã£o Retrato (Portrait Lock) */
+		/* Bloqueador de Orientação Retrato (Portrait Lock) */
 		#portrait-lock {
 			display: none;
 			position: fixed;
@@ -315,7 +316,7 @@
 
 	<!-- Canvas principal Godot -->
 	<canvas id="canvas">
-		Seu navegador n&atilde;o suporta HTML5 Canvas.
+		Seu navegador não suporta HTML5 Canvas.
 	</canvas>
 
 	<!-- Overlay de Carregamento Splash -->
@@ -323,7 +324,7 @@
 		<div class="splash-card">
 			<div class="badge-top">WEB EDITION &middot; PWA</div>
 			<h1 class="brand-title">GT3 TIME ATTACK</h1>
-			<p class="brand-subtitle">Aut&oacute;dromo de Interlagos &middot; Porsche 992 GT3 R</p>
+			<p class="brand-subtitle">Autódromo de Interlagos &middot; Porsche 992 GT3 R</p>
 
 			<div class="progress-container">
 				<div class="progress-labels">
@@ -340,14 +341,14 @@
 		</div>
 	</div>
 
-	<!-- Overlay de Destravamento de Ãudio (iOS Safari) -->
+	<!-- Overlay de Destravamento de Áudio (iOS Safari) -->
 	<div id="audio-unlock-overlay">
 		<button class="unlock-btn">TOCAR PARA INICIAR</button>
 	</div>
 
 	<script src="index.js"></script>
 	<script>
-		// Registrar Service Worker para habilitar instalaÃ§Ã£o PWA
+		// Registrar Service Worker para habilitar instalação PWA
 		if ('serviceWorker' in navigator) {
 			window.addEventListener('load', () => {
 				navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -388,24 +389,20 @@
 		window.addEventListener('click', unlockAudioContext, { passive: true, capture: true });
 		window.addEventListener('keydown', unlockAudioContext, { passive: true, capture: true });
 
-		const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+		const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":161675460,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 		const GODOT_THREADS_ENABLED = false;
 		const engine = new Engine(GODOT_CONFIG);
 
 		// Lista de chunks particionados para contornar o limite de 100MB do GitHub e Vercel
-		const PCK_PARTS = [
-			"index.pck.part0",
-			"index.pck.part1",
-			"index.pck.part2",
-			"index.pck.part3",
-			"index.pck.part4",
-			"index.pck.part5"
-		];
-		const ESTIMATED_PCK_SIZE = 250541000;
+		const PCK_PARTS = ["index.pck.part0", "index.pck.part1", "index.pck.part2", "index.pck.part3"];
+		const ESTIMATED_PCK_SIZE = 161675460;
 
 		async function fetchWithProgress(url, onChunk) {
 			const res = await fetch(url);
-			if (!res.ok) throw new Error(`HTTP ${res.status} ao baixar ${url}`);
+			if (!res.ok) {
+				if (res.status === 404) return null;
+				throw new Error(`HTTP ${res.status} ao baixar ${url}`);
+			}
 			const reader = res.body.getReader();
 			const chunks = [];
 			let received = 0;
@@ -441,8 +438,9 @@
 				}
 			} catch(e) {}
 
-			// Caso contrÃ¡rio, baixa os chunks particionados em paralelo
-			const parts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
+			// Caso contrário, baixa os chunks particionados em paralelo
+			const rawParts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
+			const parts = rawParts.filter((p) => p !== null);
 			let totalLen = 0;
 			for (const part of parts) totalLen += part.length;
 
@@ -492,7 +490,7 @@
 			});
 
 			if (missing.length !== 0) {
-				const missingMsg = 'Seu navegador não possui suporte aos seguintes recursos necessÃ¡rios:\n' + missing.join('\n');
+				const missingMsg = 'Seu navegador não possui suporte aos seguintes recursos necessários:\n' + missing.join('\n');
 				displayFailureNotice(missingMsg);
 				return;
 			}
@@ -543,3 +541,4 @@
 	</script>
 </body>
 </html>
+
