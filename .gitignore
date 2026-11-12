@@ -9,6 +9,8 @@ assets/cars/*/*.png.import
 *.aab
 *.avi
 *.mp4
+*.mp4.import
+INTERLAGOS-IN-LE-MANS-ULTIMATE-LMGT3-Track.mp4
 # texturas extraídas do cenário da pista ao importar
 assets/track/*.png
 assets/track/*.png.import
