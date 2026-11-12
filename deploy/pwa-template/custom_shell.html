@@ -58,8 +58,13 @@
 			margin: 0;
 			padding: 0;
 			border: 0;
+			position: fixed;
+			inset: 0;
 			width: 100%;
 			height: 100%;
+			width: 100vw;
+			height: 100vh;
+			height: 100dvh;
 			background-color: #0b0d10;
 			color: #f8fafc;
 			overflow: hidden;
@@ -72,6 +77,8 @@
 
 		#canvas {
 			display: block;
+			position: fixed;
+			inset: 0;
 			width: 100%;
 			height: 100%;
 			outline: none;
@@ -392,6 +399,26 @@
 		window.addEventListener('touchend', unlockAudioContext, { passive: true, capture: true });
 		window.addEventListener('click', unlockAudioContext, { passive: true, capture: true });
 		window.addEventListener('keydown', unlockAudioContext, { passive: true, capture: true });
+
+		// Forçar tela cheia imersiva em dispositivos móveis (remove barras do sistema / cutout)
+		let fullscreenAttempted = false;
+		function requestMobileFullscreen() {
+			if (fullscreenAttempted) return;
+			const isTouchDevice = navigator.maxTouchPoints > 0 || window.matchMedia('(pointer: coarse)').matches;
+			if (!isTouchDevice) return;
+			fullscreenAttempted = true;
+			const docEl = document.documentElement;
+			if (document.fullscreenEnabled && !document.fullscreenElement && docEl.requestFullscreen) {
+				docEl.requestFullscreen({ navigationUI: 'hide' }).then(() => {
+					if (screen.orientation && screen.orientation.lock) {
+						screen.orientation.lock('landscape').catch(() => {});
+					}
+				}).catch(() => {});
+			}
+		}
+
+		window.addEventListener('touchend', requestMobileFullscreen, { passive: true, capture: true });
+		window.addEventListener('click', requestMobileFullscreen, { passive: true, capture: true });
 
 		const GODOT_CONFIG = $GODOT_CONFIG;
 		if (!GODOT_CONFIG.args || GODOT_CONFIG.args.length === 0) {

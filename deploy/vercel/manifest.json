@@ -3,7 +3,11 @@
   "short_name": "GT3 Time Attack",
   "description": "GT3 Time Attack — Simulador de Gran Turismo 3 em Godot 4 no Autódromo de Interlagos",
   "start_url": "./index.html",
-  "display": "standalone",
+  "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
   "orientation": "landscape",
   "background_color": "#0b0d10",
   "theme_color": "#0b0d10",

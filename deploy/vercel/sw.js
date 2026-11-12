@@ -1,5 +1,5 @@
 // Service Worker para GT3 Time Attack PWA
-const CACHE_NAME = 'gt3-time-attack-v4';
+const CACHE_NAME = 'gt3-time-attack-v5';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
