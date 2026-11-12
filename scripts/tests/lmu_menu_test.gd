@@ -54,6 +54,10 @@ func run_tests() -> void:
 	check(int(lp_mob.cars_panel_width) == 235 and bool(lp_mob.cars_hide_aero) and bool(lp_mob.cars_pb_horizontal), "Mobile landscape Carros: painel 235px, oculta Downforce e PB horizontal")
 	check(int(lp_mob.cars_chip_height) == 36 and int(lp_mob.cars_grid_cols) == 7, "Mobile landscape chips 36px e grade 7 col")
 
+	var lp_mob_hd := LmuTheme.compute_layout_profile(Vector2(2400, 1080), true)
+	check(lp_mob_hd.profile == "mobile_landscape" and not bool(lp_mob_hd.is_compact_mobile), "2400x1080 mobile (canvas_items) usa mobile_landscape expandido")
+	check(int(lp_mob_hd.header_height) == 76 and float(lp_mob_hd.font_scale) >= 1.75, "2400x1080 mobile escala header (76px) e fontes (>=1.75x) para toque")
+
 	var lp_port := LmuTheme.compute_layout_profile(Vector2(390, 844), true)
 	check(lp_port.profile == "portrait" and int(lp_port.cars_grid_cols) == 3, "390x844 classifica como portrait (grade 3 col)")
 

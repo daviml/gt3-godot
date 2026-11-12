@@ -612,7 +612,7 @@ func _rebuild_header() -> void:
 	var gear_btn := Button.new()
 	gear_btn.text = "⚙"
 	gear_btn.tooltip_text = "Configurações"
-	gear_btn.custom_minimum_size = Vector2(28 if compact else 34, 28 if compact else 32)
+	gear_btn.custom_minimum_size = Vector2(roundi((28 if compact else 34) * fs), roundi((28 if compact else 32) * fs))
 	gear_btn.add_theme_font_size_override("font_size", roundi((13 if compact else 15) * fs))
 	LmuTheme.apply_button_styles(gear_btn, "active" if active_view == "settings" else "outline", 4, 6, 2)
 	gear_btn.pressed.connect(func(): switch_view("settings"))
@@ -622,7 +622,7 @@ func _rebuild_header() -> void:
 		var close_btn := Button.new()
 		close_btn.text = "✕"
 		close_btn.tooltip_text = "Voltar para a pista (Esc)"
-		close_btn.custom_minimum_size = Vector2(28 if compact else 34, 28 if compact else 32)
+		close_btn.custom_minimum_size = Vector2(roundi((28 if compact else 34) * fs), roundi((28 if compact else 32) * fs))
 		close_btn.add_theme_font_size_override("font_size", roundi((13 if compact else 15) * fs))
 		LmuTheme.apply_button_styles(close_btn, "primary", 4, 6, 2)
 		close_btn.pressed.connect(func(): resumed.emit())
@@ -689,7 +689,7 @@ func _make_home_nav_item(title: String, text_col: Color, bar_col: Color, active_
 	var btn := Button.new()
 	btn.focus_mode = Control.FOCUS_NONE
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	btn.custom_minimum_size = Vector2(0, (28 if sub_mode else 34) if is_compact else (36 if sub_mode else 46))
+	btn.custom_minimum_size = Vector2(0, roundi(((28 if sub_mode else 34) if is_compact else (34 if sub_mode else 44)) * fs))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	for st in ["normal", "hover", "pressed", "disabled"]:
 		var sb := StyleBoxFlat.new()
@@ -712,7 +712,7 @@ func _make_home_nav_item(title: String, text_col: Color, bar_col: Color, active_
 	btn.add_child(row)
 
 	var bar := ColorRect.new()
-	bar.custom_minimum_size = Vector2(3 if is_compact else 4, (16 if sub_mode else 20) if is_compact else (20 if sub_mode else 28))
+	bar.custom_minimum_size = Vector2(3 if is_compact else 4, roundi(((16 if sub_mode else 20) if is_compact else (20 if sub_mode else 28)) * fs))
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	bar.color = bar_col if active_bar else Color(bar_col.r, bar_col.g, bar_col.b, 0.0)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -741,7 +741,7 @@ func _build_home_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
 	var is_portrait: bool = (lp.profile == "portrait")
-	var is_compact: bool = (lp.profile == "mobile_landscape")
+	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
 	var home_pad_x := maxf(float(lp.pad_x), 56.0) if lp.profile == "desktop" else float(lp.pad_x)
 
 	var outer := _make_padded_container(home_pad_x, float(lp.pad_y))
@@ -919,7 +919,7 @@ func _build_home_view() -> void:
 
 	var swap_btn := Button.new()
 	swap_btn.text = "TROCAR DE CARRO ➔"
-	swap_btn.custom_minimum_size.y = 32 if is_compact else 40
+	swap_btn.custom_minimum_size.y = roundi((32 if is_compact else 40) * fs)
 	swap_btn.add_theme_font_size_override("font_size", roundi((11 if is_compact else 13) * fs))
 	LmuTheme.apply_button_styles(swap_btn, "outline", 4, 12, 4)
 	swap_btn.pressed.connect(func(): switch_view("cars"))
@@ -944,7 +944,7 @@ func _build_cars_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
 	var is_portrait: bool = (lp.profile == "portrait")
-	var is_compact: bool = (lp.profile == "mobile_landscape")
+	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
 	var mouse_pass := _is_transparent_studio_view()
 
 	var outer := _make_padded_container(float(lp.pad_x), float(lp.pad_y), mouse_pass)
@@ -1357,7 +1357,7 @@ func _step_car(delta: int) -> void:
 func _build_settings_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
-	var is_compact: bool = (lp.profile == "mobile_landscape")
+	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
 
 	var outer := _make_padded_container(float(lp.pad_x), float(lp.pad_y))
 	_body_holder.add_child(outer)
@@ -1381,7 +1381,7 @@ func _build_settings_view() -> void:
 	for tab_id in SETTINGS_TABS:
 		var tb := Button.new()
 		tb.text = SETTINGS_TAB_LABELS[tab_id]
-		tb.custom_minimum_size.y = 38 if is_compact else 44
+		tb.custom_minimum_size.y = roundi((38 if is_compact else 44) * fs)
 		tb.add_theme_font_size_override("font_size", roundi((12.5 if is_compact else 14) * fs))
 		LmuTheme.apply_button_styles(tb, "tab_active" if active_settings_tab == tab_id else "tab_idle", 0, 12 if is_compact else 16, 7 if is_compact else 10)
 		tb.pressed.connect(func():
@@ -1396,7 +1396,7 @@ func _build_settings_view() -> void:
 		_settings_search_edit = LineEdit.new()
 		_settings_search_edit.placeholder_text = "🔍 Buscar configuração..."
 		_settings_search_edit.text = search_query
-		_settings_search_edit.custom_minimum_size.y = 34
+		_settings_search_edit.custom_minimum_size.y = roundi(34 * fs)
 		_settings_search_edit.add_theme_font_size_override("font_size", roundi(12.5 * fs))
 		_settings_search_edit.add_theme_stylebox_override("normal", LmuTheme.input_style(false))
 		_settings_search_edit.add_theme_stylebox_override("focus", LmuTheme.input_style(true))
@@ -1427,7 +1427,7 @@ func _build_settings_view() -> void:
 	col.add_child(footer)
 	var back_btn := Button.new()
 	back_btn.text = "APLICAR & VOLTAR"
-	back_btn.custom_minimum_size = Vector2(170, 40 if is_compact else 44)
+	back_btn.custom_minimum_size = Vector2(roundi(170 * fs), roundi((40 if is_compact else 44) * fs))
 	back_btn.add_theme_font_size_override("font_size", roundi((12 if is_compact else 13) * fs))
 	LmuTheme.apply_button_styles(back_btn, "outline", 4, 16, 7 if is_compact else 8)
 	back_btn.pressed.connect(func(): switch_view("home"))
@@ -1502,7 +1502,9 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 			var show_touch := is_touch_device or OS.has_feature("mobile")
 
 			var touch_opt := OptionButton.new()
-			touch_opt.custom_minimum_size = Vector2(160, 34)
+			touch_opt.custom_minimum_size = Vector2(roundi(165 * fs), roundi(36 * fs))
+			touch_opt.add_theme_font_size_override("font_size", roundi(13 * fs))
+			touch_opt.get_popup().add_theme_font_size_override("font_size", roundi(13 * fs))
 			touch_opt.focus_mode = Control.FOCUS_NONE
 			for tm in TOUCH_MODES:
 				touch_opt.add_item(TOUCH_MODE_NAMES[tm])
@@ -1590,13 +1592,17 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 			var stepper := HBoxContainer.new()
 			stepper.add_theme_constant_override("separation", 8)
 			var q_val_lbl := LmuTheme.make_label(current_quality.to_upper(), roundi(13 * fs), Color.WHITE, 800)
-			q_val_lbl.custom_minimum_size.x = 86
+			q_val_lbl.custom_minimum_size.x = roundi(86 * fs)
 			q_val_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			var q_prev := Button.new()
 			q_prev.text = "◀"
+			q_prev.custom_minimum_size = Vector2(roundi(34 * fs), roundi(34 * fs))
+			q_prev.add_theme_font_size_override("font_size", roundi(13 * fs))
 			LmuTheme.apply_button_styles(q_prev, "outline", 4, 10, 4)
 			var q_next := Button.new()
 			q_next.text = "▶"
+			q_next.custom_minimum_size = Vector2(roundi(34 * fs), roundi(34 * fs))
+			q_next.add_theme_font_size_override("font_size", roundi(13 * fs))
 			LmuTheme.apply_button_styles(q_next, "outline", 4, 10, 4)
 			stepper.add_child(q_prev)
 			stepper.add_child(q_val_lbl)
@@ -1642,7 +1648,9 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 			_fps_explain_lbl = fps_row.get_child(0).get_child(0).get_child(1) as Label
 
 			var gauge_opt := OptionButton.new()
-			gauge_opt.custom_minimum_size = Vector2(210, 34)
+			gauge_opt.custom_minimum_size = Vector2(roundi(215 * fs), roundi(36 * fs))
+			gauge_opt.add_theme_font_size_override("font_size", roundi(13 * fs))
+			gauge_opt.get_popup().add_theme_font_size_override("font_size", roundi(13 * fs))
 			gauge_opt.focus_mode = Control.FOCUS_NONE
 			for gs in GAUGE_STYLES:
 				gauge_opt.add_item(GAUGE_NAMES[gs])
@@ -1689,10 +1697,10 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 			slider.min_value = 0.0
 			slider.max_value = 1.0
 			slider.step = 0.05
-			slider.custom_minimum_size = Vector2(140 if is_compact else 200, 26)
+			slider.custom_minimum_size = Vector2(roundi((140 if is_compact else 200) * fs), roundi(26 * fs))
 			slider.value = current_volume
 			var v_lbl := LmuTheme.make_label("%d%%" % roundi(current_volume * 100.0), roundi(13 * fs), Color.WHITE, 700)
-			v_lbl.custom_minimum_size.x = 44
+			v_lbl.custom_minimum_size.x = roundi(44 * fs)
 			v_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			slider.value_changed.connect(func(v: float):
 				current_volume = v
@@ -1724,7 +1732,7 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 		"driver":
 			parent.add_child(LmuTheme.make_label("DADOS DO PILOTO", roundi(11 * fs), LmuTheme.TEXT_DIM, 800))
 			var nick_edit := LineEdit.new()
-			nick_edit.custom_minimum_size = Vector2(160 if is_compact else 210, 34)
+			nick_edit.custom_minimum_size = Vector2(roundi((160 if is_compact else 210) * fs), roundi(36 * fs))
 			nick_edit.max_length = 16
 			nick_edit.placeholder_text = "ex.: davi"
 			nick_edit.text = current_nick
@@ -1768,7 +1776,7 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 func _build_records_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
-	var is_compact: bool = (lp.profile == "mobile_landscape")
+	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
 
 	var outer := _make_padded_container(float(lp.pad_x), float(lp.pad_y))
 	_body_holder.add_child(outer)
@@ -1920,7 +1928,7 @@ func _build_records_view() -> void:
 func _build_help_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
-	var is_compact: bool = (lp.profile == "mobile_landscape")
+	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
 	var is_portrait: bool = (lp.profile == "portrait")
 
 	var outer := _make_padded_container(float(lp.pad_x), float(lp.pad_y))
@@ -1990,7 +1998,7 @@ func _build_help_view() -> void:
 	col.add_child(footer)
 	var back_btn := Button.new()
 	back_btn.text = "VOLTAR AO MENU"
-	back_btn.custom_minimum_size = Vector2(160, 42)
+	back_btn.custom_minimum_size = Vector2(roundi(160 * fs), roundi(42 * fs))
 	back_btn.add_theme_font_size_override("font_size", roundi((12 if is_compact else 13) * fs))
 	LmuTheme.apply_button_styles(back_btn, "outline", 4, 16, 8)
 	back_btn.pressed.connect(func(): switch_view("home"))
