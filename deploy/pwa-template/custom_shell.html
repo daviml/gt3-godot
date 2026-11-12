@@ -12,7 +12,7 @@
 	<meta name="theme-color" content="#0b0d10">
 	<meta name="mobile-web-app-capable" content="yes">
 	<meta name="format-detection" content="telephone=no">
-	<meta name="description" content="GT3 Time Attack — Simulador de corrida em Godot 4 no Autódromo de Interlagos">
+	<meta name="description" content="GT3 Time Attack &mdash; Simulador de corrida em Godot 4 no Autódromo de Interlagos">
 
 	<link rel="manifest" href="manifest.json">
 	<link id="-gd-engine-icon" rel="icon" type="image/png" href="icon-192.png" />
@@ -299,9 +299,9 @@
 	<!-- Overlay de Carregamento Splash -->
 	<div id="status">
 		<div class="splash-card">
-			<div class="badge-top">WEB EDITION · PWA</div>
+			<div class="badge-top">WEB EDITION &middot; PWA</div>
 			<h1 class="brand-title">GT3 TIME ATTACK</h1>
-			<p class="brand-subtitle">Autódromo de Interlagos · Porsche 992 GT3 R</p>
+			<p class="brand-subtitle">Autódromo de Interlagos &middot; Porsche 992 GT3 R</p>
 
 			<div class="progress-container">
 				<div class="progress-labels">
@@ -476,9 +476,10 @@
 			}
 
 			try {
-				// 1. Inicializa a engine e o WASM
+				// 1. Inicializa a engine e o WASM passando o executable ("index") como base path
+				const executableName = (GODOT_CONFIG && GODOT_CONFIG.executable) ? GODOT_CONFIG.executable : 'index';
 				stepLabel.innerText = 'Inicializando WebAssembly Engine...';
-				await engine.init();
+				await engine.init(executableName);
 
 				// 2. Baixa e remonta os pacotes (chunks paralelos HTTP/2)
 				stepLabel.innerText = 'Baixando circuitos e carros...';
@@ -498,7 +499,7 @@
 
 				// 4. Inicia a execução do jogo
 				stepLabel.innerText = 'Pronto para a largada!';
-				await engine.start('--main-pack', 'index.pck');
+				await engine.start({ args: ['--main-pack', 'index.pck'] });
 
 				// Transição suave para o jogo
 				statusOverlay.style.transition = 'opacity 0.4s ease-out';

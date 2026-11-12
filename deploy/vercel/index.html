@@ -12,7 +12,7 @@
 	<meta name="theme-color" content="#0b0d10">
 	<meta name="mobile-web-app-capable" content="yes">
 	<meta name="format-detection" content="telephone=no">
-	<meta name="description" content="GT3 Time Attack â€” Simulador de corrida em Godot 4 no AutÃ³dromo de Interlagos">
+	<meta name="description" content="GT3 Time Attack &mdash; Simulador de corrida em Godot 4 no Aut&oacute;dromo de Interlagos">
 
 	<link rel="manifest" href="manifest.json">
 	<link id="-gd-engine-icon" rel="icon" type="image/png" href="icon-192.png" />
@@ -293,15 +293,15 @@
 
 	<!-- Canvas principal Godot -->
 	<canvas id="canvas">
-		Seu navegador nÃ£o suporta HTML5 Canvas.
+		Seu navegador n&atilde;o suporta HTML5 Canvas.
 	</canvas>
 
 	<!-- Overlay de Carregamento Splash -->
 	<div id="status">
 		<div class="splash-card">
-			<div class="badge-top">WEB EDITION Â· PWA</div>
+			<div class="badge-top">WEB EDITION &middot; PWA</div>
 			<h1 class="brand-title">GT3 TIME ATTACK</h1>
-			<p class="brand-subtitle">AutÃ³dromo de Interlagos Â· Porsche 992 GT3 R</p>
+			<p class="brand-subtitle">Aut&oacute;dromo de Interlagos &middot; Porsche 992 GT3 R</p>
 
 			<div class="progress-container">
 				<div class="progress-labels">
@@ -470,15 +470,16 @@
 			});
 
 			if (missing.length !== 0) {
-				const missingMsg = 'Seu navegador nÃ£o possui suporte aos seguintes recursos necessÃ¡rios:\n' + missing.join('\n');
+				const missingMsg = 'Seu navegador não possui suporte aos seguintes recursos necessÃ¡rios:\n' + missing.join('\n');
 				displayFailureNotice(missingMsg);
 				return;
 			}
 
 			try {
-				// 1. Inicializa a engine e o WASM
+				// 1. Inicializa a engine e o WASM passando o executable ("index") como base path
+				const executableName = (GODOT_CONFIG && GODOT_CONFIG.executable) ? GODOT_CONFIG.executable : 'index';
 				stepLabel.innerText = 'Inicializando WebAssembly Engine...';
-				await engine.init();
+				await engine.init(executableName);
 
 				// 2. Baixa e remonta os pacotes (chunks paralelos HTTP/2)
 				stepLabel.innerText = 'Baixando circuitos e carros...';
@@ -493,21 +494,21 @@
 				});
 
 				// 3. Monta o pacote de dados no filesystem virtual do Godot
-				stepLabel.innerText = 'Montando dados da pista e fÃ­sica...';
+				stepLabel.innerText = 'Montando dados da pista e física...';
 				await engine.preloadFile(pckBuffer, 'index.pck');
 
-				// 4. Inicia a execuÃ§Ã£o do jogo
+				// 4. Inicia a execução do jogo
 				stepLabel.innerText = 'Pronto para a largada!';
-				await engine.start('--main-pack', 'index.pck');
+				await engine.start({ args: ['--main-pack', 'index.pck'] });
 
-				// TransiÃ§Ã£o suave para o jogo
+				// Transição suave para o jogo
 				statusOverlay.style.transition = 'opacity 0.4s ease-out';
 				statusOverlay.style.opacity = '0';
 				setTimeout(() => {
 					statusOverlay.remove();
 				}, 400);
 
-				// Se o Ã¡udio ainda nÃ£o estiver destravado pelo navegador, exibe o botÃ£o
+				// Se o áudio ainda não estiver destravado pelo navegador, exibe o botão
 				const AudioCtx = window.AudioContext || window.webkitAudioContext;
 				if (AudioCtx && !audioUnlocked) {
 					audioOverlay.style.display = 'flex';
@@ -520,4 +521,3 @@
 	</script>
 </body>
 </html>
-
