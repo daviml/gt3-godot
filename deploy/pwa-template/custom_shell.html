@@ -526,6 +526,16 @@
 
 				// 3. Monta o pacote de dados no filesystem virtual do Godot
 				stepLabel.innerText = 'Montando dados da pista e física...';
+				try {
+					engine.copyToFS('index.pck', pckBuffer);
+				} catch (fsErr) {
+					console.warn('copyToFS index.pck falhou:', fsErr);
+				}
+				try {
+					engine.copyToFS('/index.pck', pckBuffer);
+				} catch (fsErr) {
+					// opcional
+				}
 				await engine.preloadFile(pckBuffer, 'index.pck');
 
 				// 4. Inicia a execução do jogo
