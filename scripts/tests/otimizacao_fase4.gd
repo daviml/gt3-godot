@@ -63,14 +63,14 @@ func run_tests() -> void:
 			tree_fast_ok = bool(sm.get_shader_parameter("fast_mode"))
 	check(tree_fast_ok, "Mínimo: impostor.gdshader com fast_mode = true")
 
-	var tree_range_ok := true
+	var tree_hidden_ok := true
 	var tree_count := 0
 	for c in main.track_view.get_children():
 		if c is MultiMeshInstance3D and SurroundingsView._is_tree(c):
 			tree_count += 1
-			if not is_equal_approx(c.visibility_range_end, 300.0):
-				tree_range_ok = false
-	check(tree_count > 0 and tree_range_ok, "Mínimo: alcance das árvores reduzido para 300 m")
+			if c.visible:
+				tree_hidden_ok = false
+	check(tree_count > 0 and tree_hidden_ok, "Mínimo: árvores ocultadas (visible = false)")
 
 	var sec_cull_ok := true
 	var sec_nonshadow_count := 0

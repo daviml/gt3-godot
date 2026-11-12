@@ -4,7 +4,7 @@
 shader_type spatial;
 render_mode unshaded, fog_disabled, cull_disabled, shadows_disabled;
 
-uniform sampler2D tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D tex : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 
 void fragment() {
 	vec4 c = texture(tex, UV);

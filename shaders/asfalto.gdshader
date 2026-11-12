@@ -24,25 +24,27 @@ void vertex() {
 }
 
 void fragment() {
+	vec2 uv = ground / 4.0;
 	if (fast_mode) {
-		vec3 c = texture(albedo_tex, UV).rgb;
-		c = c * vec3(1.22, 1.0, 0.66) + vec3(0.035, 0.026, 0.014);
+		vec3 c = texture(albedo_tex, uv).rgb;
+		c = c * vec3(1.06, 1.01, 0.92) + vec3(0.02, 0.018, 0.015);
+		c *= 0.94 + 0.12 * a_noise(ground / 18.0 + 7.0);
 		ALBEDO = c;
-		ROUGHNESS = 0.8;
+		ROUGHNESS = 0.82;
 		METALLIC = 0.0;
 	} else {
-		vec3 c = texture(albedo_tex, UV).rgb;
-		c = mix(c, texture(albedo_tex, UV * 0.23 + 0.41).rgb, 0.4);
-		c = c * vec3(1.22, 1.0, 0.66) + vec3(0.035, 0.026, 0.014);
+		vec3 c = texture(albedo_tex, uv).rgb;
+		c = mix(c, texture(albedo_tex, uv * 0.23 + 0.41).rgb, 0.4);
+		c = c * vec3(1.06, 1.01, 0.92) + vec3(0.02, 0.018, 0.015);
 		float big = a_noise(ground / 45.0) * 0.65 + a_noise(ground / 18.0 + 13.0) * 0.35;
 		float newer = smoothstep(0.6, 0.68, big);
 		float older = smoothstep(0.36, 0.28, big);
-		c *= mix(vec3(1.0), vec3(0.64, 0.65, 0.7), newer);
-		c *= mix(vec3(1.0), vec3(1.18, 1.16, 1.13), older);
+		c *= mix(vec3(1.0), vec3(0.68, 0.69, 0.72), newer);
+		c *= mix(vec3(1.0), vec3(1.14, 1.13, 1.10), older);
 		c *= 0.92 + 0.16 * a_noise(ground / 7.0 + 3.0);
 		ALBEDO = c;
-		NORMAL_MAP = texture(normal_tex, UV).rgb;
-		vec3 arm = texture(arm_tex, UV).rgb;
+		NORMAL_MAP = texture(normal_tex, uv).rgb;
+		vec3 arm = texture(arm_tex, uv).rgb;
 		AO = arm.r;
 		AO_LIGHT_AFFECT = 0.3;
 		ROUGHNESS = arm.g;

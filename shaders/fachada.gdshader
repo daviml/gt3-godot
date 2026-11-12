@@ -7,11 +7,20 @@ render_mode cull_disabled;
 
 uniform sampler2D plaster : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 
+varying vec3 wpos;
+varying vec3 wnorm;
+
 float h1(vec2 p) { return fract(sin(dot(p, vec2(41.3, 289.1))) * 15731.7); }
 
+void vertex() {
+	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	wnorm = normalize(mat3(MODEL_MATRIX) * NORMAL);
+}
+
 void fragment() {
-	float win = UV2.x;
-	vec2 fac = UV;
+	bool is_roof = abs(wnorm.y) > 0.7;
+	float win = is_roof ? -1.0 : 2.0;
+	vec2 fac = is_roof ? wpos.xz : vec2(abs(wnorm.x) > abs(wnorm.z) ? wpos.z : wpos.x, wpos.y);
 	vec3 c = COLOR.rgb;
 	vec3 pl = texture(plaster, fac / 4.0).rgb;
 	float glass = 0.0;

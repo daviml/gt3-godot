@@ -16,6 +16,7 @@ const GLB := "res://assets/track/cenario.glb"
 const TREES := "res://data/track/arvores_pos.json"
 const CHUNK := 250.0
 const CULL_SECONDARY_MIN := 300.0
+const CULL_SECONDARY_LEVE := 500.0
 const CULL_SHADOW_DEFAULT := 550.0
 
 var meshes := 0
@@ -27,6 +28,7 @@ var _cache := {}
 var _shader_mats: Array[ShaderMaterial] = []
 var _base_mats: Array[Dictionary] = []
 var _cull_meshes: Array[Dictionary] = []
+var _minimal_hide_meshes: Array[MeshInstance3D] = []
 var _name_re := RegEx.create_from_string("^o(-?\\d+)_s(\\d)")
 
 
@@ -78,8 +80,13 @@ func set_detail(level: int) -> void:
 		if mi:
 			if minimal:
 				mi.visibility_range_end = CULL_SECONDARY_MIN
+			elif level == 1:
+				mi.visibility_range_end = CULL_SECONDARY_LEVE
 			else:
 				mi.visibility_range_end = CULL_SHADOW_DEFAULT if entry.shadow else 0.0
+	for mi in _minimal_hide_meshes:
+		if mi:
+			mi.visible = not minimal
 	if surroundings:
 		surroundings.set_detail(level)
 
@@ -96,23 +103,41 @@ func _fix(n: Node) -> void:
 			shadow = m.get_string(2) == "1"
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		var is_primary_surface := false
+		var is_building_surface := false
+		var is_barrier_surface := false
+		var ext := mi.get_aabb().size
 		for s in mi.mesh.get_surface_count():
 			var mat := mi.mesh.surface_get_material(s)
 			if mat:
 				var mat_name := String(mat.resource_name)
+				if mat_name == "asfalto" and maxf(ext.x, ext.z) > 1500.0:
+					# Malha do terreno inteiro (2076x2460m) exportada com nome "asfalto": usa shader de grama
+					var gm := StandardMaterial3D.new()
+					gm.resource_name = "grama"
+					mat = gm
+					mat_name = "grama"
 				if mat_name in ["asfalto", "grama", "pinta", "torcida"]:
 					is_primary_surface = true
+				if mat_name == "fachada":
+					is_building_surface = true
+				if mat_name.begins_with("ph:concrete_wall") or (mat is BaseMaterial3D and (mat as BaseMaterial3D).albedo_color.to_html(false) in ["2457b3", "ff6a10"]):
+					is_barrier_surface = true
 				mi.set_surface_override_material(s, _material(mat, order))
+		if is_building_surface:
+			_minimal_hide_meshes.append(mi)
 		# Otimização de Distância de Visão (Culling / HLOD):
 		# Detalhes secundários (postes, alambrado, cones, placas, detalhes de pit/arquibancada)
 		# são cortados mais perto no Mínimo (300 m) e com sombra até 550 m nos demais presets.
-		var ext := mi.get_aabb().size
-		if order == 0 and not is_primary_surface and maxf(ext.x, ext.z) <= 450.0:
+		if order == 0 and not is_primary_surface and not is_building_surface and not is_barrier_surface and maxf(ext.x, ext.z) <= 450.0:
+			if maxf(ext.x, ext.z) > 12.0 or ext.y > 3.5:
+				_minimal_hide_meshes.append(mi)
 			_cull_meshes.append({"mi": mi, "shadow": shadow})
 			mi.visibility_range_end_margin = 0.0
 			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 			if detail_level == 0:
 				mi.visibility_range_end = CULL_SECONDARY_MIN
+			elif detail_level == 1:
+				mi.visibility_range_end = CULL_SECONDARY_LEVE
 			else:
 				mi.visibility_range_end = CULL_SHADOW_DEFAULT if shadow else 0.0
 	for c in n.get_children():
@@ -136,7 +161,7 @@ func _material(src: Material, order: int) -> Material:
 		var ph := nm.substr(3)
 		var o := ORMMaterial3D.new()
 		o.albedo_texture = _tex(ph + "_diff")
-		o.albedo_color = bm.albedo_color
+		o.albedo_color = bm.albedo_color * (Color(0.72, 0.71, 0.69) if ph.begins_with("concrete_wall") else Color.WHITE)
 		o.normal_enabled = true
 		o.normal_texture = _tex(ph + "_nor_gl")
 		o.orm_texture = _tex(ph + "_arm")
@@ -150,6 +175,8 @@ func _material(src: Material, order: int) -> Material:
 			d.normal_enabled = true
 			d.normal_texture = _tex("asphalt_track_nor_gl")
 			d.normal_scale = 0.6
+			d.roughness = 0.88
+			d.metallic_specular = 0.2
 			d.roughness_texture = _tex("asphalt_track_arm")
 			d.roughness_texture_channel = BaseMaterial3D.TEXTURE_CHANNEL_GREEN
 		if d.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA:

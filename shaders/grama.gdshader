@@ -26,11 +26,16 @@ void vertex() {
 }
 
 void fragment() {
-	vec2 uv = UV;
+	vec2 uv = ground / 6.0;
 	if (fast_mode) {
 		vec3 green = texture(grass_tex, uv).rgb;
-		ALBEDO = base_color * green * 1.15;
-		ROUGHNESS = 0.9;
+		float n = vnoise(ground * 0.02) * 0.7 + vnoise(ground * 0.08) * 0.3;
+		float lg = dot(green, vec3(0.3, 0.59, 0.11));
+		vec3 olive = green * vec3(0.95, 0.92, 0.48);
+		vec3 straw = vec3(lg) * vec3(1.28, 0.98, 0.42);
+		float dry_k = smoothstep(0.35, 0.75, n);
+		ALBEDO = base_color * mix(olive, straw, dry_k * 0.75) * (0.86 + 0.28 * vnoise(ground * 0.035 + 7.0));
+		ROUGHNESS = 0.92;
 		METALLIC = 0.0;
 	} else {
 		vec2 gp = ground;

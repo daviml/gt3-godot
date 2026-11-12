@@ -126,7 +126,7 @@ static func _sub_arrays(arr: Array, tri: PackedInt32Array) -> Array:
 # Orçamento dos arredores por preset: 0 = Mínimo, 1 = Leve, 2 = Médio, 3 = Extremo.
 # A torcida em cartões e a mata ganham distância de corte adequada para alta taxa de quadros no mobile.
 const DETAIL := [
-	{"level": 0, "crowd": 0.0, "trees": 300.0, "towers": 0.0},     # 0 = Mínimo (sem torcida, sem torres, mata 300m)
+	{"level": 0, "crowd": 0.0, "trees": 0.0, "towers": 0.0},     # 0 = Mínimo (sem torcida, sem torres, sem mata)
 	{"level": 1, "crowd": 180.0, "trees": 1200.0, "towers": 1800.0}, # 1 = Leve (60 fps S22)
 	{"level": 2, "crowd": 400.0, "trees": 2400.0, "towers": 0.0},    # 2 = Médio
 	{"level": 3, "crowd": 0.0, "trees": 0.0, "towers": 0.0},         # 3 = Extremo (0 = ilimitado)
@@ -141,7 +141,11 @@ func set_detail(level: int) -> void:
 func _apply_detail(n: Node, d: Dictionary) -> void:
 	var lvl: int = int(d.get("level", 2))
 	if n is MultiMeshInstance3D and _is_tree(n):
-		_range(n, d.trees)
+		if lvl == 0:
+			n.visible = false
+		else:
+			n.visible = true
+			_range(n, d.trees)
 	elif n is MeshInstance3D and _is_crowd(n):
 		if lvl == 0:
 			n.visible = false
