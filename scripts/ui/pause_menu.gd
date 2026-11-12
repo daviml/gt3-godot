@@ -1,21 +1,21 @@
-# Menu de pausa e configurações (etapa 10; porte do src/ui/menu.ts do web): Esc no PC, ☰ / Voltar no Android,
-# Start no controle. Nick, qualidade gráfica (Leve / Médio / Extremo) com o FPS ao vivo, volume, assistências
-# (ABS, TC, câmbio automático), esquemas de controles mobile (Padrão, Fly-by-wire, Inclinar, Legacy),
-# instruções, voltar para a garagem (trocar carro) e sair.
-# Fica numa CanvasLayer própria escalada pela densidade da tela (no celular os botões ficam do tamanho do dedo).
-# Qualidade, volume, controles e assistências ficam guardados em user://jogo.cfg (Game.get_setting / set_setting).
+# Menu de pausa e configurações em estilo LMU (envolve LmuMenu no Context.PAUSE).
+# Esc no PC, ☰ / Voltar no Android, Start no controle. Preserva todos os sinais e constantes públicas
+# esperadas pelo main.gd, adicionando restart_requested, car_selected e hide_touch_changed.
 class_name PauseMenu
 extends CanvasLayer
 
 signal resumed
 signal garage
 signal quit
+signal restart_requested
+signal car_selected(car_id: String)
 signal nick_changed(nick: String)
 signal mode_changed(mode: String)
 signal quality_changed(name: String)
 signal volume_changed(v: float)
 signal assist_changed(key: String, on: bool)
 signal touch_mode_changed(mode: String)
+signal hide_touch_changed(hidden: bool)
 signal hud_gauge_changed(style: String)
 signal recenter_tilt
 
@@ -37,7 +37,7 @@ const TOUCH_MODE_NAMES := {
 	"padrao": "Padrão",
 	"fly": "Fly-by-wire",
 	"inclinar": "Inclinar",
-	"legacy": "Legacy"
+	"legacy": "Legacy",
 }
 const TOUCH_MODE_NOTES := {
 	"padrao": "Analógico suave à esquerda + pedais de acelerador e freio por altura à direita",
@@ -55,431 +55,75 @@ Controle: analógico esterça · gatilhos aceleram e freiam · RB/A sobe marcha 
 Celular: 4 esquemas (Padrão com pedais por altura, Fly-by-wire, Inclinar com acelerômetro e Legacy) · ☰ ou Voltar abre este menu"""
 
 var is_open := false
-var _s := 1.0
-var _root: Control
-var _card: PanelContainer
-var _sub: Label
-var _fps: Label
-var _nick: LineEdit
-var _mbtn := {}
-var _mnote: Label
-var _current_mode := "sim"
-var _qbtn := {}
-var _qnote: Label
-var _vol: HSlider
-var _vol_lbl: Label
-var _aids := {}
-var _gbtn := {}
-var _current_gauge := "barra"
-var _touch_section: VBoxContainer
-var _tbtn := {}
-var _tnote: Label
-var _recenter_btn: Button
-var _current_touch_mode := "padrao"
-var _help: Label
-var _resume: Button
-var _fps_hist: Array[int] = []
-
-
-func _init() -> void:
-	layer = 20
-	visible = false
+var lmu_menu: LmuMenu
 
 
 func _ready() -> void:
-	_build()
-	get_viewport().size_changed.connect(_fit)
-	_fit()
+	layer = 20
+	visible = false
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	lmu_menu = LmuMenu.new(LmuMenu.Context.PAUSE)
+	lmu_menu.resumed.connect(func(): resumed.emit())
+	lmu_menu.garage_requested.connect(func(): garage.emit())
+	lmu_menu.quit_requested.connect(func(): quit.emit())
+	lmu_menu.restart_requested.connect(func(): restart_requested.emit())
+	lmu_menu.car_selected.connect(func(car_id: String): car_selected.emit(car_id))
+	lmu_menu.nick_changed.connect(func(nick: String): nick_changed.emit(nick))
+	lmu_menu.mode_changed.connect(func(mode: String): mode_changed.emit(mode))
+	lmu_menu.quality_changed.connect(func(qname: String): quality_changed.emit(qname))
+	lmu_menu.volume_changed.connect(func(v: float): volume_changed.emit(v))
+	lmu_menu.assist_changed.connect(func(key: String, on: bool): assist_changed.emit(key, on))
+	lmu_menu.touch_mode_changed.connect(func(tm: String): touch_mode_changed.emit(tm))
+	lmu_menu.hide_touch_changed.connect(func(hidden: bool): hide_touch_changed.emit(hidden))
+	lmu_menu.hud_gauge_changed.connect(func(style: String): hud_gauge_changed.emit(style))
+	lmu_menu.recenter_tilt.connect(func(): recenter_tilt.emit())
+	add_child(lmu_menu)
 
 
-## escala do menu: densidade do celular (dpi/160) ou altura da janela no PC
-func _fit() -> void:
-	var vp := get_viewport().get_visible_rect().size
-	if OS.has_feature("mobile"):
-		_s = clampf(DisplayServer.screen_get_dpi() / 160.0, 1.0, 3.5)
-		# em paisagem a tela é baixa: não deixa o cartão maior que ~1,2× a altura da tela
-		_s = minf(_s, vp.y / 420.0)
-	else:
-		_s = clampf(vp.y / 1080.0, 0.8, 1.4)
-	scale = Vector2(_s, _s)
-	_root.size = vp / _s
-	_card.custom_minimum_size.x = minf(760.0, _root.size.x - 32.0)
-
-
-func _build() -> void:
-	_root = Control.new()
-	_root.mouse_filter = Control.MOUSE_FILTER_STOP
-	_root.process_mode = Node.PROCESS_MODE_ALWAYS
-	add_child(_root)
-	var bg := ColorRect.new()
-	bg.color = Color(6 / 255.0, 8 / 255.0, 12 / 255.0, 0.6)
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(bg)
-	var scroll := ScrollContainer.new()
-	scroll.set_anchors_preset(Control.PRESET_FULL_RECT)
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_root.add_child(scroll)
-	var center := CenterContainer.new()
-	center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	center.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.add_child(center)
-	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_top", 16)
-	margin.add_theme_constant_override("margin_bottom", 16)
-	center.add_child(margin)
-	_card = PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(16 / 255.0, 19 / 255.0, 25 / 255.0, 0.94)
-	sb.set_corner_radius_all(14)
-	sb.content_margin_left = 22
-	sb.content_margin_right = 22
-	sb.content_margin_top = 16
-	sb.content_margin_bottom = 18
-	sb.shadow_color = Color(0, 0, 0, 0.5)
-	sb.shadow_size = 24
-	_card.add_theme_stylebox_override("panel", sb)
-	margin.add_child(_card)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 6)
-	_card.add_child(box)
-
-	# título + FPS ao vivo
-	var head := HBoxContainer.new()
-	box.add_child(head)
-	head.add_child(_label("GT3 Time Attack", 24, Color.WHITE, true))
-	_sub = _label("Interlagos", 15, Color(1, 1, 1, 0.6))
-	_sub.size_flags_vertical = Control.SIZE_SHRINK_END
-	head.add_child(_sub)
-	var sp := Control.new()
-	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(sp)
-	_fps = _label("-- fps", 15, Color(1, 1, 1, 0.7))
-	_fps.size_flags_vertical = Control.SIZE_SHRINK_END
-	head.add_child(_fps)
-
-	# nick
-	box.add_child(_field("Seu nick"))
-	_nick = LineEdit.new()
-	_nick.max_length = 16
-	_nick.placeholder_text = "ex.: davi"
-	_nick.add_theme_font_size_override("font_size", 18)
-	_nick.text_submitted.connect(func(_t): _resume_pressed())
-	_nick.text_changed.connect(func(t): nick_changed.emit(t.strip_edges()))
-	box.add_child(_nick)
-
-	# modo de condução
-	box.add_child(_field("Modo"))
-	var mrow := HBoxContainer.new()
-	mrow.add_theme_constant_override("separation", 8)
-	box.add_child(mrow)
-	var mgroup := ButtonGroup.new()
-	for m in MODES:
-		var mb := _button(MODE_NAMES[m], 16)
-		mb.toggle_mode = true
-		mb.button_group = mgroup
-		mb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mb.pressed.connect(func(): _pick_mode(m))
-		mrow.add_child(mb)
-		_mbtn[m] = mb
-	_mnote = _label("", 12, Color(1, 1, 1, 0.7))
-	_mnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(_mnote)
-
-	# qualidade
-	box.add_child(_field("Gráficos"))
-	var qrow := HBoxContainer.new()
-	qrow.add_theme_constant_override("separation", 8)
-	box.add_child(qrow)
-	var group := ButtonGroup.new()
-	for q in QUALITIES:
-		var b := _button(q, 17)
-		b.toggle_mode = true
-		b.button_group = group
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(func(): _pick_quality(q))
-		qrow.add_child(b)
-		_qbtn[q] = b
-	_qnote = _label("", 12, Color(1, 1, 1, 0.7))
-	_qnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(_qnote)
-
-	# volume
-	box.add_child(_field("Volume"))
-	var vrow := HBoxContainer.new()
-	vrow.add_theme_constant_override("separation", 12)
-	box.add_child(vrow)
-	_vol = HSlider.new()
-	_vol.min_value = 0.0
-	_vol.max_value = 1.0
-	_vol.step = 0.05
-	_vol.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_vol.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_vol.custom_minimum_size.y = 28
-	_vol.value_changed.connect(_on_volume)
-	vrow.add_child(_vol)
-	_vol_lbl = _label("60%", 15, Color(1, 1, 1, 0.8))
-	_vol_lbl.custom_minimum_size.x = 44
-	vrow.add_child(_vol_lbl)
-
-	# assistências
-	box.add_child(_field("Assistências"))
-	var arow := HBoxContainer.new()
-	arow.add_theme_constant_override("separation", 16)
-	box.add_child(arow)
-	for a in AIDS:
-		var cb := CheckButton.new()
-		cb.text = a[1]
-		cb.add_theme_font_size_override("font_size", 15)
-		cb.focus_mode = Control.FOCUS_ALL
-		cb.toggled.connect(func(on): _on_assist(a[0], on))
-		arow.add_child(cb)
-		_aids[a[0]] = cb
-
-	# estilo do mostrador do HUD
-	box.add_child(_field("Mostrador do HUD"))
-	var grow := HBoxContainer.new()
-	grow.add_theme_constant_override("separation", 8)
-	box.add_child(grow)
-	var ggroup := ButtonGroup.new()
-	for gs in GAUGE_STYLES:
-		var gb := _button(GAUGE_NAMES[gs], 15)
-		gb.toggle_mode = true
-		gb.button_group = ggroup
-		gb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		gb.pressed.connect(func(): _pick_gauge(gs))
-		grow.add_child(gb)
-		_gbtn[gs] = gb
-
-	# controles de toque no celular
-	_touch_section = VBoxContainer.new()
-	_touch_section.add_theme_constant_override("separation", 6)
-	box.add_child(_touch_section)
-	_touch_section.add_child(_field("Controles no Celular"))
-	var trow := HBoxContainer.new()
-	trow.add_theme_constant_override("separation", 8)
-	_touch_section.add_child(trow)
-	var tgroup := ButtonGroup.new()
-	for tm in TOUCH_MODES:
-		var b := _button(TOUCH_MODE_NAMES[tm], 15)
-		b.toggle_mode = true
-		b.button_group = tgroup
-		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		b.pressed.connect(func(): _pick_touch_mode(tm))
-		trow.add_child(b)
-		_tbtn[tm] = b
-	_tnote = _label("", 12, Color(1, 1, 1, 0.7))
-	_tnote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_touch_section.add_child(_tnote)
-
-	_recenter_btn = _button("⟳ CALIBRAR VOLANTE (RECENTRALIZAR)", 15)
-	_recenter_btn.pressed.connect(func(): recenter_tilt.emit())
-	_recenter_btn.visible = false
-	_touch_section.add_child(_recenter_btn)
-
-	# botões
-	var brow := HBoxContainer.new()
-	brow.add_theme_constant_override("separation", 8)
-	box.add_child(brow)
-	_resume = _button("CONTINUAR", 20, true)
-	_resume.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_resume.pressed.connect(_resume_pressed)
-	brow.add_child(_resume)
-	var g := _button("GARAGEM", 17)
-	g.tooltip_text = "Trocar de carro"
-	g.pressed.connect(func(): _close(); garage.emit())
-	brow.add_child(g)
-	var h := _button("INSTRUÇÕES", 17)
-	h.pressed.connect(func(): _help.visible = not _help.visible)
-	brow.add_child(h)
-	var x := _button("SAIR", 17)
-	x.pressed.connect(func(): quit.emit())
-	brow.add_child(x)
-	_help = _label(HELP, 12, Color(1, 1, 1, 0.65))
-	_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_help.visible = false
-	box.add_child(_help)
-
-
-func _label(t: String, size: int, c: Color, bold := false) -> Label:
-	var l := Label.new()
-	l.text = t
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", c)
-	if bold:
-		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Bahnschrift", "Segoe UI", "Roboto", "sans-serif"])
-		f.font_weight = 700
-		l.add_theme_font_override("font", f)
-	return l
-
-
-func _field(t: String) -> Label:
-	return _label(t.to_upper(), 12, Color(1, 1, 1, 0.55))
-
-
-func _button(t: String, size: int, primary := false) -> Button:
-	var b := Button.new()
-	b.text = t
-	b.focus_mode = Control.FOCUS_ALL
-	b.custom_minimum_size.y = 44
-	b.add_theme_font_size_override("font_size", size)
-	for st in ["normal", "hover", "pressed", "focus"]:
-		var sb := StyleBoxFlat.new()
-		if primary:
-			sb.bg_color = Color("#e10600") if st == "normal" else Color("#f05a4d")
-			sb.border_color = Color(1, 1, 1, 0.0 if st != "focus" else 0.8)
-		else:
-			var a := 0.08
-			if st == "hover":
-				a = 0.16
-			elif st == "pressed":
-				a = 0.28
-			sb.bg_color = Color(1, 1, 1, a)
-			sb.border_color = Color(1, 1, 1, 0.8 if st == "focus" else 0.25)
-		sb.set_border_width_all(1)
-		sb.set_corner_radius_all(9)
-		sb.content_margin_left = 14
-		sb.content_margin_right = 14
-		b.add_theme_stylebox_override(st, sb)
-	return b
-
-
-# ------------------------------------------------------------------ estado
-
-## abre com o estado atual do jogo
-func open(nick: String, quality: String, volume: float, assists: Dictionary, touch_mode := "padrao", is_touch := false, focus_nick := false, mode := "sim", hud_gauge := "barra") -> void:
-	_nick.text = nick
-	_current_mode = mode if mode in MODES else "sim"
-	for m in _mbtn:
-		_mbtn[m].set_pressed_no_signal(m == _current_mode)
-	_note_mode(_current_mode)
-	for q in _qbtn:
-		_qbtn[q].button_pressed = q == quality
-	_note_quality(quality)
-	_vol.set_value_no_signal(volume)
-	_vol_lbl.text = "%d%%" % roundi(volume * 100)
-	for key in _aids:
-		_aids[key].set_pressed_no_signal(bool(assists.get(key, false)))
-	_current_gauge = hud_gauge if hud_gauge in GAUGE_STYLES else "barra"
-	for gs in _gbtn:
-		_gbtn[gs].set_pressed_no_signal(gs == _current_gauge)
-
-	_current_touch_mode = touch_mode
-	for tm in _tbtn:
-		_tbtn[tm].button_pressed = (tm == touch_mode)
-	_note_touch_mode(touch_mode)
-	if _touch_section:
-		_touch_section.visible = is_touch or OS.has_feature("mobile")
-
+func open(nick: String, quality: String, volume: float, assists: Dictionary, touch_mode := "padrao", is_touch := false, focus_nick := false, mode := "sim", hud_gauge := "barra", car_id := "") -> void:
 	is_open = true
 	visible = true
-	_fps_hist.clear()
-	if focus_nick or nick == "":
-		_nick.grab_focus.call_deferred()
-	else:
-		_resume.grab_focus.call_deferred()
+	if lmu_menu == null:
+		return
+	var state := {
+		"nick": nick,
+		"car_id": car_id if car_id != "" else Game.car_id,
+		"mode": mode,
+		"quality": quality,
+		"volume": volume,
+		"assists": assists,
+		"touch_mode": touch_mode,
+		"hide_touch": Game.is_hide_touch_controls(),
+		"hud_gauge": hud_gauge,
+		"is_touch": is_touch,
+		"view": "settings" if focus_nick else "home",
+		"settings_tab": "driver" if focus_nick else lmu_menu.active_settings_tab,
+	}
+	lmu_menu.configure(state)
+	lmu_menu.relayout()
 
 
-func _close() -> void:
+func set_shared_records(mode: String, recs: Array) -> void:
+	if lmu_menu:
+		lmu_menu.set_shared_records(mode, recs)
+
+
+func update_fps(fps: int) -> void:
+	if not is_open or lmu_menu == null:
+		return
+	lmu_menu.update_fps(fps)
+
+
+## Navega de volta à Home dentro do menu antes de retomar a corrida. Retorna true se consumiu a ação.
+func handle_back() -> bool:
+	if not is_open or lmu_menu == null:
+		return false
+	if lmu_menu.active_view != "home":
+		lmu_menu.switch_view("home")
+		return true
+	return false
+
+
+func close() -> void:
 	is_open = false
 	visible = false
-	var f := _root.get_viewport().gui_get_focus_owner()
-	if f:
-		f.release_focus()
-
-
-func _resume_pressed() -> void:
-	_close()
-	resumed.emit()
-
-
-## chamado pelo jogo a cada quadro enquanto aberto: FPS médio dos últimos ~2 s
-func update_fps(fps: int) -> void:
-	_fps_hist.append(fps)
-	if _fps_hist.size() > 8:
-		_fps_hist.pop_front()
-	var sum := 0
-	for v in _fps_hist:
-		sum += v
-	var avg := roundi(float(sum) / _fps_hist.size())
-	_fps.text = "%d fps" % avg
-	_fps.add_theme_color_override("font_color", Color("#2fd36b") if avg >= 55 else (Color("#ffb020") if avg >= 30 else Color("#ff5a4f")))
-	var q := ""
-	for k in _qbtn:
-		if _qbtn[k].button_pressed:
-			q = k
-	_note_quality(q, avg)
-
-
-func _pick_mode(m: String) -> void:
-	if m == _current_mode:
-		return
-	_current_mode = m
-	Game.set_mode(m)
-	_note_mode(m)
-	mode_changed.emit(m)
-
-
-func _note_mode(m: String) -> void:
-	if _sub:
-		_sub.text = "Interlagos · Arcade" if m == "arcade" else "Interlagos"
-		_sub.add_theme_color_override("font_color", Color("#ffb020") if m == "arcade" else Color(1, 1, 1, 0.6))
-	if _mnote and MODE_NOTES.has(m):
-		_mnote.text = MODE_NOTES[m]
-
-
-func _pick_quality(q: String) -> void:
-	Game.set_setting("video", "qualidade", q)
-	quality_changed.emit(q)
-	_note_quality(q)
-
-
-func _note_quality(q: String, fps := 0) -> void:
-	var parts := []
-	if fps > 0:
-		parts.append("rodando a %d fps" % fps)
-	if QUALITY_NOTE.has(q):
-		parts.append(QUALITY_NOTE[q])
-	if q != "Leve" and fps > 0 and fps < 45:
-		parts.append("se travar, use o Leve")
-	_qnote.text = " · ".join(parts)
-
-
-func _pick_touch_mode(tm: String) -> void:
-	_current_touch_mode = tm
-	Game.set_setting("controles", "modo_toque", tm)
-	touch_mode_changed.emit(tm)
-	_note_touch_mode(tm)
-
-
-func _note_touch_mode(tm: String) -> void:
-	if TOUCH_MODE_NOTES.has(tm):
-		_tnote.text = TOUCH_MODE_NOTES[tm]
-	if _recenter_btn:
-		_recenter_btn.visible = (tm == "inclinar")
-
-
-func _on_volume(v: float) -> void:
-	_vol_lbl.text = "%d%%" % roundi(v * 100)
-	Game.set_setting("audio", "volume", v)
-	volume_changed.emit(v)
-
-
-func _on_assist(key: String, on: bool) -> void:
-	Game.set_setting("assistencias", key, on)
-	assist_changed.emit(key, on)
-
-
-func _pick_gauge(gs: String) -> void:
-	if gs == _current_gauge:
-		return
-	_current_gauge = gs
-	Game.set_setting("hud", "mostrador", gs)
-	hud_gauge_changed.emit(gs)
-
-
-## fecha por fora (Esc / Start / ☰ / Voltar, tratados no main.gd)
-func close() -> void:
-	_close()
-	resumed.emit()

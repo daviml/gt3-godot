@@ -45,17 +45,15 @@ var dragging := false
 var steer_pose := 0.22      # rodas da frente esterçadas, pose de vitrine
 
 var name_lbl: Label
-var info_lbl: Label
-var idx_lbl: Label
-var drive_btn: Button
-var mode_btns := {}
-var mode_note: Label
 var loading_overlay: PanelContainer
 var loading_spinner: _SpinnerGraphic
 var loading_lbl: Label
+var lmu_menu: LmuMenu
+var remote_records: Records.RemoteClient
 var shot_dir := ""
 var manual_setup := false
 var _transitioning := false
+var _prefetch_other_mode_records := true
 
 var _nav_dir := 1
 var _last_switch_ms := -1000
@@ -124,42 +122,8 @@ func _build_studio() -> void:
 	env.tonemap_exposure = 1.1
 	
 	# SSAO, SSR, Glow e resolução respeitam o preset gráfico salvo em user://jogo.cfg
-	studio_quality_level = Game.get_quality_level()
-	var is_mobile := Game.is_mobile_platform()
-	var is_compat := Game.is_compatibility_renderer()
-	var vp := get_viewport()
-	if vp:
-		vp.mesh_lod_threshold = 6.0 if studio_quality_level == 0 else (3.0 if studio_quality_level == 1 else 1.0)
-		if studio_quality_level == 0:
-			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
-			vp.scaling_3d_scale = Game.get_minimal_3d_scale(vp)
-			vp.msaa_3d = Viewport.MSAA_DISABLED
-		elif studio_quality_level == 1:
-			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR if (is_mobile or is_compat) else Viewport.SCALING_3D_MODE_FSR
-			vp.scaling_3d_scale = 0.75
-			vp.fsr_sharpness = 0.2
-			vp.msaa_3d = Viewport.MSAA_DISABLED
-		elif studio_quality_level == 2:
-			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
-			vp.scaling_3d_scale = 1.0
-			vp.msaa_3d = Viewport.MSAA_2X
-		else:
-			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
-			vp.scaling_3d_scale = 1.0
-			vp.msaa_3d = Viewport.MSAA_4X
-
-	env.ssao_enabled = (studio_quality_level >= 2) and not is_compat
-	if env.ssao_enabled:
-		env.ssao_radius = 0.8
-		env.ssao_intensity = 1.2 if studio_quality_level == 2 else 2.0
-	env.ssr_enabled = (studio_quality_level >= 3) and not is_compat
-	if env.ssr_enabled:
-		env.ssr_max_steps = 64
-	env.glow_enabled = studio_quality_level >= 2
-	if env.glow_enabled:
-		env.glow_intensity = 0.3 if studio_quality_level == 2 else 0.4
-		env.glow_bloom = 0.03
 	studio_env = env
+	_apply_studio_quality()
 		
 	env.adjustment_enabled = true
 	env.adjustment_contrast = 1.06
@@ -292,135 +256,73 @@ func _build_studio() -> void:
 
 # ------------------------------------------------------------------ UI
 
+func _apply_studio_quality() -> void:
+	studio_quality_level = Game.get_quality_level()
+	var is_mobile := Game.is_mobile_platform()
+	var is_compat := Game.is_compatibility_renderer()
+	var vp := get_viewport()
+	if vp:
+		vp.mesh_lod_threshold = 6.0 if studio_quality_level == 0 else (3.0 if studio_quality_level == 1 else 1.0)
+		if studio_quality_level == 0:
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+			vp.scaling_3d_scale = Game.get_minimal_3d_scale(vp)
+			vp.msaa_3d = Viewport.MSAA_DISABLED
+		elif studio_quality_level == 1:
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR if (is_mobile or is_compat) else Viewport.SCALING_3D_MODE_FSR
+			vp.scaling_3d_scale = 0.75
+			vp.fsr_sharpness = 0.2
+			vp.msaa_3d = Viewport.MSAA_DISABLED
+		elif studio_quality_level == 2:
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+			vp.scaling_3d_scale = 1.0
+			vp.msaa_3d = Viewport.MSAA_2X
+		else:
+			vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+			vp.scaling_3d_scale = 1.0
+			vp.msaa_3d = Viewport.MSAA_4X
+	if studio_env:
+		studio_env.ssao_enabled = (studio_quality_level >= 2) and not is_compat
+		if studio_env.ssao_enabled:
+			studio_env.ssao_radius = 0.8
+			studio_env.ssao_intensity = 1.2 if studio_quality_level == 2 else 2.0
+		studio_env.ssr_enabled = (studio_quality_level >= 3) and not is_compat
+		if studio_env.ssr_enabled:
+			studio_env.ssr_max_steps = 64
+		studio_env.glow_enabled = studio_quality_level >= 2
+		if studio_env.glow_enabled:
+			studio_env.glow_intensity = 0.3 if studio_quality_level == 2 else 0.4
+			studio_env.glow_bloom = 0.03
+	if key_light:
+		key_light.shadow_enabled = studio_quality_level >= 1
+
+
 func _build_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	var root := Control.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(root)
+	var sync_root := func():
+		root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	sync_root.call()
+	get_viewport().size_changed.connect(sync_root)
 
-	var title := _label("GARAGEM", 22, Color(1, 1, 1, 0.55))
-	title.position = Vector2(36, 26)
-	root.add_child(title)
-
-	# Piloto / Nick (canto superior esquerdo)
-	var pbox := HBoxContainer.new()
-	pbox.position = Vector2(36, 58)
-	pbox.add_theme_constant_override("separation", 8)
-	root.add_child(pbox)
-
-	var plbl := _label("PILOTO:", 14, Color(1, 1, 1, 0.55))
-	plbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	pbox.add_child(plbl)
-
-	var pedit := LineEdit.new()
-	pedit.custom_minimum_size = Vector2(160, 32)
-	pedit.text = Records.load_nick()
-	pedit.placeholder_text = "Seu nick"
-	pedit.max_length = 16
-	pedit.add_theme_font_size_override("font_size", 14)
-	var esb := StyleBoxFlat.new()
-	esb.bg_color = Color(1, 1, 1, 0.08)
-	esb.border_color = Color(1, 1, 1, 0.25)
-	esb.set_border_width_all(1)
-	esb.set_corner_radius_all(6)
-	esb.content_margin_left = 8
-	esb.content_margin_right = 8
-	pedit.add_theme_stylebox_override("normal", esb)
-	var esb_f := esb.duplicate()
-	esb_f.border_color = Color(1, 1, 1, 0.6)
-	pedit.add_theme_stylebox_override("focus", esb_f)
-	pedit.text_changed.connect(func(t: String):
-		Records.save_nick(t)
+	lmu_menu = LmuMenu.new(LmuMenu.Context.GARAGE)
+	lmu_menu.visible = (shot_dir == "")
+	lmu_menu.car_selected.connect(_on_menu_car_selected)
+	lmu_menu.drive_requested.connect(_drive)
+	lmu_menu.quit_requested.connect(func(): get_tree().quit())
+	lmu_menu.quality_changed.connect(func(_q: String): _apply_studio_quality())
+	lmu_menu.mode_changed.connect(func(m: String):
+		_prefetch_other_mode_records = false
+		_fetch_shared_records(m)
 	)
-	pedit.text_submitted.connect(func(_t: String):
-		pedit.release_focus()
-	)
-	pbox.add_child(pedit)
+	root.add_child(lmu_menu)
 
-	# seletor Simulador / Arcade (canto superior direito)
-	var mbox := VBoxContainer.new()
-	mbox.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	mbox.offset_left = -356
-	mbox.offset_right = -36
-	mbox.offset_top = 24
-	mbox.offset_bottom = 104
-	mbox.add_theme_constant_override("separation", 6)
-	root.add_child(mbox)
-	var mrow := HBoxContainer.new()
-	mrow.add_theme_constant_override("separation", 8)
-	mrow.alignment = BoxContainer.ALIGNMENT_END
-	mbox.add_child(mrow)
-	var mgroup := ButtonGroup.new()
-	for entry in [["sim", "Simulador"], ["arcade", "Arcade (2×)"]]:
-		var m_id: String = entry[0]
-		var mb := _button(entry[1], 16)
-		mb.toggle_mode = true
-		mb.button_group = mgroup
-		mb.custom_minimum_size = Vector2(148, 40)
-		mb.pressed.connect(func(): _pick_mode(m_id))
-		mrow.add_child(mb)
-		mode_btns[m_id] = mb
-	mode_note = _label("", 13, Color(1, 1, 1, 0.6))
-	mode_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	mbox.add_child(mode_note)
-	_sync_mode_ui()
-
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	box.offset_left = -500
-	box.offset_right = 500
-	box.offset_top = -190
-	box.offset_bottom = -40
-	box.alignment = BoxContainer.ALIGNMENT_END
-	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(box)
-	idx_lbl = _label("", 18, Color(1, 1, 1, 0.5))
-	name_lbl = _label("", 46, Color.WHITE)
-	info_lbl = _label("", 20, Color(1, 1, 1, 0.8))
-	for l in [idx_lbl, name_lbl, info_lbl]:
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		box.add_child(l)
-
-	var prev := _button("◀", 44)
-	prev.set_anchors_preset(Control.PRESET_CENTER_LEFT)
-	prev.offset_left = 30
-	prev.offset_right = 120
-	prev.offset_top = -50
-	prev.offset_bottom = 50
-	prev.pressed.connect(func():
-		_nav_dir = -1
-		_show(idx - 1)
-	)
-	root.add_child(prev)
-	var nxt := _button("▶", 44)
-	nxt.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
-	nxt.offset_left = -120
-	nxt.offset_right = -30
-	nxt.offset_top = -50
-	nxt.offset_bottom = 50
-	nxt.pressed.connect(func():
-		_nav_dir = 1
-		_show(idx + 1)
-	)
-	root.add_child(nxt)
-	var go := _button("PILOTAR", 28)
-	drive_btn = go
-	go.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	go.offset_left = -270
-	go.offset_right = -36
-	go.offset_top = -110
-	go.offset_bottom = -40
-	go.pressed.connect(_drive)
-	root.add_child(go)
-
-	var help := _label("◀ ▶ trocar   ·   Enter pilotar   ·   arraste para girar   ·   Esc sair", 16, Color(1, 1, 1, 0.45))
-	help.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	help.offset_left = 36
-	help.offset_top = -48
-	help.offset_bottom = -24
-	root.add_child(help)
+	# Rótulo sincronizado (preservado para testes e automações que leem `gar.name_lbl.text`)
+	name_lbl = _label("", 20, Color.WHITE)
+	name_lbl.visible = false
+	root.add_child(name_lbl)
 
 	# Indicador discreto e não-bloqueante sobre a plataforma enquanto o carro carrega em segundo plano
 	loading_overlay = PanelContainer.new()
@@ -452,6 +354,33 @@ func _build_ui() -> void:
 	loading_lbl = _label("Carregando carro...", 18, Color(1, 1, 1, 0.92))
 	lbox.add_child(loading_lbl)
 
+	if shot_dir == "":
+		remote_records = Records.RemoteClient.new()
+		add_child(remote_records)
+		_fetch_shared_records.call_deferred(Game.mode)
+
+
+func _fetch_shared_records(m: String) -> void:
+	if remote_records == null:
+		return
+	remote_records.fetch_ranking(m, func(ok: bool, voltas: Array, r_mode: String):
+		if ok and lmu_menu != null and is_instance_valid(lmu_menu):
+			lmu_menu.set_shared_records(r_mode, voltas)
+		if _prefetch_other_mode_records:
+			_prefetch_other_mode_records = false
+			var other := "arcade" if r_mode == "sim" else "sim"
+			_fetch_shared_records(other)
+	)
+
+
+func _on_menu_car_selected(car_id: String) -> void:
+	for i in cars.size():
+		if cars[i].id == car_id:
+			var delta := posmod(i - idx, cars.size())
+			_nav_dir = 1 if delta <= cars.size() / 2 else -1
+			_show(i)
+			return
+
 
 func _label(t: String, size: int, c: Color) -> Label:
 	var l := Label.new()
@@ -460,40 +389,6 @@ func _label(t: String, size: int, c: Color) -> Label:
 	l.add_theme_color_override("font_color", c)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return l
-
-
-func _button(t: String, size: int) -> Button:
-	var b := Button.new()
-	b.text = t
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", size)
-	for st in ["normal", "hover", "pressed"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = Color(1, 1, 1, 0.08 if st == "normal" else (0.16 if st == "hover" else 0.28))
-		sb.border_color = Color(1, 1, 1, 0.25)
-		sb.set_border_width_all(1)
-		sb.set_corner_radius_all(10)
-		b.add_theme_stylebox_override(st, sb)
-	return b
-
-
-func _pick_mode(m: String) -> void:
-	Game.set_mode(m)
-	_sync_mode_ui()
-
-
-func _sync_mode_ui() -> void:
-	var m := Game.mode
-	for k in mode_btns:
-		var mb: Button = mode_btns[k]
-		mb.set_pressed_no_signal(k == m)
-	if mode_note:
-		if m == "arcade":
-			mode_note.text = "2,0× aderência · sem capotar · ranking Arcade"
-			mode_note.add_theme_color_override("font_color", Color("#ffb020"))
-		else:
-			mode_note.text = "Física realista GT3 (1,0×) · ranking Simulador"
-			mode_note.add_theme_color_override("font_color", Color(1, 1, 1, 0.6))
 
 
 # ------------------------------------------------------------------ carro
@@ -517,11 +412,8 @@ func _show(i: int, sync := false) -> void:
 		ring_mat.emission_energy_multiplier = 2.5
 	if name_lbl:
 		name_lbl.text = c.name
-	if idx_lbl:
-		idx_lbl.text = "%d / %d" % [idx + 1, cars.size()]
-	var d := Game.get_car_data(car_id)
-	if info_lbl and d.has("params"):
-		info_lbl.text = _info(c, d.params)
+	if lmu_menu:
+		lmu_menu.set_selected_car(car_id, false)
 
 	# Se já estamos aguardando exatamente este carro em modo assíncrono, não reinicia
 	if _pending_car_id == car_id and not sync:
@@ -748,13 +640,6 @@ func _process_async_loading(dt: float) -> void:
 				_in_flight_prefetches.erase(glb)
 
 
-func _info(c: Dictionary, p: Dictionary) -> String:
-	var cv := 0.0
-	for pt in p.engine.torque:
-		cv = maxf(cv, pt[0] * pt[1] * TAU / 60.0 / 735.5)
-	return "Motor %s   ·   %d cv   ·   %d kg   ·   %d marchas" % [c.layout, roundi(cv / 5.0) * 5, p.mass, p.gearbox.ratios.size()]
-
-
 func _drive() -> void:
 	if _transitioning:
 		return
@@ -762,9 +647,8 @@ func _drive() -> void:
 	var cur_nick := Records.load_nick()
 	if cur_nick != "":
 		Records.save_nick(cur_nick)
-	if drive_btn:
-		drive_btn.text = "CARREGANDO..."
-		drive_btn.disabled = true
+	if lmu_menu:
+		lmu_menu.set_drive_busy(true)
 	Game.save_car(cars[idx].id)
 	Game.from_garage = true
 	Game.transition_target = "track"
@@ -778,8 +662,16 @@ func _process(dt: float) -> void:
 	if shot_dir == "" and idle_t > 3.0 and not dragging:
 		pivot.rotation.y += SPIN_RATE * dt
 	var target := Vector3(0, 0.55, 0)
+	var eff_dist := cam_dist
 	if shot_dir == "":
-		cam.global_position = target + Vector3(sin(cam_yaw) * cos(cam_pitch), sin(cam_pitch), cos(cam_yaw) * cos(cam_pitch)) * cam_dist
+		if lmu_menu != null and lmu_menu.visible and lmu_menu.active_view == "cars":
+			var vp_rect := get_viewport().get_visible_rect().size
+			if vp_rect.x > vp_rect.y:
+				# Desloca o enquadramento para que o carro fique livre na área esquerda/superior, acima da barra inferior e à esquerda da ficha técnica
+				var cam_right := Vector3(cos(cam_yaw), 0.0, -sin(cam_yaw))
+				target = Vector3(0.0, 0.12, 0.0) + cam_right * 0.72
+				eff_dist = maxf(cam_dist, 8.2)
+		cam.global_position = target + Vector3(sin(cam_yaw) * cos(cam_pitch), sin(cam_pitch), cos(cam_yaw) * cos(cam_pitch)) * eff_dist
 		cam.look_at(target, Vector3.UP)
 	if loading_overlay and loading_overlay.visible and loading_spinner:
 		loading_spinner.angle = fmod(loading_spinner.angle + dt * 6.0, TAU)
@@ -788,29 +680,47 @@ func _process(dt: float) -> void:
 
 
 func _unhandled_input(e: InputEvent) -> void:
+	var focus_owner := get_viewport().gui_get_focus_owner()
+	if focus_owner is LineEdit:
+		if e is InputEventKey and e.pressed and e.keycode == KEY_ESCAPE:
+			focus_owner.release_focus()
+		return
+	var cur_view: String = lmu_menu.active_view if lmu_menu else "cars"
 	if e is InputEventKey and e.pressed and not e.echo:
 		match e.keycode:
 			KEY_LEFT, KEY_A:
-				_nav_dir = -1
-				_show(idx - 1)
+				if cur_view == "cars":
+					_nav_dir = -1
+					_show(idx - 1)
 			KEY_RIGHT, KEY_D:
-				_nav_dir = 1
-				_show(idx + 1)
+				if cur_view == "cars":
+					_nav_dir = 1
+					_show(idx + 1)
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
-				_drive()
+				if cur_view == "home" or cur_view == "cars":
+					_drive()
 			KEY_ESCAPE:
-				get_tree().quit()
+				if lmu_menu and lmu_menu.active_view != "home":
+					lmu_menu.switch_view("home")
+				else:
+					get_tree().quit()
 	elif e is InputEventJoypadButton and e.pressed:
 		match e.button_index:
 			JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_LEFT_SHOULDER:
-				_nav_dir = -1
-				_show(idx - 1)
+				if cur_view == "cars":
+					_nav_dir = -1
+					_show(idx - 1)
 			JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_RIGHT_SHOULDER:
-				_nav_dir = 1
-				_show(idx + 1)
+				if cur_view == "cars":
+					_nav_dir = 1
+					_show(idx + 1)
 			JOY_BUTTON_A, JOY_BUTTON_START:
-				_drive()
-	elif e is InputEventMouseButton:
+				if cur_view == "home" or cur_view == "cars":
+					_drive()
+			JOY_BUTTON_B:
+				if lmu_menu and lmu_menu.active_view != "home":
+					lmu_menu.switch_view("home")
+	elif cur_view == "cars" and e is InputEventMouseButton:
 		if e.button_index == MOUSE_BUTTON_LEFT:
 			dragging = e.pressed
 			idle_t = 0.0
@@ -818,7 +728,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			cam_dist = maxf(4.2, cam_dist - 0.4)
 		elif e.button_index == MOUSE_BUTTON_WHEEL_DOWN and e.pressed:
 			cam_dist = minf(12.0, cam_dist + 0.4)
-	elif e is InputEventMouseMotion and dragging:
+	elif cur_view == "cars" and e is InputEventMouseMotion and dragging:
 		cam_yaw -= e.relative.x * 0.006
 		cam_pitch = clampf(cam_pitch + e.relative.y * 0.004, deg_to_rad(2), deg_to_rad(55))
 		idle_t = 0.0

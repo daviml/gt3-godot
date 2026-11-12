@@ -26,6 +26,10 @@ var mode := "padrao":
 			_clear_inputs()
 			_layout()
 
+## ocultar botões na tela manualmente (ex.: preferência salva) ou automaticamente com gamepad conectado
+var manual_hide := false
+var gamepad_connected := false
+
 ## botão ☰ interno (desativado no jogo porque o HUD exibe ❚❚ MENU no topo central)
 var show_menu_btn := true:
 	set(v):
@@ -124,6 +128,15 @@ func set_enabled(on: bool) -> void:
 	set_process_input(on)
 	if not on:
 		_clear_inputs()
+
+
+func is_effectively_hidden() -> bool:
+	return manual_hide or gamepad_connected or Game.has_gamepad_connected()
+
+
+func sync_visibility(active := true) -> void:
+	gamepad_connected = Game.has_gamepad_connected()
+	set_enabled(active and not (manual_hide or gamepad_connected))
 
 
 func _clear_inputs() -> void:

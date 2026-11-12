@@ -207,3 +207,33 @@ static func set_mode(m: String) -> void:
 		m = "sim"
 	mode = m
 	set_setting("jogo", "modo", m)
+
+
+static func is_hide_touch_controls() -> bool:
+	return bool(get_setting("controles", "ocultar_toque", false))
+
+
+static func set_hide_touch_controls(hide: bool) -> void:
+	set_setting("controles", "ocultar_toque", hide)
+
+
+static func has_gamepad_connected() -> bool:
+	return Input.get_connected_joypads().size() > 0
+
+
+static func is_touch_device() -> bool:
+	return is_mobile_platform() or "--touch" in OS.get_cmdline_user_args()
+
+
+static func should_show_touch_controls(touch_enabled: bool) -> bool:
+	return touch_enabled and not is_hide_touch_controls() and not has_gamepad_connected()
+
+
+static func weight_distribution_for_layout(layout: String) -> String:
+	match layout:
+		"traseiro":
+			return "39% / 61%"
+		"central":
+			return "43% / 57%"
+		_:
+			return "49% / 51%"

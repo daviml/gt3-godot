@@ -131,19 +131,22 @@ func setup_step_hud_and_quality() -> void:
 		car.assists.auto = true
 	_apply_mode(mode, false)
 	_spawn()
+	bot = _create_bot()
+	# No celular ou com flag --mobile, já inicia configurado para Mobile; o menu de pausa guarda a escolha
+	_apply_quality(Game.get_quality_name())
+	_update_car_view(1.0)
+	chase.snap()
+
+
+func _create_bot():
 	if REFS.has(car_id):
 		# malha de giro: segue o traçado real do iRacing sem passar da zebra (Porsche 1:35,9 e Mustang 1:33,6 válidas).
 		# A volta do R8 passa 2,3 m além da zebra na Descida do Lago: ele continua com o traçado contido.
 		var opts := {"yaw_p": 2.0, "hold_line": 0.02}
 		if car_id == "audi-r8-lms-gt3":
 			opts = {"yaw_p": 2.0, "line_gain": 0.4, "hold_line": 0.02, "edge": [-0.3, 0.5]}
-		bot = RefBot.new(track, car, RefBot.load_ref(REFS[car_id]), opts)
-	else:
-		bot = Bot.new(track, car)
-	# No celular ou com flag --mobile, já inicia configurado para Mobile; o menu de pausa guarda a escolha
-	_apply_quality(Game.get_quality_name())
-	_update_car_view(1.0)
-	chase.snap()
+		return RefBot.new(track, car, RefBot.load_ref(REFS[car_id]), opts)
+	return Bot.new(track, car)
 
 
 func _apply_cli_post_setup() -> void:
@@ -313,17 +316,28 @@ func _build_hud() -> void:
 		touch = TouchControls.new()
 		touch.show_menu_btn = false
 		touch.mode = touch_mode_saved
+		touch.manual_hide = Game.is_hide_touch_controls()
 		touch.keys = input.touch_keys
 		touch.axes = input.touch_axes
 		touch.menu_pressed.connect(_toggle_pause)
 		touch.recenter_requested.connect(func(): _toast("Volante calibrado"))
 		layer.add_child(touch)
 		car.assists.brake_reverse = true
+	if not Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
+		Input.joy_connection_changed.connect(_on_joy_connection_changed)
+	_sync_touch_visibility()
 	# menu de pausa (scripts/ui/pause_menu.gd): CanvasLayer própria por cima de tudo
 	menu = PauseMenu.new()
 	menu.resumed.connect(func(): _set_paused(false))
 	menu.garage.connect(_to_garage)
 	menu.quit.connect(func(): get_tree().quit())
+	menu.restart_requested.connect(func():
+		_set_paused(false)
+		_spawn()
+		if chase:
+			chase.snap()
+	)
+	menu.car_selected.connect(_switch_car)
 	menu.nick_changed.connect(_on_nick)
 	menu.mode_changed.connect(func(m: String):
 		_apply_mode(m, not autopilot)
@@ -340,6 +354,11 @@ func _build_hud() -> void:
 		if touch:
 			touch.mode = tm
 		_toast("Controles: " + TouchControls.MODE_NAMES.get(tm, tm))
+	)
+	menu.hide_touch_changed.connect(func(hidden: bool):
+		if touch:
+			touch.manual_hide = hidden
+		_sync_touch_visibility()
 	)
 	menu.recenter_tilt.connect(func():
 		if touch:
@@ -409,6 +428,8 @@ func _on_remote_ranking(ok: bool, voltas: Array, r_mode: String) -> void:
 	shared_records = voltas
 	has_shared_records = true
 	_refresh_records()
+	if menu:
+		menu.set_shared_records(r_mode, voltas)
 
 
 func _on_remote_lap_posted(ok: bool, is_record: bool, voltas: Array, r_mode: String) -> void:
@@ -417,6 +438,8 @@ func _on_remote_lap_posted(ok: bool, is_record: bool, voltas: Array, r_mode: Str
 	shared_records = voltas
 	has_shared_records = true
 	_refresh_records()
+	if menu:
+		menu.set_shared_records(r_mode, voltas)
 	if is_record and not voltas.is_empty():
 		var best_rec: Dictionary = voltas[0]
 		if String(best_rec.get("nick", "")) == nick.strip_edges() and String(best_rec.get("carId", "")) == car_id:
@@ -531,9 +554,19 @@ func _process(dt: float) -> void:
 func _unhandled_input(e: InputEvent) -> void:
 	var key: bool = e is InputEventKey and e.pressed and not e.echo
 	var pad: bool = e is InputEventJoypadButton and e.pressed
-	# menu aberto: Esc / Start / Voltar fecham; o resto é do menu (o carro está parado)
+	# menu aberto: Esc volta para a Home antes de retomar; Start fecha direto
 	if paused:
-		if (key and e.keycode == KEY_ESCAPE) or (pad and e.button_index == JOY_BUTTON_START):
+		var focus_owner := get_viewport().gui_get_focus_owner()
+		if focus_owner is LineEdit:
+			if key and e.keycode == KEY_ESCAPE:
+				focus_owner.release_focus()
+				get_viewport().set_input_as_handled()
+			return
+		if key and e.keycode == KEY_ESCAPE:
+			if menu == null or not menu.handle_back():
+				_set_paused(false)
+			get_viewport().set_input_as_handled()
+		elif pad and e.button_index == JOY_BUTTON_START:
 			_set_paused(false)
 			get_viewport().set_input_as_handled()
 		return
@@ -580,13 +613,74 @@ func _unhandled_input(e: InputEvent) -> void:
 
 
 func _notification(what: int) -> void:
-	# botão voltar do Android: abre/fecha o menu
+	# botão voltar do Android: volta para a Home dentro do menu ou abre/fecha o menu
 	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		if paused and menu and menu.handle_back():
+			return
 		_toggle_pause()
 
 
 func _toggle_pause() -> void:
 	_set_paused(not paused)
+
+
+func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
+	_sync_touch_visibility()
+
+
+func _sync_touch_visibility() -> void:
+	if touch:
+		touch.sync_visibility(not paused)
+		input.touch_hidden = touch.is_effectively_hidden()
+	else:
+		input.touch_hidden = Game.is_hide_touch_controls() or Game.has_gamepad_connected()
+
+
+## Troca o carro ao vivo diretamente a partir do Menu de Pausa sem sair da pista.
+func _switch_car(new_id: String) -> void:
+	if new_id == "" or new_id == car_id:
+		return
+	if not FileAccess.file_exists("res://data/cars/%s.json" % new_id):
+		push_warning("carro desconhecido: %s" % new_id)
+		return
+	var prev_assists := car.assists.duplicate()
+	var prev_grip := car.grip_scale
+	car_id = new_id
+	Game.save_car(car_id)
+
+	if car_view:
+		car_view.queue_free()
+	var q_lvl := Game.get_quality_level()
+	car_view = CarView.new(car_id, q_lvl >= 2, q_lvl == 0)
+	add_child(car_view)
+	car_data = car_view.data
+
+	car = Car.new(track, car_data.params)
+	car.assists = prev_assists
+	car.grip_scale = prev_grip
+
+	if car_audio:
+		car_audio.queue_free()
+	car_audio = CarAudio.new(car, car_id)
+	car_audio.set_paused(paused)
+	add_child(car_audio)
+
+	if chase:
+		chase.car = car
+	if hud:
+		hud.car = car
+		var c_info := Game.get_car_info(car_id)
+		if c_info.has("color"):
+			hud.car_color = Color(String(c_info.color))
+		hud.dash = (car_id in Hud.DASH_CARS)
+		hud.dash_on = hud.dash
+	bot = _create_bot()
+	_spawn()
+	_update_car_view(1.0)
+	if chase:
+		chase.snap()
+	var cname := String(Game.get_car_info(car_id).get("name", car_id))
+	_toast("Carro: " + cname)
 
 
 ## pausa = menu aberto (o carro para, os botões de toque somem)
@@ -596,14 +690,16 @@ func _set_paused(on: bool, focus_nick := false) -> void:
 	paused = on
 	if hud:
 		hud.set_menu_open(on)
-	if touch:
-		touch.set_enabled(not on)
+		hud.visible = not on
+	_sync_touch_visibility()
 	if speed_blur and on:
 		speed_blur.rect.visible = false
 	if car_audio:
 		car_audio.set_paused(on)
 	if on:
-		menu.open(nick, quality_name, volume, car.assists, input.touch_mode, input.touch, focus_nick, mode, hud.gauge_style if hud else "barra")
+		menu.open(nick, quality_name, volume, car.assists, input.touch_mode, input.touch, focus_nick, mode, hud.gauge_style if hud else "barra", car_id)
+		if has_shared_records and not shared_records.is_empty():
+			menu.set_shared_records(mode, shared_records)
 	elif menu.is_open:
 		menu.close()
 

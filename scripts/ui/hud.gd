@@ -121,13 +121,21 @@ var _radar_radius := 76.0
 var _radar_left := PackedVector2Array()
 var _radar_right := PackedVector2Array()
 var _radar_cline := PackedVector2Array()
-var _radar_quad := PackedVector2Array()
-var _radar_kerb_pts := PackedVector2Array()
-var _radar_kerb_cols := PackedColorArray()
+var _radar_tri_pts := PackedVector2Array()
+var _radar_tri_cols := PackedColorArray()
+var _radar_tri_idx := PackedInt32Array()
+var _radar_edge_segs := PackedVector2Array()
+var _radar_cline_segs := PackedVector2Array()
+var _radar_kerb_w_segs := PackedVector2Array()
+var _radar_kerb_r_segs := PackedVector2Array()
+var _cone_pts := PackedVector2Array()
+var _arrow_pts := PackedVector2Array()
+var _arrow_outline_pts := PackedVector2Array()
+var _radar_tip_pts := PackedVector2Array()
+var _reset_tip_pts := PackedVector2Array()
+var _g_trail_pts := PackedVector2Array()
 
-# nós filhos para recorte circular do radar e áreas clicáveis (sem interferir em TouchControls)
-var _radar_clip: Control
-var _radar_view: _RadarView
+# áreas clicáveis (botões transparentes para respeitar PauseMenu e TouchControls)
 var _btn_menu: Button
 var _btn_cam: Button
 var _btn_reset: Button
@@ -174,7 +182,11 @@ func _init_radar_buffers() -> void:
 	_radar_left.resize(RADAR_N)
 	_radar_right.resize(RADAR_N)
 	_radar_cline.resize(RADAR_N)
-	_radar_quad.resize(4)
+	_cone_pts.resize(3)
+	_arrow_pts.resize(4)
+	_arrow_outline_pts.resize(5)
+	_radar_tip_pts.resize(3)
+	_reset_tip_pts.resize(3)
 
 
 func _ready() -> void:
@@ -191,15 +203,6 @@ func _ready() -> void:
 
 
 func _build_interactive_nodes() -> void:
-	_radar_clip = _RadarClip.new()
-	_radar_clip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_radar_clip.clip_children = CanvasItem.CLIP_CHILDREN_ONLY
-	add_child(_radar_clip)
-
-	_radar_view = _RadarView.new(self)
-	_radar_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_radar_clip.add_child(_radar_view)
-
 	var make_btn := func(cb: Callable) -> Button:
 		var b := Button.new()
 		b.flat = true
@@ -227,8 +230,6 @@ func _sync_btn_visibility() -> void:
 	_btn_menu.visible = show_top
 	_btn_cam.visible = show_top and touch
 	_btn_reset.visible = show_top and touch
-	if _radar_clip:
-		_radar_clip.visible = (map_mode == "dynamic")
 
 
 func _toggle_board() -> void:
@@ -313,8 +314,9 @@ func _layout() -> void:
 	_top_sc = clampf(s.y / 460.0, 0.82, 1.25) if touch else clampf(s.y / 860.0, 0.85, 1.18)
 	_fps_sb.set_corner_radius_all(roundi(4 * _top_sc))
 
+	var low_gpu := touch or quality_level <= 1
 	_tyres_panel_sb.set_corner_radius_all(roundi(10 * _k))
-	_tyres_panel_sb.shadow_size = roundi(6 * _k)
+	_tyres_panel_sb.shadow_size = 0 if low_gpu else roundi(6 * _k)
 	_tyres_panel_sb.shadow_offset = Vector2(0, 4 * _k)
 	_tyres_body_sb.set_border_width_all(maxi(1, roundi(2 * _k)))
 	_tyres_body_sb.corner_radius_top_left = roundi(12 * _k)
@@ -333,7 +335,7 @@ func _layout() -> void:
 	_hbar_sb.corner_radius_top_right = 0
 	_hbar_sb.corner_radius_bottom_left = roundi(8 * _kb)
 	_hbar_sb.corner_radius_bottom_right = roundi(8 * _kb)
-	_hbar_sb.shadow_size = roundi(10 * _kb)
+	_hbar_sb.shadow_size = 0 if low_gpu else roundi(10 * _kb)
 	_hbar_sb.shadow_offset = Vector2(0, 5 * _kb)
 
 	var ins := _insets()
@@ -357,13 +359,6 @@ func _update_map_layout(pos: Vector2, sc: float) -> void:
 
 	_radar_center = pos + Vector2(93.0 * sc, 25.0 * sc + 79.0 * sc)
 	_radar_radius = 74.0 * sc
-	if _radar_clip:
-		var box := Rect2(pos + Vector2(8 * sc, 25 * sc), Vector2(170 * sc, 158 * sc))
-		_radar_clip.position = box.position
-		_radar_clip.size = box.size
-		_radar_clip.set_circle(_radar_radius, _radar_center - box.position)
-		_radar_view.position = Vector2.ZERO
-		_radar_view.size = box.size
 
 
 ## câmera atual: o painel do Porsche só aparece na de capô (nas de fora ele tampava a traseira do carro)
@@ -446,8 +441,6 @@ func update(dt: float, thr: float, brk: float) -> void:
 	if _redraw_t >= interval:
 		_redraw_t = 0.0
 		queue_redraw()
-		if _radar_view and map_mode == "dynamic":
-			_radar_view.queue_redraw()
 
 
 # ------------------------------------------------------------------ desenho
@@ -609,9 +602,14 @@ func _draw_top_bar(top_center: Vector2) -> float:
 			_draw_top_pill(_r_reset, sc, r_hot)
 			var rc := _r_reset.get_center()
 			var col_r := Color.WHITE if r_hot else Color(1, 1, 1, 0.9)
-			draw_arc(rc + Vector2(0, 0.5 * sc), 5.2 * sc, deg_to_rad(-155), deg_to_rad(135), 14, col_r, 1.8 * sc, true)
+			draw_arc(rc + Vector2(0, 0.5 * sc), 5.2 * sc, deg_to_rad(-155), deg_to_rad(135), 14, col_r, 1.8 * sc, not (touch or quality_level <= 1))
 			var tip := rc + Vector2(-4.8 * sc, -2.5 * sc)
-			draw_colored_polygon(PackedVector2Array([tip + Vector2(-2.2 * sc, 2.2 * sc), tip + Vector2(2.6 * sc, 1.6 * sc), tip + Vector2(0.2 * sc, -2.6 * sc)]), col_r)
+			if _reset_tip_pts.size() != 3:
+				_reset_tip_pts.resize(3)
+			_reset_tip_pts[0] = tip + Vector2(-2.2 * sc, 2.2 * sc)
+			_reset_tip_pts[1] = tip + Vector2(2.6 * sc, 1.6 * sc)
+			_reset_tip_pts[2] = tip + Vector2(0.2 * sc, -2.6 * sc)
+			draw_colored_polygon(_reset_tip_pts, col_r)
 
 	return y + h
 
@@ -846,6 +844,33 @@ func _next_corner() -> Array:
 	return [best_c, best_dist]
 
 
+static func _clip_to_circle(p: Vector2, rc: Vector2, r: float) -> Vector2:
+	var v := p - rc
+	var l_sq := v.length_squared()
+	if l_sq > r * r:
+		return rc + v * (r / sqrt(l_sq))
+	return p
+
+
+static func _seg_circle_range(p0: Vector2, p1: Vector2, rc: Vector2, r: float) -> Vector2:
+	var d := p1 - p0
+	var a := d.length_squared()
+	var f := p0 - rc
+	var r_sq := r * r
+	if a < 1e-6:
+		return Vector2(0.0, 1.0) if f.length_squared() <= r_sq else Vector2(1.0, 0.0)
+	var b := 2.0 * f.dot(d)
+	var c := f.length_squared() - r_sq
+	var disc := b * b - 4.0 * a * c
+	if disc <= 0.0:
+		return Vector2(1.0, 0.0)
+	var sq := sqrt(disc)
+	var inv2a := 0.5 / a
+	var t0 := maxf(0.0, (-b - sq) * inv2a)
+	var t1 := minf(1.0, (-b + sq) * inv2a)
+	return Vector2(t0, t1)
+
+
 func _draw_map(pos: Vector2, sc: float) -> void:
 	var w := 186.0 * sc
 	var h := 202.0 * sc
@@ -863,12 +888,18 @@ func _draw_map(pos: Vector2, sc: float) -> void:
 	if _map_draw_pts.size() != _map_pts.size() or _map_pos != pos or _map_layout_sc != sc:
 		_update_map_layout(pos, sc)
 
+	var aa := not (touch or quality_level <= 1)
 	if map_mode == "dynamic":
-		# moldura externa do radar (desenhada por cima do clip filho)
-		draw_arc(_radar_center, _radar_radius, 0, TAU, 48, Color(1, 1, 1, 0.16), 1.5 * sc, true)
-		draw_arc(_radar_center, _radar_radius, -PI * 0.65, -PI * 0.35, 16, ACCENT, 2.5 * sc, true)
+		_draw_radar(pos, sc, aa)
+		draw_arc(_radar_center, _radar_radius, 0, TAU, 36 if not aa else 48, Color(1, 1, 1, 0.16), 1.5 * sc, aa)
+		draw_arc(_radar_center, _radar_radius, -PI * 0.65, -PI * 0.35, 12, ACCENT, 2.5 * sc, aa)
 		var tip := _radar_center + Vector2(0, -_radar_radius - 2 * sc)
-		draw_colored_polygon(PackedVector2Array([tip, tip + Vector2(-4 * sc, 6 * sc), tip + Vector2(4 * sc, 6 * sc)]), ACCENT)
+		if _radar_tip_pts.size() != 3:
+			_radar_tip_pts.resize(3)
+		_radar_tip_pts[0] = tip
+		_radar_tip_pts[1] = tip + Vector2(-4 * sc, 6 * sc)
+		_radar_tip_pts[2] = tip + Vector2(4 * sc, 6 * sc)
+		draw_colored_polygon(_radar_tip_pts, ACCENT)
 		var nc := _next_corner()
 		var c_info: Dictionary = nc[0]
 		if not c_info.is_empty():
@@ -876,35 +907,44 @@ func _draw_map(pos: Vector2, sc: float) -> void:
 			var lbl := "T%d %s • %dm" % [int(c_info.number), String(c_info.name), dist_m]
 			_text(_bold, Vector2(pos.x + 6 * sc, pos.y + h - 17 * sc), lbl, 10.0 * sc, Color(0.95, 0.96, 0.98, 0.95), HORIZONTAL_ALIGNMENT_CENTER, w - 12 * sc)
 	else:
-		draw_polyline(_map_draw_pts, Color(0, 0, 0, 0.6), 7 * sc, true)
-		draw_polyline(_map_draw_pts, Color(235 / 255.0, 238 / 255.0, 242 / 255.0, 0.9), 3.5 * sc, true)
-		draw_line(_map_finish_draw[0], _map_finish_draw[1], Color("#e5483b"), 2.5 * sc, true)
+		draw_polyline(_map_draw_pts, Color(0, 0, 0, 0.6), 7 * sc, aa)
+		draw_polyline(_map_draw_pts, Color(235 / 255.0, 238 / 255.0, 242 / 255.0, 0.9), 3.5 * sc, aa)
+		draw_line(_map_finish_draw[0], _map_finish_draw[1], Color("#e5483b"), 2.5 * sc, aa)
 		for cr in _corners:
 			var cp := _map_origin + _to_map(cr.pos) * sc
 			draw_circle(cp, 5.0 * sc, Color(20 / 255.0, 24 / 255.0, 34 / 255.0, 0.85))
-			draw_arc(cp, 5.0 * sc, 0, TAU, 16, ACCENT, 1.0 * sc, true)
+			draw_arc(cp, 5.0 * sc, 0, TAU, 14, ACCENT, 1.0 * sc, aa)
 			_text(_bold, cp - Vector2(5.0 * sc, 4.0 * sc), str(cr.number), 7.0 * sc, WHITE, HORIZONTAL_ALIGNMENT_CENTER, 10.0 * sc)
 		var c := _map_origin + _to_map(car.pos) * sc
 		draw_circle(c, 5.5 * sc, Color.BLACK)
 		draw_circle(c, 4.0 * sc, car_color)
 
 
-func _draw_radar_inside(canvas: Control, size: Vector2) -> void:
-	var sc := _map_layout_sc
-	var W := size.x
-	var H := size.y
-	var cx := W * 0.5
-	var cy := H * 0.72
+func _draw_radar(pos: Vector2, sc: float, aa: bool) -> void:
+	var rc := _radar_center
 	var R := _radar_radius
+	var cx := rc.x
+	var cy := pos.y + 25.0 * sc + 158.0 * sc * 0.72
+	var dy := cy - rc.y
+	var cc := Vector2(cx, cy)
 	var sc_m := R / 230.0  # ~340 m visíveis à frente do carro
 
-	# fundo escuro + anéis de distância (50 m a 300 m) + eixos
-	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("#070a13"))
-	canvas.draw_circle(Vector2(W * 0.5, H * 0.5), R * 0.55, Color(13 / 255.0, 19 / 255.0, 31 / 255.0, 0.65))
-	for dm in [50.0, 100.0, 150.0, 200.0, 250.0, 300.0]:
-		canvas.draw_arc(Vector2(cx, cy), dm * sc_m, 0, TAU, 40, Color(1, 1, 1, 0.06), 1.0, true)
-	canvas.draw_line(Vector2(cx, cy - R * 1.6), Vector2(cx, cy + R), Color(1, 1, 1, 0.04), 1.0)
-	canvas.draw_line(Vector2(cx - R, cy), Vector2(cx + R, cy), Color(1, 1, 1, 0.04), 1.0)
+	# fundo circular + anéis de distância recortados analiticamente ao círculo (sem CLIP_CHILDREN_ONLY / subpass GPU)
+	draw_circle(rc, R, Color("#070a13"))
+	draw_circle(rc, R * 0.55, Color(13 / 255.0, 19 / 255.0, 31 / 255.0, 0.65))
+	var ring_col := Color(1, 1, 1, 0.06)
+	for dm: float in [50.0, 100.0, 150.0, 200.0, 250.0, 300.0]:
+		var rr := dm * sc_m
+		if rr + dy <= R:
+			draw_arc(cc, rr, 0.0, TAU, 24, ring_col, 1.0, false)
+		elif absf(rr - dy) < R:
+			var s_lim := (R * R - rr * rr - dy * dy) / (2.0 * dy * rr)
+			if s_lim > -1.0:
+				var phi := asin(clampf(s_lim, -1.0, 1.0))
+				draw_arc(cc, rr, -PI - phi, phi, 20, ring_col, 1.0, false)
+	draw_line(Vector2(cx, rc.y - R), Vector2(cx, rc.y + R), Color(1, 1, 1, 0.04), 1.0)
+	var half_w := sqrt(maxf(0.0, R * R - dy * dy))
+	draw_line(Vector2(cx - half_w, cy), Vector2(cx + half_w, cy), Color(1, 1, 1, 0.04), 1.0)
 
 	if track == null or track.n <= 0:
 		return
@@ -913,10 +953,16 @@ func _draw_radar_inside(canvas: Control, size: Vector2) -> void:
 	var cur_idx := clampi(car.hint, 0, track.n - 1) if car.hint >= 0 else track.li
 	var cos_a := cos(-_radar_angle)
 	var sin_a := sin(-_radar_angle)
-
 	var N := track.n
-	_radar_kerb_pts.clear()
-	_radar_kerb_cols.clear()
+
+	_radar_tri_pts.clear()
+	_radar_tri_cols.clear()
+	_radar_tri_idx.clear()
+	_radar_edge_segs.clear()
+	_radar_cline_segs.clear()
+	_radar_kerb_w_segs.clear()
+	_radar_kerb_r_segs.clear()
+
 	for k_idx in RADAR_N:
 		var offset := -RADAR_BACK + k_idx * RADAR_STEP
 		var idx := posmod(cur_idx + offset, N)
@@ -924,70 +970,128 @@ func _draw_radar_inside(canvas: Control, size: Vector2) -> void:
 		var r := track.R[idx]
 		var w_l := track.wl[idx]
 		var w_r := track.wr[idx]
-		var lx := p.x - r.x * w_l
-		var lz := p.z - r.z * w_l
-		var rx := p.x + r.x * w_r
-		var rz := p.z + r.z * w_r
+		var dlx := p.x - r.x * w_l - car_pos.x
+		var dlz := p.z - r.z * w_l - car_pos.z
+		var drx := p.x + r.x * w_r - car_pos.x
+		var drz := p.z + r.z * w_r - car_pos.z
+		var dcx := p.x - car_pos.x
+		var dcz := p.z - car_pos.z
+		_radar_left[k_idx] = Vector2(cx + (dlx * cos_a - dlz * sin_a) * sc_m, cy + (dlx * sin_a + dlz * cos_a) * sc_m)
+		_radar_right[k_idx] = Vector2(cx + (drx * cos_a - drz * sin_a) * sc_m, cy + (drx * sin_a + drz * cos_a) * sc_m)
+		_radar_cline[k_idx] = Vector2(cx + (dcx * cos_a - dcz * sin_a) * sc_m, cy + (dcx * sin_a + dcz * cos_a) * sc_m)
 
-		var pl := Vector2(cx + ((lx - car_pos.x) * cos_a - (lz - car_pos.z) * sin_a) * sc_m, cy + ((lx - car_pos.x) * sin_a + (lz - car_pos.z) * cos_a) * sc_m)
-		var pr := Vector2(cx + ((rx - car_pos.x) * cos_a - (rz - car_pos.z) * sin_a) * sc_m, cy + ((rx - car_pos.x) * sin_a + (rz - car_pos.z) * cos_a) * sc_m)
-		var pc := Vector2(cx + ((p.x - car_pos.x) * cos_a - (p.z - car_pos.z) * sin_a) * sc_m, cy + ((p.x - car_pos.x) * sin_a + (p.z - car_pos.z) * cos_a) * sc_m)
-		_radar_left[k_idx] = pl
-		_radar_right[k_idx] = pr
-		_radar_cline[k_idx] = pc
-
-		if track.kerb_l[idx] > 0.0:
-			_radar_kerb_pts.append(pl)
-			_radar_kerb_cols.append(ACCENT if (offset % 4 == 0) else Color.WHITE)
-		if track.kerb_r[idx] > 0.0:
-			_radar_kerb_pts.append(pr)
-			_radar_kerb_cols.append(ACCENT if (offset % 4 == 0) else Color.WHITE)
-
+	var road_col := Color("#222735")
+	var r_inner_sq := (R - 1.5 * sc) * (R - 1.5 * sc)
 	for k_idx in RADAR_N - 1:
-		_radar_quad[0] = _radar_left[k_idx]
-		_radar_quad[1] = _radar_left[k_idx + 1]
-		_radar_quad[2] = _radar_right[k_idx + 1]
-		_radar_quad[3] = _radar_right[k_idx]
-		canvas.draw_colored_polygon(_radar_quad, Color("#222735"))
-	canvas.draw_polyline(_radar_left, Color(1, 1, 1, 0.35), 1.2 * sc, true)
-	canvas.draw_polyline(_radar_right, Color(1, 1, 1, 0.35), 1.2 * sc, true)
-	for ki in _radar_kerb_pts.size():
-		canvas.draw_circle(_radar_kerb_pts[ki], 1.5 * sc, _radar_kerb_cols[ki])
-	canvas.draw_polyline(_radar_cline, Color(235 / 255.0, 238 / 255.0, 245 / 255.0, 0.9), 2.4 * sc, true)
+		var pc0 := _radar_cline[k_idx]
+		var pc1 := _radar_cline[k_idx + 1]
+		var tr := _seg_circle_range(pc0, pc1, rc, R)
+		if tr.x >= tr.y:
+			continue
+		var pl0 := _radar_left[k_idx]
+		var pl1 := _radar_left[k_idx + 1]
+		var pr0 := _radar_right[k_idx]
+		var pr1 := _radar_right[k_idx + 1]
+		var l0 := _clip_to_circle(pl0.lerp(pl1, tr.x) if tr.x > 0.0 else pl0, rc, R)
+		var l1 := _clip_to_circle(pl0.lerp(pl1, tr.y) if tr.y < 1.0 else pl1, rc, R)
+		var r0 := _clip_to_circle(pr0.lerp(pr1, tr.x) if tr.x > 0.0 else pr0, rc, R)
+		var r1 := _clip_to_circle(pr0.lerp(pr1, tr.y) if tr.y < 1.0 else pr1, rc, R)
+		var cl0 := pc0.lerp(pc1, tr.x) if tr.x > 0.0 else pc0
+		var cl1 := pc0.lerp(pc1, tr.y) if tr.y < 1.0 else pc1
 
-	# curvas visíveis no radar
+		var base := _radar_tri_pts.size()
+		_radar_tri_pts.append(l0)
+		_radar_tri_pts.append(l1)
+		_radar_tri_pts.append(r1)
+		_radar_tri_pts.append(r0)
+		_radar_tri_cols.append(road_col)
+		_radar_tri_cols.append(road_col)
+		_radar_tri_cols.append(road_col)
+		_radar_tri_cols.append(road_col)
+		_radar_tri_idx.append(base)
+		_radar_tri_idx.append(base + 1)
+		_radar_tri_idx.append(base + 2)
+		_radar_tri_idx.append(base)
+		_radar_tri_idx.append(base + 2)
+		_radar_tri_idx.append(base + 3)
+
+		_radar_edge_segs.append(l0)
+		_radar_edge_segs.append(l1)
+		_radar_edge_segs.append(r0)
+		_radar_edge_segs.append(r1)
+		_radar_cline_segs.append(cl0)
+		_radar_cline_segs.append(cl1)
+
+		var offset := -RADAR_BACK + k_idx * RADAR_STEP
+		var idx := posmod(cur_idx + offset, N)
+		var is_red := (offset % 4 == 0)
+		if track.kerb_l[idx] > 0.0 and (l0 - rc).length_squared() <= r_inner_sq and (l1 - rc).length_squared() <= r_inner_sq:
+			if is_red:
+				_radar_kerb_r_segs.append(l0)
+				_radar_kerb_r_segs.append(l1)
+			else:
+				_radar_kerb_w_segs.append(l0)
+				_radar_kerb_w_segs.append(l1)
+		if track.kerb_r[idx] > 0.0 and (r0 - rc).length_squared() <= r_inner_sq and (r1 - rc).length_squared() <= r_inner_sq:
+			if is_red:
+				_radar_kerb_r_segs.append(r0)
+				_radar_kerb_r_segs.append(r1)
+			else:
+				_radar_kerb_w_segs.append(r0)
+				_radar_kerb_w_segs.append(r1)
+
+	if not _radar_tri_idx.is_empty():
+		RenderingServer.canvas_item_add_triangle_array(get_canvas_item(), _radar_tri_idx, _radar_tri_pts, _radar_tri_cols)
+	if not _radar_edge_segs.is_empty():
+		draw_multiline(_radar_edge_segs, Color(1, 1, 1, 0.35), 1.2 * sc, false)
+	if not _radar_kerb_w_segs.is_empty():
+		draw_multiline(_radar_kerb_w_segs, Color.WHITE, 2.0 * sc, false)
+	if not _radar_kerb_r_segs.is_empty():
+		draw_multiline(_radar_kerb_r_segs, ACCENT, 2.0 * sc, false)
+	if not _radar_cline_segs.is_empty():
+		draw_multiline(_radar_cline_segs, Color(235 / 255.0, 238 / 255.0, 245 / 255.0, 0.9), 2.2 * sc, aa)
+
+	# curvas visíveis dentro do círculo do radar
 	var nc := _next_corner()
 	var closest: Dictionary = nc[0]
-	var center_box := size * 0.5
+	var max_cr := R - 7.5 * sc
 	for cr in _corners:
 		var cp: Vector3 = cr.pos
 		var kx := cx + ((cp.x - car_pos.x) * cos_a - (cp.z - car_pos.z) * sin_a) * sc_m
 		var ky := cy + ((cp.x - car_pos.x) * sin_a + (cp.z - car_pos.z) * cos_a) * sc_m
 		var kpt := Vector2(kx, ky)
-		if kpt.distance_to(center_box) <= R + 12 * sc:
+		if kpt.distance_to(rc) <= max_cr:
 			var is_next := not closest.is_empty() and int(closest.number) == int(cr.number)
 			if is_next:
-				canvas.draw_circle(kpt, 17 * sc, Color(34 / 255.0, 197 / 255.0, 94 / 255.0, 0.28))
-				canvas.draw_arc(kpt, 14 * sc, 0, TAU, 24, Color(74 / 255.0, 222 / 255.0, 128 / 255.0, 0.6), 2.0 * sc, true)
-				canvas.draw_circle(kpt, 10.5 * sc, Color("#22c55e"))
+				draw_circle(kpt, 16 * sc, Color(34 / 255.0, 197 / 255.0, 94 / 255.0, 0.26))
+				draw_arc(kpt, 13.5 * sc, 0, TAU, 20, Color(74 / 255.0, 222 / 255.0, 128 / 255.0, 0.6), 2.0 * sc, aa)
+				draw_circle(kpt, 10.0 * sc, Color("#22c55e"))
 				var fs := maxi(6, roundi(10.0 * sc))
-				canvas.draw_string(_bold, kpt + Vector2(-10 * sc, _bold.get_ascent(fs) * 0.36), str(cr.number), HORIZONTAL_ALIGNMENT_CENTER, 20 * sc, fs, Color.WHITE)
+				draw_string(_bold, kpt + Vector2(-10 * sc, _bold.get_ascent(fs) * 0.36), str(cr.number), HORIZONTAL_ALIGNMENT_CENTER, 20 * sc, fs, Color.WHITE)
 				var nfs := maxi(6, roundi(8.5 * sc))
-				canvas.draw_string(_bold, kpt + Vector2(-50 * sc, -15 * sc) + Vector2(1, 1), String(cr.name), HORIZONTAL_ALIGNMENT_CENTER, 100 * sc, nfs, Color(0, 0, 0, 0.75))
-				canvas.draw_string(_bold, kpt + Vector2(-50 * sc, -15 * sc), String(cr.name), HORIZONTAL_ALIGNMENT_CENTER, 100 * sc, nfs, Color.WHITE)
+				draw_string(_bold, kpt + Vector2(-50 * sc, -15 * sc) + Vector2(1, 1), String(cr.name), HORIZONTAL_ALIGNMENT_CENTER, 100 * sc, nfs, Color(0, 0, 0, 0.75))
+				draw_string(_bold, kpt + Vector2(-50 * sc, -15 * sc), String(cr.name), HORIZONTAL_ALIGNMENT_CENTER, 100 * sc, nfs, Color.WHITE)
 			else:
-				canvas.draw_circle(kpt, 8.0 * sc, Color(22 / 255.0, 101 / 255.0, 52 / 255.0, 0.9))
-				canvas.draw_arc(kpt, 8.0 * sc, 0, TAU, 18, Color("#4ade80"), 1.5 * sc, true)
+				draw_circle(kpt, 8.0 * sc, Color(22 / 255.0, 101 / 255.0, 52 / 255.0, 0.9))
+				draw_arc(kpt, 8.0 * sc, 0, TAU, 16, Color("#4ade80"), 1.5 * sc, aa)
 				var fs2 := maxi(6, roundi(8.0 * sc))
-				canvas.draw_string(_bold, kpt + Vector2(-8 * sc, _bold.get_ascent(fs2) * 0.36), str(cr.number), HORIZONTAL_ALIGNMENT_CENTER, 16 * sc, fs2, Color.WHITE)
+				draw_string(_bold, kpt + Vector2(-8 * sc, _bold.get_ascent(fs2) * 0.36), str(cr.number), HORIZONTAL_ALIGNMENT_CENTER, 16 * sc, fs2, Color.WHITE)
 
 	# feixe de farol + seta do carro do jogador
-	var cc := Vector2(cx, cy)
-	canvas.draw_colored_polygon(PackedVector2Array([cc, cc + Vector2(-18 * sc, -44 * sc), cc + Vector2(18 * sc, -44 * sc)]), Color(1.0, 0.92, 0.63, 0.14))
-	var arrow := PackedVector2Array([cc + Vector2(0, -8 * sc), cc + Vector2(-6 * sc, 7 * sc), cc + Vector2(0, 4 * sc), cc + Vector2(6 * sc, 7 * sc)])
-	canvas.draw_colored_polygon(arrow, Color("#22c55e"))
-	canvas.draw_polyline(PackedVector2Array([arrow[0], arrow[1], arrow[2], arrow[3], arrow[0]]), Color.BLACK, 1.5 * sc, true)
-	canvas.draw_circle(cc, 2.0 * sc, Color.WHITE)
+	_cone_pts[0] = cc
+	_cone_pts[1] = cc + Vector2(-18 * sc, -44 * sc)
+	_cone_pts[2] = cc + Vector2(18 * sc, -44 * sc)
+	draw_colored_polygon(_cone_pts, Color(1.0, 0.92, 0.63, 0.14))
+	_arrow_pts[0] = cc + Vector2(0, -8 * sc)
+	_arrow_pts[1] = cc + Vector2(-6 * sc, 7 * sc)
+	_arrow_pts[2] = cc + Vector2(0, 4 * sc)
+	_arrow_pts[3] = cc + Vector2(6 * sc, 7 * sc)
+	draw_colored_polygon(_arrow_pts, Color("#22c55e"))
+	for ai in 4:
+		_arrow_outline_pts[ai] = _arrow_pts[ai]
+	_arrow_outline_pts[4] = _arrow_pts[0]
+	draw_polyline(_arrow_outline_pts, Color.BLACK, 1.5 * sc, aa)
+	draw_circle(cc, 2.0 * sc, Color.WHITE)
 
 
 # ------------------------------------------------------------------ barra horizontal (padrão, estilo foto)
@@ -1006,6 +1110,7 @@ func _draw_hbar(pos: Vector2, kb: float) -> void:
 	var h := pad_top + rpm_h + 7.0 * kb + main_h + (7.0 * kb + delta_h if show_delta else 0.0) + pad_bot
 
 	var r := Rect2(pos, Vector2(w, h))
+	_hbar_sb.shadow_size = 0 if (touch or quality_level <= 1) else roundi(10 * kb)
 	draw_style_box(_hbar_sb, r)
 	draw_rect(Rect2(pos, Vector2(w, 2.0 * kb)), ACCENT)
 
@@ -1117,19 +1222,22 @@ func _draw_hbar(pos: Vector2, kb: float) -> void:
 	draw_line(Vector2(gx_start, y + 2 * kb), Vector2(gx_start, y + main_h - 2 * kb), Color(1, 1, 1, 0.14), 1.0)
 	var gc := Vector2(gx_start + 34.0 * kb, row_cy)
 	var gr := 24.0 * kb
+	var aa := not (touch or quality_level <= 1)
 	draw_circle(gc, gr, Color(0, 0, 0, 0.36))
-	draw_arc(gc, gr, 0, TAU, 32, Color(1, 1, 1, 0.22), 1.0, true)
-	draw_arc(gc, gr * (19.0 / 28.0), 0, TAU, 28, Color(1, 1, 1, 0.14), 0.8, true)
-	draw_arc(gc, gr * (9.5 / 28.0), 0, TAU, 20, Color(1, 1, 1, 0.12), 0.8, true)
+	draw_arc(gc, gr, 0, TAU, 24 if not aa else 32, Color(1, 1, 1, 0.22), 1.0, aa)
+	draw_arc(gc, gr * (19.0 / 28.0), 0, TAU, 18 if not aa else 28, Color(1, 1, 1, 0.14), 0.8, aa)
+	draw_arc(gc, gr * (9.5 / 28.0), 0, TAU, 14 if not aa else 20, Color(1, 1, 1, 0.12), 0.8, aa)
 	draw_line(gc - Vector2(gr, 0), gc + Vector2(gr, 0), Color(1, 1, 1, 0.16), 0.8)
 	draw_line(gc - Vector2(0, gr), gc + Vector2(0, gr), Color(1, 1, 1, 0.16), 0.8)
 
 	var sc_g := gr / 24.0
 	if _g_trail.size() >= 2:
-		for ti in range(1, _g_trail.size()):
-			draw_line(gc + _g_trail[ti - 1] * sc_g, gc + _g_trail[ti] * sc_g, Color(1.0, 204 / 255.0, 48 / 255.0, 0.45), 1.5 * kb, true)
+		_g_trail_pts.resize(_g_trail.size())
+		for ti in _g_trail.size():
+			_g_trail_pts[ti] = gc + _g_trail[ti] * sc_g
+		draw_polyline(_g_trail_pts, Color(1.0, 204 / 255.0, 48 / 255.0, 0.45), 1.5 * kb, aa)
 	var g_pt := gc + Vector2(clampf(car.g_lat / 2.8 * 24.0, -24.0, 24.0), clampf(-car.g_long / 2.8 * 24.0, -24.0, 24.0)) * sc_g
-	draw_line(gc, g_pt, Color(1, 1, 1, 0.45), 1.2 * kb, true)
+	draw_line(gc, g_pt, Color(1, 1, 1, 0.45), 1.2 * kb, aa)
 	var g_tot := Vector2(car.g_lat, car.g_long).length()
 	var g_col := Color("#ff4b5c") if g_tot > 1.85 else (Color("#f2cc30") if g_tot > 1.1 else GREEN)
 	draw_circle(g_pt, 3.8 * kb, Color.WHITE)
@@ -1178,7 +1286,7 @@ func _polar(c: Vector2, deg: float, r: float) -> Vector2:
 func _arc(c: Vector2, r: float, a0: float, a1: float, col: Color, width: float) -> void:
 	if absf(a1 - a0) < 0.01:
 		return
-	draw_arc(c, r, deg_to_rad(a0), deg_to_rad(a1), maxi(8, int(absf(a1 - a0) / 3.0)), col, width, true)
+	draw_arc(c, r, deg_to_rad(a0), deg_to_rad(a1), maxi(8, int(absf(a1 - a0) / 3.0)), col, width, not (touch or quality_level <= 1))
 
 
 func _draw_cluster(pos: Vector2, k: float) -> void:
@@ -1265,6 +1373,12 @@ static func _led_color(i: int) -> Color:
 
 
 func _box(r: Rect2, bg: Color, border: Color, bw: float, radius := 0.0) -> void:
+	if radius <= 0.0 or ((touch or quality_level <= 1) and radius <= 3.5):
+		if bg.a > 0.0:
+			draw_rect(r, bg)
+		if bw > 0.0 and border.a > 0.0:
+			draw_rect(r, border, false, bw)
+		return
 	_ensure_styleboxes()
 	_box_sb.bg_color = bg
 	_box_sb.border_color = border
@@ -1450,27 +1564,4 @@ func _draw_telemetry(pos: Vector2) -> void:
 		y += fs * 1.45
 
 
-# ------------------------------------------------------------------ nós auxiliares do radar circular
 
-class _RadarClip extends Control:
-	var radius := 76.0
-	var center := Vector2(85, 85)
-
-	func set_circle(r: float, c: Vector2) -> void:
-		radius = r
-		center = c
-		queue_redraw()
-
-	func _draw() -> void:
-		draw_circle(center, radius, Color.WHITE)
-
-
-class _RadarView extends Control:
-	var hud: Hud
-
-	func _init(owner_hud: Hud) -> void:
-		hud = owner_hud
-
-	func _draw() -> void:
-		if hud != null:
-			hud._draw_radar_inside(self, size)

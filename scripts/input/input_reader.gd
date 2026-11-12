@@ -11,6 +11,8 @@ const STEER_LINEARITY := 1.6
 
 ## celular: os botões de toque usam a direção antiga (rampa constante e limite próprio)
 var touch := false
+## oculta leitura do toque (quando usuário desativa na tela ou há controle físico conectado)
+var touch_hidden := false
 ## modo de controle mobile ("padrao", "fly", "inclinar", "legacy")
 var touch_mode := "padrao"
 ## teclas de toque apertadas ("left", "right", "gas", "brake"), preenchidas pelo TouchControls
@@ -56,16 +58,17 @@ static func _key(a: Key, b: Key) -> bool:
 
 ## estado cru dos aparelhos (teclado + toque + primeiro controle conectado)
 func read_devices() -> Dictionary:
+	var joy := Input.get_connected_joypads()
+	var use_touch := touch and not touch_hidden and joy.is_empty()
 	var raw := {
-		"left": _key(KEY_LEFT, KEY_A) or touch_keys.has("left"),
-		"right": _key(KEY_RIGHT, KEY_D) or touch_keys.has("right"),
-		"gas": _key(KEY_UP, KEY_W) or touch_keys.has("gas"),
-		"brake": _key(KEY_DOWN, KEY_S) or Input.is_physical_key_pressed(KEY_SPACE) or touch_keys.has("brake"),
+		"left": _key(KEY_LEFT, KEY_A) or (use_touch and touch_keys.has("left")),
+		"right": _key(KEY_RIGHT, KEY_D) or (use_touch and touch_keys.has("right")),
+		"gas": _key(KEY_UP, KEY_W) or (use_touch and touch_keys.has("gas")),
+		"brake": _key(KEY_DOWN, KEY_S) or Input.is_physical_key_pressed(KEY_SPACE) or (use_touch and touch_keys.has("brake")),
 		"up": _key(KEY_E, KEY_SHIFT),
 		"down": _key(KEY_Q, KEY_CTRL),
 		"pad": null,
 	}
-	var joy := Input.get_connected_joypads()
 	if joy.size() > 0:
 		var d: int = joy[0]
 		raw.pad = {
@@ -104,17 +107,18 @@ func filter(dt: float, speed_ms: float, raw: Dictionary) -> void:
 	_kb_throttle = clampf(_kb_throttle + (4.0 if raw.gas else -8.0) * dt, 0.0, 1.0)
 	_kb_brake = clampf(_kb_brake + (6.0 if raw.brake else -10.0) * dt, 0.0, 1.0)
 
-	var cur_steer: float = _touch_steer if (touch and touch_mode == "legacy") else _kb_steer * limit
+	var allow_touch := touch and not touch_hidden and raw.pad == null
+	var cur_steer: float = _touch_steer if (allow_touch and touch_mode == "legacy") else _kb_steer * limit
 	var cur_thr: float = _kb_throttle
 	var cur_brk: float = _kb_brake
 	var up: bool = raw.up
 	var down: bool = raw.down
 	var rst := false
-	source = "toque" if touch_keys.size() > 0 else "teclado"
+	source = "toque" if (allow_touch and touch_keys.size() > 0) else "teclado"
 
 	# esquemas novos do celular: volante proporcional (analógico ou giro do celular) no limite antigo do toque,
 	# com a mesma limitação de velocidade do analógico do controle; pedais proporcionais com filtro de 0,05 s
-	var tm := touch_mode if touch else "legacy"
+	var tm := touch_mode if allow_touch else "legacy"
 	if tm != "legacy":
 		var target_analog: float = (raw.get("tilt_steer", float(touch_axes.get("steer", 0.0))) if tm == "inclinar" else float(touch_axes.get("steer", 0.0))) * old_limit
 		var rate := 5.0 if absf(target_analog) > absf(_analog_steer) else 8.0
