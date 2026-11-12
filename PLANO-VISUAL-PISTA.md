@@ -32,23 +32,28 @@ Referência atual no código: `Game.QUALITY_LEVELS` (`scripts/game.gd`), `Main._
 
 ## Fases de Execução
 
-### Fase 0 — Captura dos ~90 Prints (LMU vs. Jogo Atual) e Diagnóstico
-Objetivo: ter base visual objetiva segundo a segundo de uma volta completa (~90s) em Interlagos.
+### Fase 0 — Captura de Referência (LMU vs. Jogo Atual) e Diagnóstico
+Objetivo: ter base visual objetiva e alinhada por posição na pista em Interlagos.
 
-1. **Extração dos frames do vídeo do LMU:**
+1. **Extração de frames nos pontos-chave do vídeo do LMU:**
    - Vídeo de referência: `INTERLAGOS-IN-LE-MANS-ULTIMATE-LMGT3-Track.mp4` (na raiz do projeto, já ignorado pelo `.gitignore`).
-   - Usar `ffmpeg` para extrair **1 frame por segundo** (`-vf fps=1`) do vídeo da Porsche em Interlagos no LMU, gerando ~90 imagens numeradas (`lmu_001.png` ... `lmu_090.png`) em `build/compare/lmu/` (também ignorada pelo `.gitignore` via `build/`).
-2. **Captura automática da volta com Bot no `gt3-godot`:**
-   - Criar uma cena/script de captura automatizada (usando `RefBot` com `data/reference/interlagos-r8.json` ou `Bot` em `scripts/track/bot.gd`) para dar 1 volta limpa em Interlagos com a câmera padrão de jogo (`chase_camera.gd`), capturando **1 print a cada 1,0 segundo** de simulação (`get_viewport().get_texture().get_image().save_png(...)`) em `build/compare/godot_atual/`.
-   - Garantir que o tempo de volta bata ~90 segundos para alinhar os trechos com o vídeo do LMU.
-3. **Comparação lado a lado por setor/segundo:**
-   - Mapear os principais pontos da volta (Reta Principal, S do Senna, Curva do Sol, Reta Oposta, Descida do Lago, Ferradura, Laranjinha, Pinheirinho, Bico de Pato, Mergulho, Junção, Subida dos Boxes).
+   - Usar `ffmpeg` para extrair frames em **15 a 25 pontos fixos da pista** (cobrindo os 12 setores principais e áreas de escape) em `build/compare/lmu/` (já ignorado pelo `.gitignore` via `build/`).
+   - *Por que por posição/setor e não por segundo (`1 fps`):* pequenas diferenças de velocidade ou frenagem entre o vídeo do LMU e o Bot no Godot deslocam os frames em dezenas de metros no mesmo `t`, dificultando a comparação exata.
+2. **Captura automática por posição no `gt3-godot`:**
+   - Criar uma cena/script de captura automatizada (usando `RefBot` com `data/reference/interlagos-r8.json` ou `Bot` em `scripts/track/bot.gd`) para percorrer Interlagos e salvar prints (`get_viewport().get_texture().get_image().save_png(...)`) exatamente nos **mesmos pontos/distâncias da pista** em `build/compare/godot_atual/`.
+   - Ajustar o FOV e a altura da câmera de comparação (`chase_camera.gd`) para ficarem próximos aos do vídeo do LMU, evitando confundir distorção de lente com erro de largura de zebra ou escala de muro/prédio.
+3. **Checagem de referência de exposição e luz base:**
+   - Antes de calibrar cores nos shaders, conferir se a exposição, o tone mapping e a cor do sol/céu (`WorldEnvironment` / `DirectionalLight3D`) estão em um ponto neutro próximo ao vídeo, para não "compensar" iluminação errada diretamente no albedo dos materiais.
+4. **Comparação lado a lado por setor:**
+   - Mapear os 12 setores principais (Reta Principal, S do Senna, Curva do Sol, Reta Oposta, Descida do Lago, Ferradura, Laranjinha, Pinheirinho, Bico de Pato, Mergulho, Junção, Subida dos Boxes).
    - Documentar em tabela as diferenças encontradas em:
      - Tom/cor do asfalto, manchas e emborrachamento.
      - Cores, largura e padrão das zebras.
      - Cores e acabamento dos muros, guard-rails, pneus e paredes.
      - Cores do mato/grama, terra e áreas de escape.
      - Presença/cor/escala de prédios, arquibancadas, pórticos, placas e árvores.
+
+> **Fluxo de trabalho (Iteração vs. Validação):** Não usar a captura completa de prints a cada ajuste pequeno. Para **iterar**, teletransportar o carro para 3–4 trechos representativos (ex.: S do Senna, Reta Oposta, Bico de Pato, Subida dos Boxes) e ajustar os parâmetros dos shaders/materiais em tempo real. Usar a captura automática de prints apenas para **validar** o fechamento de cada fase (`Antes vs. Depois vs. LMU`).
 
 ---
 
@@ -62,7 +67,7 @@ Objetivo: deixar o modo mais leve com visual limpo, fiel nas cores e bem detalha
    - `shaders/grama.gdshader` (`fast_mode = true`): ajustar `base_color` e mistura verde/palha barata para reproduzir fielmente o tom do mato de Interlagos no LMU.
    - Materiais de **zebras**, **muros**, **paredes** e **faixas** (`tools/cenario/cenario.ts` -> `assets/track/cenario.glb` e `TrackView._material`): corrigir cores base (albedo), saturação e contraste para ficarem fiéis mesmo sem normal map nem sombras.
 3. **Validação da Fase 1:**
-   - Rodar novamente o Bot tirando ~90 prints no modo **Mínimo** e comparar com o LMU.
+   - Rodar a captura automática nos pontos-chave no modo **Mínimo** e comparar com o LMU.
 
 ---
 
@@ -74,8 +79,9 @@ Objetivo: manter o desempenho no celular (60 FPS) adicionando profundidade e con
    - Habilitar detalhes de pista próximos (pórticos, passarela, placas de frenagem, barreiras e postes) com culling de distância adequado.
 2. **Ajuste visual dos prédios e fachadas (`shaders/fachada.gdshader`, `shaders/torre.gdshader`):**
    - Comparar cores, contraste e escala de prédios/arquibancadas com os prints do LMU e ajustar materiais/texturas base.
-3. **Validação da Fase 2:**
-   - Rodar o Bot tirando ~90 prints no modo **Leve** e comparar com o LMU e com o Mínimo.
+3. **Validação da Fase 2 (Visual + Desempenho):**
+   - Rodar a captura automática nos pontos-chave no modo **Leve** e comparar com o LMU e com o Mínimo.
+   - Medir FPS / frame time nos trechos mais densos (ex.: Reta Principal com boxes e arquibancadas) para garantir que o orçamento no celular segue dentro da meta antes de avançar.
 
 ---
 
@@ -89,13 +95,13 @@ Objetivo: entregar o nível completo de detalhes da pista e entorno no Médio, e
 2. **Espelhar Médio → Extremo (detalhes da pista):**
    - Garantir que `TrackView.set_detail(3)` e `SurroundingsView.DETAIL[3]` usem exatamente os mesmos detalhes de pista do nível `2` (Médio), sem adicionar novos custos de sombra/pós-processamento nesta etapa.
 3. **Validação Final:**
-   - Rodar o Bot tirando ~90 prints no modo **Médio** (e checar paridade no **Extremo**) comparando lado a lado com os ~90 prints do vídeo do LMU.
+   - Rodar a captura automática nos pontos-chave no modo **Médio** (e checar paridade no **Extremo**) comparando lado a lado com os prints do vídeo do LMU.
 
 ---
 
 ## Ordem de Execução Recomendada
 
-1. **Fase 0:** Extrair os ~90 prints do vídeo do LMU + gerar os ~90 prints do Bot no jogo atual + montar comparativo.
-2. **Fase 1:** Implementar e validar o **Mínimo** (cores da pista, zebras, muros, paredes, mato; sem árvores/prédios).
-3. **Fase 2:** Implementar e validar o **Leve** (adiciona prédios, boxes, arquibancadas e detalhes externos com culling).
+1. **Fase 0:** Extrair os 15–25 prints de referência do vídeo do LMU + gerar os prints alinhados por posição no jogo atual + checar exposição/luz base + montar comparativo.
+2. **Fase 1:** Implementar e validar o **Mínimo** (cores da pista, zebras, muros, paredes, mato; sem árvores/prédios), iterando em tempo real nos trechos-chave.
+3. **Fase 2:** Implementar e validar o **Leve** (adiciona prédios, boxes, arquibancadas e detalhes externos com culling + checagem de FPS nos trechos densos).
 4. **Fase 3:** Implementar e validar o **Médio** (tudo ativo) e replicar a configuração de pista no **Extremo**.
