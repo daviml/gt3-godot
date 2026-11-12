@@ -47,7 +47,7 @@ func run_tests() -> void:
 
 	print("--- 1. Testando CarView enable_blur := false (3.3) ---")
 	Game.clear_car_cache()
-	var cv_no_blur := CarView.new("porsche-992-gt3r")
+	var cv_no_blur := CarView.new("corvette-c6r-gt3")
 	root.add_child(cv_no_blur)
 	check(not cv_no_blur.blur_enabled, "CarView.new(id) inicia com blur_enabled = false por padrão")
 	check(_count_ghosts(cv_no_blur) == 0, "CarView sem blur não instancia as 24 malhas ghosts")
@@ -62,7 +62,7 @@ func run_tests() -> void:
 	check(all_hidden, "Desligar blur_enabled oculta todos os ghosts")
 	cv_no_blur.queue_free()
 
-	var cv_blur := CarView.new("porsche-992-gt3r", true)
+	var cv_blur := CarView.new("corvette-c6r-gt3", true)
 	root.add_child(cv_blur)
 	check(cv_blur.blur_enabled and _count_ghosts(cv_blur) == 24, "CarView.new(id, true) instancia os 24 ghosts")
 	cv_blur.queue_free()
@@ -70,8 +70,8 @@ func run_tests() -> void:
 
 	print("\n--- 2. Testando Garagem respeitando preset gráfico em user://jogo.cfg (3.3) ---")
 	var gar_scene := load("res://scenes/garagem.tscn") as PackedScene
-	Game.car_id = "porsche-992-gt3r"
-	Game.load_car_scene("porsche-992-gt3r")
+	Game.car_id = "corvette-c6r-gt3"
+	Game.load_car_scene("corvette-c6r-gt3")
 
 	Game.set_setting("video", "qualidade", "Mínimo")
 	var gar_min := gar_scene.instantiate()
@@ -103,12 +103,12 @@ func run_tests() -> void:
 
 	print("\n--- 3. Testando Pré-carregamento dos Vizinhos (3.1) ---")
 	Game.clear_car_cache()
-	Game.car_id = "porsche-992-gt3r"
-	Game.load_car_scene("porsche-992-gt3r")
+	Game.car_id = "corvette-c6r-gt3"
+	Game.load_car_scene("corvette-c6r-gt3")
 	var gar := gar_scene.instantiate()
 	root.add_child(gar)
 	current_scene = gar
-	check(gar.view != null and gar.view.id == "porsche-992-gt3r", "Carro inicial exibido imediatamente via cache")
+	check(gar.view != null and gar.view.id == "corvette-c6r-gt3", "Carro inicial exibido imediatamente via cache")
 	check(not gar.loading_overlay.visible, "Overlay de carregamento fica oculto quando o carro está em cache")
 
 	var prev_id: String = gar.cars[gar.cars.size() - 1].id
@@ -116,7 +116,7 @@ func run_tests() -> void:
 	var prefetched := await _wait_until(func():
 		return Game.has_cached_car_scene(next_id) and Game.has_cached_car_scene(prev_id), 900)
 	check(prefetched, "Vizinhos (idx - 1 e idx + 1) pré-carregados assincronamente em segundo plano")
-	check(Game.has_cached_car_scene("porsche-992-gt3r"), "Carro atual permaneceu no cache LRU após prefetch dos vizinhos")
+	check(Game.has_cached_car_scene("corvette-c6r-gt3"), "Carro atual permaneceu no cache LRU após prefetch dos vizinhos")
 
 	gar._nav_dir = 1
 	gar._show(gar.idx + 1)

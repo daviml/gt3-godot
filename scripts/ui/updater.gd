@@ -258,9 +258,14 @@ var _sector_lbls: Array[Label] = []
 
 
 func _ready() -> void:
+	if OS.has_feature("web"):
+		# No navegador, o jogo roda com o pacote completo embarcado
+		get_tree().change_scene_to_file.call_deferred(GARAGEM_SCENE)
+		return
+
 	_initial_car_id = Game.car_id
 	if _initial_car_id.is_empty():
-		_initial_car_id = "porsche-992-gt3r"
+		_initial_car_id = "corvette-c6r-gt3"
 	_car_info = Game.get_car_info(_initial_car_id)
 	_car_data = Game.get_car_data(_initial_car_id)
 
@@ -940,7 +945,7 @@ func _finish_and_enter_game() -> void:
 
 	_initial_car_id = Game.car_id
 	if _initial_car_id.is_empty():
-		_initial_car_id = "porsche-992-gt3r"
+		_initial_car_id = "corvette-c6r-gt3"
 	_initial_car_glb = Game.get_car_glb_path(_initial_car_id)
 	var car_info := Game.get_car_info(_initial_car_id)
 	var car_name := String(car_info.get("name", _initial_car_id))

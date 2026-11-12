@@ -9,7 +9,7 @@ extends Node3D
 
 const WHEELS := ["FL", "FR", "RL", "RR"]
 ## carros com envelopamento fosco: pintura sem verniz e peças sem espelhar o céu
-const MATTE := ["ford-mustang-gt3"]
+const MATTE := []
 ## tempo de exposição do desfoque da roda (1/60 s, como uma câmera de TV)
 const SHUTTER := 1.0 / 60.0
 const GHOSTS := 6

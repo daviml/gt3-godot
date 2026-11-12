@@ -133,7 +133,7 @@ func _initialize() -> void:
 
 	print("ré automática no toque (brake_to_reverse)")
 	var flat := FlatGround.new()
-	var car := Car.load_car(flat, "porsche-992-gt3r")
+	var car := Car.load_car(flat, "corvette-c6r-gt3")
 	car.reset(Vector3(0, car.p.cg, 0), 0.0)
 	car.assists["brake_reverse"] = true
 	check(car.gear == 1, "inicia em 1a marcha")

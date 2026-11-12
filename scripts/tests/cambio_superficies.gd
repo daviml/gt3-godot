@@ -11,7 +11,7 @@ func check(cond: bool, msg: String) -> void:
 	ok = ok and cond
 
 
-func new_car(g: Ground, id := "porsche-992-gt3r") -> Car:
+func new_car(g: Ground, id := "corvette-c6r-gt3") -> Car:
 	var car := Car.load_car(g, id)
 	car.reset(Vector3(0, car.p.cg, 0), 0.0)
 	for i in Car.HZ:
@@ -123,7 +123,7 @@ func _init() -> void:
 		if track.kerb_r[i] > 0.0 and track.kerb_r[(i + 15) % track.n] > 0.0 and absf(track.curv[i]) < 0.01:
 			k = i
 			break
-	var c := Car.load_car(track, "porsche-992-gt3r")
+	var c := Car.load_car(track, "corvette-c6r-gt3")
 	var t0 := track.T[k]
 	var off: float = track.wr[k] + 0.3 - c.p.track_f / 2.0
 	c.reset(track.P[k] + track.R[k] * off + Vector3.UP * (c.p.cg + 0.05), atan2(-t0.x, -t0.z))

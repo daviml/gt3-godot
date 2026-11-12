@@ -41,7 +41,7 @@ func _initialize() -> void:
 
 	print("reta: aceleração e freada")
 	var flat := FlatGround.new()
-	var car := Car.load_car(flat, "porsche-992-gt3r")
+	var car := Car.load_car(flat, "corvette-c6r-gt3")
 	car.reset(Vector3(0, car.p.cg, 0), 0.0)
 	for i in Car.HZ:
 		car.step(DT, 0, 0, 0)
@@ -64,11 +64,11 @@ func _initialize() -> void:
 	check(absf(d_min[0] - d_alvo) < 0.04, "freando (%.1f g), chega %.0f cm para a frente (alvo %.0f cm; ~35 cm a 2,2 g)" % [g_min[0], (6.8 - d_min[0]) * 100.0, (6.8 - d_alvo) * 100.0])
 	check(chase.shake.value < 1e-3, "sem tremida na reta lisa abaixo de 250 km/h")
 
-	print("volta do RefBot (Porsche), câmera a 60 Hz")
+	print("volta do RefBot (Audi R8), câmera a 60 Hz")
 	var track := Track.new("res://data/track/track.json")
-	car = Car.load_car(track, "porsche-992-gt3r")
+	car = Car.load_car(track, "audi-r8-lms-gt3")
 	car.assists.auto = true
-	var bot := RefBot.new(track, car, RefBot.load_ref("interlagos-porsche"))
+	var bot := RefBot.new(track, car, RefBot.load_ref("interlagos-r8"))
 	var s0 := track.length - 300.0
 	var p0 := bot.line_point(s0)
 	var p1 := bot.line_point(s0 + 4.0)

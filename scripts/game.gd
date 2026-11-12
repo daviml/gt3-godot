@@ -26,7 +26,7 @@ static var _cars_list_cache: Array = []
 
 
 static func is_mobile_platform() -> bool:
-	return OS.has_feature("mobile") or "--mobile" in OS.get_cmdline_user_args()
+	return OS.has_feature("mobile") or "--mobile" in OS.get_cmdline_user_args() or OS.has_feature("web_android") or OS.has_feature("web_ios")
 
 
 static func is_compatibility_renderer() -> bool:
@@ -153,7 +153,7 @@ static func _load_car() -> String:
 		var id: String = c.get_value("garagem", "carro", "")
 		if FileAccess.file_exists("res://data/cars/%s.json" % id):
 			return id
-	return "porsche-992-gt3r"
+	return "corvette-c6r-gt3"
 
 
 static func save_car(id: String) -> void:
@@ -222,7 +222,7 @@ static func has_gamepad_connected() -> bool:
 
 
 static func is_touch_device() -> bool:
-	return is_mobile_platform() or "--touch" in OS.get_cmdline_user_args()
+	return is_mobile_platform() or "--touch" in OS.get_cmdline_user_args() or (OS.has_feature("web") and DisplayServer.is_touchscreen_available())
 
 
 static func should_show_touch_controls(touch_enabled: bool) -> bool:

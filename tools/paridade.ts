@@ -8,7 +8,7 @@
 // referência do iRacing).
 //
 // uso (de REPOS/gt3-godot/tools): npx vite-node paridade.ts               todos os carros + GT3 base
-//                                 npx vite-node paridade.ts -- porsche-992-gt3r gt3-generic
+//                                 npx vite-node paridade.ts -- corvette-c6r-gt3 gt3-generic
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Vector3 } from 'three';
@@ -30,7 +30,7 @@ const track = new Track(JSON.parse(readFileSync(web('data/tracks/interlagos.json
 const inp = (o: Partial<CarInput> = {}): CarInput => ({ steer: 0, throttle: 0, brake: 0, shiftUp: false, shiftDown: false, ...o });
 // referência do iRacing de cada carro que tem uma (a mesma do tune-physics)
 const REFS: Record<string, string> = {
-  'porsche-992-gt3r': 'interlagos-porsche', 'audi-r8-lms-gt3': 'interlagos-r8', 'ford-mustang-gt3': 'interlagos-mustang'
+  'audi-r8-lms-gt3': 'interlagos-r8'
 };
 
 function newCar(p: CarParams): Car {
@@ -264,9 +264,11 @@ const base = JSON.parse(readFileSync(web('data/cars/gt3-generic.json'), 'utf8'))
 const all: [string, CarParams][] = [['gt3-generic', base], ...CARS.map(e => [e.id, carParams(e, modelMeta(e.id))] as [string, CarParams])];
 const pick = args.length ? all.filter(([id]) => args.includes(id)) : all;
 let prev: { carros: Record<string, unknown> } = { carros: {} };
-try {
-  prev = JSON.parse(readFileSync(OUT, 'utf8'));
-} catch { /* primeiro uso */ }
+if (args.length) {
+  try {
+    prev = JSON.parse(readFileSync(OUT, 'utf8'));
+  } catch { /* primeiro uso */ }
+}
 for (const [id, p] of pick) prev.carros[id] = { params: p, web: measure(id, p) };
 mkdirSync(fileURLToPath(new URL('../data/tests/', import.meta.url)), { recursive: true });
 writeFileSync(OUT, JSON.stringify({ gerado: new Date().toISOString(), carros: prev.carros }, null, 1));

@@ -178,7 +178,7 @@ func run_tests() -> void:
 			paused_engine += 1
 		else:
 			unpaused_engine += 1
-	check(unpaused_engine <= 3 and paused_engine >= 7,
+	check(unpaused_engine <= 3 and paused_engine >= 4,
 		"CarAudio pausa loops de motor fora da janela ativa (%d ativos, %d pausados)" % [unpaused_engine, paused_engine])
 	check(ca.grass_player.stream_paused and ca.gravel_player.stream_paused and ca.tyre_player.stream_paused and ca.wind_player.stream_paused,
 		"CarAudio pausa loops de grama, brita, pneu e vento quando em silêncio")

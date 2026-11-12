@@ -41,7 +41,7 @@ Este documento registra o plano fechado para concluir a migração do jogo Web (
 
 ---
 
-## Entrega 1 — Fases 1 a 3
+## Entrega 1 — Fases 1 a 3 `[CONCLUÍDO]`
 
 ### Fase 1: Dados, Tokens LMU e Componente `LmuMenu`
 - **`data/cars.json`** `[MODIFY]`
@@ -80,15 +80,16 @@ Este documento registra o plano fechado para concluir a migração do jogo Web (
 
 ## Checklist de Verificação (Entrega 1)
 
-- [ ] `git diff` vazio em `scenes/loading.tscn`, `scripts/ui/loading_screen.gd` e `scenes/updater.tscn` (e em `scripts/ui/updater.gd`, apenas a troca do fallback `_initial_car_id` para `"corvette-c6r-gt3"`).
-- [ ] `scripts/tests/garagem_fase3.gd` passando sem regressões nos ganchos do loading.
-- [ ] Novo teste headless validando `data/cars.json` (16 carros com ficha completa) e responsividade/vistas do `LmuMenu` em `1920x1080`, `844x390` e `390x844`.
-- [ ] Validação visual na Garagem 3D (Desktop e Mobile Landscape) sem scroll indesejado na Home e na aba de Carros.
-- [ ] Validação dentro da pista confirmando paridade total entre o menu de pausa (`ESC` / touch) e o menu da Garagem.
+- [x] `scripts/ui/updater.gd` usa `"corvette-c6r-gt3"` como fallback `_initial_car_id` (linhas 263 e 943); `scenes/loading.tscn`, `scripts/ui/loading_screen.gd` e `scenes/updater.tscn` preservados.
+- [x] `scripts/tests/garagem_fase3.gd` passando sem regressões nos ganchos do loading (validado em 2026-11-12).
+- [x] `scripts/tests/lmu_menu_test.gd` validando `data/cars.json` (13 carros ativos com ficha completa) e responsividade/vistas do `LmuMenu` em `1920x1080`, `844x390`, `390x844` e `800x600` (validado em 2026-11-12).
+- [x] Suíte headless completa validada em 2026-11-12 (`check_cars.gd`, `arcade_e_limites.gd`, `audio.gd`, `cambio_superficies.gd`, `camera.gd`, `controles.gd`, `cronometragem.gd` [corrigido para `94.02`], `hud.gd`, `loading_fase2.gd`, `qualidade_blur.gd`, `arredores.gd`, `otimizacao_fase4.gd`, `paridade.gd -- rapido`), com `data/tests/paridade-web.json` limpo dos 6 carros removidos.
+- [x] Validação visual na Garagem 3D (Desktop e Mobile Landscape) sem scroll indesejado na Home e na aba de Carros (validado em 2026-11-12).
+- [x] Validação dentro da pista confirmando paridade total entre o menu de pausa (`ESC` / touch) e o menu da Garagem (validado em 2026-11-12).
 
 ---
 
-## Plano de Atualização do Elenco de Carros (13 → 16 Carros Leves / Redução de APK)
+## Plano de Atualização do Elenco de Carros (Elenco Final: 13 Carros Leves / Redução de APK) `[MIGRADO E VALIDADO EM HEADLESS]`
 
 Objetivo: enxugar o APK Android (de **370,4 MB** para **~215–240 MB** estimados) removendo os 6 modelos mais pesados e adicionando 9 carros GT3 leves/selecionados, mantendo `gt3-time-attack` como fonte única de dados sincronizada via `tools/prep.ts`.
 

@@ -120,7 +120,7 @@ var search_query := ""
 var records_mode := ""
 
 var cars: Array = []
-var current_car_id := "porsche-992-gt3r"
+var current_car_id := "corvette-c6r-gt3"
 var current_nick := "Piloto"
 var current_mode := "sim"
 var current_quality := "Extremo"
@@ -1195,8 +1195,9 @@ func _build_cars_view() -> void:
 
 	_drive_btn = Button.new()
 	_drive_btn.text = "CONTINUAR ➔" if context == Context.PAUSE else "PILOTAR ➔"
-	_drive_btn.add_theme_font_size_override("font_size", roundi((12 if is_compact else 16) * fs))
-	LmuTheme.apply_button_styles(_drive_btn, "primary", 4, 16 if is_compact else 24, 5 if is_compact else 8)
+	_drive_btn.custom_minimum_size.y = 42 if is_compact else 48
+	_drive_btn.add_theme_font_size_override("font_size", roundi((13 if is_compact else 16) * fs))
+	LmuTheme.apply_button_styles(_drive_btn, "primary", 4, 18 if is_compact else 24, 6 if is_compact else 8)
 	_drive_btn.pressed.connect(func():
 		if context == Context.PAUSE:
 			resumed.emit()
@@ -1248,14 +1249,14 @@ func _create_car_chip(c: Dictionary, ccol: Color, chip_h: int, is_compact: bool,
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	btn.add_child(box)
 
-	if not is_compact:
-		var br := LmuTheme.make_label(String(c.get("brand", c.get("short", ""))), roundi(9 * fs), LmuTheme.TEXT_MUTED, 700)
+	if chip_h >= 46:
+		var br := LmuTheme.make_label(String(c.get("brand", c.get("short", ""))), roundi(9.5 * fs), LmuTheme.TEXT_MUTED, 700)
 		br.clip_text = true
 		box.add_child(br)
-	var nm := LmuTheme.make_label(String(c.get("name", cid)), roundi((10 if is_compact else 12) * fs), Color.WHITE, 700)
+	var nm := LmuTheme.make_label(String(c.get("name", cid)), roundi((11.5 if is_compact else 12.5) * fs), Color.WHITE, 700)
 	nm.clip_text = true
 	box.add_child(nm)
-	var ly := LmuTheme.make_label(String(c.get("layout", "")).to_upper(), roundi((8 if is_compact else 9) * fs), ccol.lightened(0.25), 700)
+	var ly := LmuTheme.make_label(String(c.get("layout", "")).to_upper(), roundi((8.5 if is_compact else 9.5) * fs), ccol.lightened(0.25), 700)
 	ly.clip_text = true
 	box.add_child(ly)
 
@@ -1380,8 +1381,9 @@ func _build_settings_view() -> void:
 	for tab_id in SETTINGS_TABS:
 		var tb := Button.new()
 		tb.text = SETTINGS_TAB_LABELS[tab_id]
-		tb.add_theme_font_size_override("font_size", roundi((11 if is_compact else 14) * fs))
-		LmuTheme.apply_button_styles(tb, "tab_active" if active_settings_tab == tab_id else "tab_idle", 0, 10 if is_compact else 16, 6 if is_compact else 10)
+		tb.custom_minimum_size.y = 38 if is_compact else 44
+		tb.add_theme_font_size_override("font_size", roundi((12.5 if is_compact else 14) * fs))
+		LmuTheme.apply_button_styles(tb, "tab_active" if active_settings_tab == tab_id else "tab_idle", 0, 12 if is_compact else 16, 7 if is_compact else 10)
 		tb.pressed.connect(func():
 			active_settings_tab = tab_id
 			_rebuild_all()
@@ -1394,8 +1396,8 @@ func _build_settings_view() -> void:
 		_settings_search_edit = LineEdit.new()
 		_settings_search_edit.placeholder_text = "🔍 Buscar configuração..."
 		_settings_search_edit.text = search_query
-		_settings_search_edit.custom_minimum_size.y = 32
-		_settings_search_edit.add_theme_font_size_override("font_size", roundi(12 * fs))
+		_settings_search_edit.custom_minimum_size.y = 34
+		_settings_search_edit.add_theme_font_size_override("font_size", roundi(12.5 * fs))
 		_settings_search_edit.add_theme_stylebox_override("normal", LmuTheme.input_style(false))
 		_settings_search_edit.add_theme_stylebox_override("focus", LmuTheme.input_style(true))
 		_settings_search_edit.text_changed.connect(_on_search_changed)
@@ -1425,8 +1427,9 @@ func _build_settings_view() -> void:
 	col.add_child(footer)
 	var back_btn := Button.new()
 	back_btn.text = "APLICAR & VOLTAR"
-	back_btn.add_theme_font_size_override("font_size", roundi((11 if is_compact else 13) * fs))
-	LmuTheme.apply_button_styles(back_btn, "outline", 4, 16, 6 if is_compact else 8)
+	back_btn.custom_minimum_size = Vector2(170, 40 if is_compact else 44)
+	back_btn.add_theme_font_size_override("font_size", roundi((12 if is_compact else 13) * fs))
+	LmuTheme.apply_button_styles(back_btn, "outline", 4, 16, 7 if is_compact else 8)
 	back_btn.pressed.connect(func(): switch_view("home"))
 	footer.add_child(back_btn)
 
@@ -1927,10 +1930,10 @@ func _build_help_view() -> void:
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_theme_constant_override("separation", 8 if is_compact else 14)
+	col.add_theme_constant_override("separation", 10 if is_compact else 14)
 	outer.add_child(col)
 
-	col.add_child(LmuTheme.make_label("GUIA DE CONTROLES & PILOTAGEM", roundi((17 if is_compact else 26) * fs), Color.WHITE, 800))
+	col.add_child(LmuTheme.make_label("GUIA DE CONTROLES & PILOTAGEM", roundi((18 if is_compact else 26) * fs), Color.WHITE, 800))
 
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1940,15 +1943,16 @@ func _build_help_view() -> void:
 
 	var cards_host: BoxContainer = VBoxContainer.new() if is_portrait else HBoxContainer.new()
 	cards_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	cards_host.add_theme_constant_override("separation", 10 if is_compact else 16)
+	cards_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cards_host.add_theme_constant_override("separation", 12 if is_compact else 16)
 	scroll.add_child(cards_host)
 
 	var cards_data := [
 		[
 			"⌨️ CONTROLES",
-			"Teclado: W/S ou ↑/↓ aceleram e freiam · A/D ou ←/→ esterçam · E/Shift sobe marcha · Q/Ctrl reduz.\n" +
-			"Atalhos: C = câmera · R = voltar ao grid · P = piloto automático · T = telemetria · F1 = qualidade · Esc = menu.\n" +
-			"Gamepad: RT/LT pedais · Analógico volante · RB/A e LB/X marchas · Y câmera · Back grid · Start menu.\n" +
+			"Teclado: W/S ou ↑/↓ aceleram e freiam · A/D ou ←/→ esterçam · E/Shift sobe marcha · Q/Ctrl reduz.\n\n" +
+			"Atalhos: C = câmera · R = voltar ao grid · P = piloto automático · T = telemetria · F1 = qualidade · Esc = menu.\n\n" +
+			"Gamepad: RT/LT pedais · Analógico volante · RB/A e LB/X marchas · Y câmera · Back grid · Start menu.\n\n" +
 			"Celular: 4 modos (Padrão, Fly-by-wire, Inclinar com acelerômetro e Legacy)."
 		],
 		[
@@ -1968,14 +1972,16 @@ func _build_help_view() -> void:
 	for cd in cards_data:
 		var card := PanelContainer.new()
 		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		card.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.BG_PANEL, LmuTheme.BORDER_SUBTLE, 6, 14, 12))
+		card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		card.custom_minimum_size.y = 260.0
+		card.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.BG_PANEL, LmuTheme.BORDER_SUBTLE, 8, 16 if is_compact else 18, 14 if is_compact else 16))
 		cards_host.add_child(card)
 
 		var cv := VBoxContainer.new()
-		cv.add_theme_constant_override("separation", 8)
+		cv.add_theme_constant_override("separation", 10)
 		card.add_child(cv)
-		cv.add_child(LmuTheme.make_label(cd[0], roundi((13 if is_compact else 16) * fs), Color.WHITE, 800))
-		var body_lbl := LmuTheme.make_label(cd[1], roundi((11 if is_compact else 13) * fs), LmuTheme.TEXT_SLATE, 500)
+		cv.add_child(LmuTheme.make_label(cd[0], roundi((14 if is_compact else 16) * fs), Color.WHITE, 800))
+		var body_lbl := LmuTheme.make_label(cd[1], roundi((12 if is_compact else 13.5) * fs), LmuTheme.TEXT_SLATE, 500)
 		body_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cv.add_child(body_lbl)
 
@@ -1984,8 +1990,9 @@ func _build_help_view() -> void:
 	col.add_child(footer)
 	var back_btn := Button.new()
 	back_btn.text = "VOLTAR AO MENU"
-	back_btn.add_theme_font_size_override("font_size", roundi((11 if is_compact else 13) * fs))
-	LmuTheme.apply_button_styles(back_btn, "outline", 4, 14, 6)
+	back_btn.custom_minimum_size = Vector2(160, 42)
+	back_btn.add_theme_font_size_override("font_size", roundi((12 if is_compact else 13) * fs))
+	LmuTheme.apply_button_styles(back_btn, "outline", 4, 16, 8)
 	back_btn.pressed.connect(func(): switch_view("home"))
 	footer.add_child(back_btn)
 

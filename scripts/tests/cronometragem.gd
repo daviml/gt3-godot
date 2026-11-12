@@ -19,7 +19,7 @@ func check(cond: bool, msg: String) -> void:
 
 func _init() -> void:
 	track = Track.new("res://data/track/track.json")
-	print("volta lançada (RefBot Porsche)")
+	print("volta lançada (RefBot R8)")
 	bot_laps()
 	print("limites de pista")
 	limits()
@@ -30,9 +30,9 @@ func _init() -> void:
 
 
 func bot_laps() -> void:
-	var car := Car.load_car(track, "porsche-992-gt3r")
+	var car := Car.load_car(track, "audi-r8-lms-gt3")
 	car.assists.auto = true
-	var bot := RefBot.new(track, car, RefBot.load_ref("interlagos-porsche"), BOT_OPTS)
+	var bot := RefBot.new(track, car, RefBot.load_ref("interlagos-r8"), BOT_OPTS)
 	var s0 := track.length - 300.0
 	var p0 := bot.line_point(s0)
 	var p1 := bot.line_point(s0 + 4.0)
@@ -64,8 +64,7 @@ func bot_laps() -> void:
 	var a: LapTimer.Lap = got[0]
 	var b: LapTimer.Lap = got[1]
 	print("    voltas %s / %s, setores %.2f %.2f %.2f" % [LapTimer.format_time(a.time), LapTimer.format_time(b.time), a.sectors[0], a.sectors[1], a.sectors[2]])
-	# o RefBot sem a malha de giro faz 1:36,36, mas abre 2,4 m e passa da zebra na saída da Descida do Lago
-	check(absf(a.time - 95.88) < 0.15, "1ª volta ≈ 1:35,88 (paridade com o web)")
+	check(absf(a.time - 94.02) < 0.25, "1ª volta ≈ 1:34,02 (RefBot R8)")
 	check(a.valid and b.valid, "as duas voltas válidas")
 	check(absf(a.sectors[0] + a.sectors[1] + a.sectors[2] - a.time) < 1e-4, "setores somam a volta")
 	check(a.sectors.all(func(x): return x > 20.0 and x < 45.0), "3 setores de tamanho plausível")
@@ -104,7 +103,7 @@ func limits() -> void:
 	check(i >= 0, "achou zebra + escape largos (amostra %d)" % i)
 	if i < 0:
 		return
-	var car := Car.load_car(track, "porsche-992-gt3r")
+	var car := Car.load_car(track, "corvette-c6r-gt3")
 	var half := absf(car.wheels[0].mount.x)
 	var timer := LapTimer.new(track)
 	var edge := track.wr[i]
@@ -122,21 +121,21 @@ func limits() -> void:
 
 
 func records() -> void:
-	var path := Records.PATH
+	var path := Records.path_for()
 	var backup := FileAccess.get_file_as_string(path) if FileAccess.file_exists(path) else ""
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	var lap := LapTimer.Lap.new()
 	lap.time = 97.5
 	lap.sectors = [30.0, 35.0, 32.5]
-	check(Records.save_lap("teste", "porsche-992-gt3r", lap), "1ª volta válida vira recorde")
+	check(Records.save_lap("teste", "corvette-c6r-gt3", lap), "1ª volta válida vira recorde")
 	lap.time = 98.0
-	check(not Records.save_lap("teste", "porsche-992-gt3r", lap), "volta mais lenta não substitui")
+	check(not Records.save_lap("teste", "corvette-c6r-gt3", lap), "volta mais lenta não substitui")
 	lap.time = 96.9
 	lap.valid = false
-	check(not Records.save_lap("teste", "porsche-992-gt3r", lap), "volta inválida não grava")
+	check(not Records.save_lap("teste", "corvette-c6r-gt3", lap), "volta inválida não grava")
 	lap.valid = true
-	check(not Records.save_lap("", "porsche-992-gt3r", lap), "sem nick não grava")
-	check(Records.save_lap("teste", "porsche-992-gt3r", lap), "volta mais rápida substitui")
+	check(not Records.save_lap("", "corvette-c6r-gt3", lap), "sem nick não grava")
+	check(Records.save_lap("teste", "corvette-c6r-gt3", lap), "volta mais rápida substitui")
 	check(Records.save_lap("teste", "audi-r8-lms-gt3", lap), "outro carro = outro recorde")
 	var all := Records.load_all()
 	check(all.size() == 2 and absf(float(Records.top(1)[0].time) - 96.9) < 1e-6, "2 recordes, melhor 1:36,900")

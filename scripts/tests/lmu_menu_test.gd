@@ -91,8 +91,8 @@ func run_tests() -> void:
 			central_count += 1
 	check(gar_menu._cars_grid_nodes.size() == central_count, "Filtro motor central exibe %d/%d chips" % [gar_menu._cars_grid_nodes.size(), central_count])
 
-	gar_menu.set_selected_car("ferrari-296-gt3", true)
-	check(picked_car[0] == "ferrari-296-gt3" and Game.car_id == "ferrari-296-gt3", "Seleção de carro emite sinal e salva em Game")
+	gar_menu.set_selected_car("ferrari-488-gt3", true)
+	check(picked_car[0] == "ferrari-488-gt3" and Game.car_id == "ferrari-488-gt3", "Seleção de carro emite sinal e salva em Game")
 
 	gar_menu.switch_view("settings")
 	gar_menu.search_query = "abs"
@@ -107,7 +107,7 @@ func run_tests() -> void:
 	check(gar_menu.active_settings_tab == "driver", "Todas as 5 abas de configurações constroem sem erro")
 
 	gar_menu.switch_view("records")
-	gar_menu.set_shared_records("sim", [{"nick": "PilotoTeste", "carId": "porsche-992-gt3r", "time": 94.12, "sectors": [30.1, 32.0, 32.02]}])
+	gar_menu.set_shared_records("sim", [{"nick": "PilotoTeste", "carId": "corvette-c6r-gt3", "time": 94.12, "sectors": [30.1, 32.0, 32.02]}])
 	await _frames(2)
 	check(gar_menu.shared_records_by_mode.has("sim"), "Records recebe lista compartilhada por modo")
 
@@ -139,7 +139,7 @@ func run_tests() -> void:
 	var pmenu := PauseMenu.new()
 	root.add_child(pmenu)
 	await _frames(1)
-	pmenu.open("Davi", "Leve", 0.5, {"abs": true, "tc": true, "auto": false}, "padrao", true, false, "sim", "barra", "porsche-992-gt3r")
+	pmenu.open("Davi", "Leve", 0.5, {"abs": true, "tc": true, "auto": false}, "padrao", true, false, "sim", "barra", "corvette-c6r-gt3")
 	await _frames(2)
 	check(pmenu.is_open and pmenu.visible, "PauseMenu abre e fica visível")
 	check(pmenu.lmu_menu.context == LmuMenu.Context.PAUSE, "PauseMenu usa LmuMenu em Context.PAUSE")

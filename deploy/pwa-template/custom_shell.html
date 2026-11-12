@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+	<title>$GODOT_PROJECT_NAME</title>
+
+	<!-- Configurações PWA & iOS Safari -->
+	<meta name="apple-mobile-web-app-capable" content="yes">
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+	<meta name="apple-mobile-web-app-title" content="GT3 Time Attack">
+	<meta name="theme-color" content="#0b0d10">
+	<meta name="mobile-web-app-capable" content="yes">
+	<meta name="format-detection" content="telephone=no">
+	<meta name="description" content="GT3 Time Attack — Simulador de corrida em Godot 4 no Autódromo de Interlagos">
+
+	<link rel="manifest" href="manifest.json">
+	<link id="-gd-engine-icon" rel="icon" type="image/png" href="icon-192.png" />
+	<link rel="apple-touch-icon" href="icon-192.png" />
+	<link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
+
+	$GODOT_HEAD_INCLUDE
+
+	<style>
+		* {
+			box-sizing: border-box;
+			-webkit-tap-highlight-color: transparent;
+		}
+
+		html, body {
+			margin: 0;
+			padding: 0;
+			border: 0;
+			width: 100%;
+			height: 100%;
+			background-color: #0b0d10;
+			color: #f8fafc;
+			overflow: hidden;
+			touch-action: none;
+			overscroll-behavior: none;
+			-webkit-user-select: none;
+			user-select: none;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+		}
+
+		#canvas {
+			display: block;
+			width: 100%;
+			height: 100%;
+			outline: none;
+		}
+
+		#canvas:focus {
+			outline: none;
+		}
+
+		/* Bloqueador de Orientação Retrato (Portrait Lock) */
+		#portrait-lock {
+			display: none;
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: rgba(11, 13, 16, 0.98);
+			backdrop-filter: blur(14px);
+			-webkit-backdrop-filter: blur(14px);
+			z-index: 99999;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			text-align: center;
+			padding: 32px;
+		}
+
+		@media screen and (orientation: portrait) and (max-width: 1024px) {
+			#portrait-lock {
+				display: flex;
+			}
+		}
+
+		.portrait-box {
+			max-width: 360px;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+		}
+
+		.rotate-icon {
+			width: 64px;
+			height: 64px;
+			margin-bottom: 24px;
+			stroke: #3b82f6;
+			animation: rotate-phone 2.2s ease-in-out infinite alternate;
+		}
+
+		@keyframes rotate-phone {
+			0% { transform: rotate(0deg); }
+			40% { transform: rotate(-90deg); }
+			100% { transform: rotate(-90deg); }
+		}
+
+		.portrait-box h2 {
+			font-size: 24px;
+			font-weight: 700;
+			letter-spacing: 1px;
+			margin: 0 0 10px 0;
+			color: #ffffff;
+		}
+
+		.portrait-box p {
+			font-size: 15px;
+			line-height: 1.5;
+			color: #94a3b8;
+			margin: 0;
+		}
+
+		/* Splash e Barra de Progresso Customizada GT3 */
+		#status {
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: radial-gradient(circle at center, #151a24 0%, #080a0d 100%);
+			display: flex;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			z-index: 1000;
+			padding: 24px;
+		}
+
+		.splash-card {
+			width: 100%;
+			max-width: 620px;
+			background: rgba(18, 22, 31, 0.88);
+			border: 1px solid rgba(59, 130, 246, 0.3);
+			border-radius: 20px;
+			padding: 36px 40px;
+			box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65), 0 0 40px rgba(59, 130, 246, 0.12);
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			text-align: center;
+		}
+
+		.badge-top {
+			background: rgba(59, 130, 246, 0.18);
+			border: 1px solid rgba(59, 130, 246, 0.5);
+			color: #60a5fa;
+			font-size: 11px;
+			font-weight: 700;
+			letter-spacing: 2px;
+			padding: 4px 12px;
+			border-radius: 6px;
+			margin-bottom: 14px;
+		}
+
+		.brand-title {
+			font-size: 32px;
+			font-weight: 900;
+			letter-spacing: 2px;
+			margin: 0 0 6px 0;
+			color: #ffffff;
+			text-transform: uppercase;
+		}
+
+		.brand-subtitle {
+			font-size: 13px;
+			font-weight: 600;
+			letter-spacing: 1.5px;
+			color: #94a3b8;
+			margin: 0 0 28px 0;
+			text-transform: uppercase;
+		}
+
+		.progress-container {
+			width: 100%;
+			margin-bottom: 8px;
+		}
+
+		.progress-labels {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 10px;
+			font-size: 14px;
+		}
+
+		#loading-step {
+			color: #cbd5e1;
+			font-weight: 500;
+		}
+
+		#loading-pct {
+			color: #60a5fa;
+			font-weight: 700;
+			font-family: "Consolas", "Courier New", monospace;
+			font-size: 18px;
+		}
+
+		.progress-track {
+			width: 100%;
+			height: 12px;
+			background: rgba(255, 255, 255, 0.08);
+			border-radius: 6px;
+			overflow: hidden;
+			position: relative;
+			border: 1px solid rgba(255, 255, 255, 0.05);
+		}
+
+		#custom-progress-bar {
+			width: 0%;
+			height: 100%;
+			background: linear-gradient(90deg, #2563eb, #60a5fa);
+			border-radius: 6px;
+			transition: width 0.15s ease-out;
+			box-shadow: 0 0 12px rgba(96, 165, 250, 0.5);
+		}
+
+		#loading-details {
+			font-size: 12px;
+			color: #64748b;
+			margin-top: 10px;
+			font-family: "Consolas", monospace;
+		}
+
+		#status-notice {
+			display: none;
+			background-color: #5b2128;
+			border-radius: 8px;
+			border: 1px solid #991b1b;
+			color: #fecaca;
+			font-size: 13px;
+			line-height: 1.4;
+			margin-top: 18px;
+			padding: 12px 16px;
+			text-align: left;
+			max-width: 100%;
+		}
+
+		#audio-unlock-overlay {
+			display: none;
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(11, 13, 16, 0.88);
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+			z-index: 1001;
+			flex-direction: column;
+			justify-content: center;
+			align-items: center;
+			cursor: pointer;
+		}
+
+		.unlock-btn {
+			background: linear-gradient(135deg, #2563eb, #1d4ed8);
+			color: #ffffff;
+			border: 2px solid #60a5fa;
+			border-radius: 12px;
+			padding: 18px 42px;
+			font-size: 20px;
+			font-weight: 800;
+			letter-spacing: 2px;
+			cursor: pointer;
+			box-shadow: 0 8px 24px rgba(37, 99, 235, 0.45);
+			animation: pulse-btn 1.8s infinite;
+		}
+
+		@keyframes pulse-btn {
+			0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+			70% { transform: scale(1.03); box-shadow: 0 0 0 16px rgba(59, 130, 246, 0); }
+			100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+		}
+	</style>
+</head>
+<body>
+	<!-- Bloqueador de Modo Retrato -->
+	<div id="portrait-lock">
+		<div class="portrait-box">
+			<svg class="rotate-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+				<path d="M12 18h.01"></path>
+			</svg>
+			<h2>Gire o Dispositivo</h2>
+			<p>GT3 Time Attack foi desenhado para pilotagem na horizontal (Landscape). Gire seu celular para iniciar.</p>
+		</div>
+	</div>
+
+	<!-- Canvas principal Godot -->
+	<canvas id="canvas">
+		Seu navegador não suporta HTML5 Canvas.
+	</canvas>
+
+	<!-- Overlay de Carregamento Splash -->
+	<div id="status">
+		<div class="splash-card">
+			<div class="badge-top">WEB EDITION · PWA</div>
+			<h1 class="brand-title">GT3 TIME ATTACK</h1>
+			<p class="brand-subtitle">Autódromo de Interlagos · Porsche 992 GT3 R</p>
+
+			<div class="progress-container">
+				<div class="progress-labels">
+					<span id="loading-step">Iniciando download...</span>
+					<span id="loading-pct">0%</span>
+				</div>
+				<div class="progress-track">
+					<div id="custom-progress-bar"></div>
+				</div>
+				<div id="loading-details">Conectando aos servidores Vercel...</div>
+			</div>
+
+			<div id="status-notice"></div>
+		</div>
+	</div>
+
+	<!-- Overlay de Destravamento de Áudio (iOS Safari) -->
+	<div id="audio-unlock-overlay">
+		<button class="unlock-btn">TOCAR PARA INICIAR</button>
+	</div>
+
+	<script src="$GODOT_URL"></script>
+	<script>
+		// Registrar Service Worker para habilitar instalação PWA
+		if ('serviceWorker' in navigator) {
+			window.addEventListener('load', () => {
+				navigator.serviceWorker.register('./sw.js').then((reg) => {
+					console.log('[GT3 PWA] Service Worker ativo:', reg.scope);
+				}).catch((err) => {
+					console.warn('[GT3 PWA] Service Worker falhou:', err);
+				});
+			});
+		}
+
+		// Desbloqueador de Web Audio Universal (iOS Safari / WebKit)
+		let audioUnlocked = false;
+		function unlockAudioContext() {
+			if (audioUnlocked) return;
+			const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+			if (AudioContextClass) {
+				if (!window.__gt3AudioContext) {
+					try {
+						window.__gt3AudioContext = new AudioContextClass();
+					} catch(e) {}
+				}
+				if (window.__gt3AudioContext && window.__gt3AudioContext.state === 'suspended') {
+					window.__gt3AudioContext.resume().then(() => {
+						audioUnlocked = true;
+					});
+				} else {
+					audioUnlocked = true;
+				}
+			}
+			const unlockOverlay = document.getElementById('audio-unlock-overlay');
+			if (unlockOverlay) {
+				unlockOverlay.style.display = 'none';
+			}
+		}
+
+		window.addEventListener('touchstart', unlockAudioContext, { passive: true, capture: true });
+		window.addEventListener('touchend', unlockAudioContext, { passive: true, capture: true });
+		window.addEventListener('click', unlockAudioContext, { passive: true, capture: true });
+		window.addEventListener('keydown', unlockAudioContext, { passive: true, capture: true });
+
+		const GODOT_CONFIG = $GODOT_CONFIG;
+		const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
+		const engine = new Engine(GODOT_CONFIG);
+
+		// Lista de chunks particionados para contornar o limite de 100MB do GitHub e Vercel
+		const PCK_PARTS = [
+			"index.pck.part0",
+			"index.pck.part1",
+			"index.pck.part2",
+			"index.pck.part3",
+			"index.pck.part4",
+			"index.pck.part5"
+		];
+		const ESTIMATED_PCK_SIZE = 250541000;
+
+		async function fetchWithProgress(url, onChunk) {
+			const res = await fetch(url);
+			if (!res.ok) throw new Error(`HTTP ${res.status} ao baixar ${url}`);
+			const reader = res.body.getReader();
+			const chunks = [];
+			let received = 0;
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				chunks.push(value);
+				received += value.length;
+				if (onChunk) onChunk(value.length);
+			}
+			const all = new Uint8Array(received);
+			let pos = 0;
+			for (const c of chunks) {
+				all.set(c, pos);
+				pos += c.length;
+			}
+			return all;
+		}
+
+		async function loadFullGamePck(onProgress) {
+			let totalLoaded = 0;
+			const onChunk = (bytes) => {
+				totalLoaded += bytes;
+				if (onProgress) onProgress(totalLoaded, ESTIMATED_PCK_SIZE);
+			};
+
+			// Se index.pck direto existir (ex: rodando localmente sem split), usa direto
+			try {
+				const directCheck = await fetch('index.pck', { method: 'HEAD' });
+				if (directCheck.ok && parseInt(directCheck.headers.get('content-length') || '0', 10) > 1000000) {
+					const buf = await fetchWithProgress('index.pck', onChunk);
+					return buf.buffer;
+				}
+			} catch(e) {}
+
+			// Caso contrário, baixa os chunks particionados em paralelo
+			const parts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
+			let totalLen = 0;
+			for (const part of parts) totalLen += part.length;
+
+			const full = new Uint8Array(totalLen);
+			let offset = 0;
+			for (const part of parts) {
+				full.set(part, offset);
+				offset += part.length;
+			}
+			return full.buffer;
+		}
+
+		(async function () {
+			const statusOverlay = document.getElementById('status');
+			const progressBar = document.getElementById('custom-progress-bar');
+			const stepLabel = document.getElementById('loading-step');
+			const pctLabel = document.getElementById('loading-pct');
+			const detailsLabel = document.getElementById('loading-details');
+			const statusNotice = document.getElementById('status-notice');
+			const audioOverlay = document.getElementById('audio-unlock-overlay');
+
+			function setStatusNotice(text) {
+				while (statusNotice.lastChild) {
+					statusNotice.removeChild(statusNotice.lastChild);
+				}
+				const lines = text.split('\n');
+				lines.forEach((line) => {
+					statusNotice.appendChild(document.createTextNode(line));
+					statusNotice.appendChild(document.createElement('br'));
+				});
+				statusNotice.style.display = 'block';
+			}
+
+			function displayFailureNotice(err) {
+				console.error(err);
+				if (err instanceof Error) {
+					setStatusNotice(err.message);
+				} else if (typeof err === 'string') {
+					setStatusNotice(err);
+				} else {
+					setStatusNotice('Ocorreu um erro ao carregar o jogo.');
+				}
+			}
+
+			const missing = Engine.getMissingFeatures({
+				threads: GODOT_THREADS_ENABLED,
+			});
+
+			if (missing.length !== 0) {
+				const missingMsg = 'Seu navegador não possui suporte aos seguintes recursos necessários:\n' + missing.join('\n');
+				displayFailureNotice(missingMsg);
+				return;
+			}
+
+			try {
+				// 1. Inicializa a engine e o WASM
+				stepLabel.innerText = 'Inicializando WebAssembly Engine...';
+				await engine.init();
+
+				// 2. Baixa e remonta os pacotes (chunks paralelos HTTP/2)
+				stepLabel.innerText = 'Baixando circuitos e carros...';
+				const pckBuffer = await loadFullGamePck((current, total) => {
+					const pct = Math.min(100, Math.max(0, Math.round((current / total) * 100)));
+					progressBar.style.width = pct + '%';
+					pctLabel.innerText = pct + '%';
+
+					const curMB = (current / (1024 * 1024)).toFixed(1);
+					const totMB = (total / (1024 * 1024)).toFixed(1);
+					detailsLabel.innerText = `${curMB} MB / ${totMB} MB`;
+				});
+
+				// 3. Monta o pacote de dados no filesystem virtual do Godot
+				stepLabel.innerText = 'Montando dados da pista e física...';
+				await engine.preloadFile(pckBuffer, 'index.pck');
+
+				// 4. Inicia a execução do jogo
+				stepLabel.innerText = 'Pronto para a largada!';
+				await engine.start('--main-pack', 'index.pck');
+
+				// Transição suave para o jogo
+				statusOverlay.style.transition = 'opacity 0.4s ease-out';
+				statusOverlay.style.opacity = '0';
+				setTimeout(() => {
+					statusOverlay.remove();
+				}, 400);
+
+				// Se o áudio ainda não estiver destravado pelo navegador, exibe o botão
+				const AudioCtx = window.AudioContext || window.webkitAudioContext;
+				if (AudioCtx && !audioUnlocked) {
+					audioOverlay.style.display = 'flex';
+					audioOverlay.onclick = unlockAudioContext;
+				}
+			} catch (err) {
+				displayFailureNotice(err);
+			}
+		}());
+	</script>
+</body>
+</html>

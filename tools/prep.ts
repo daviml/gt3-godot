@@ -123,7 +123,7 @@ for (const f of refs) copyFileSync(web(`data/reference/${f}`), out(`data/referen
 console.log('osm, árvores e', refs.length, 'referências:', refs.join(', '));
 
 // ---------- carros: acerto final (o mesmo objeto que o web entrega à física) + modelo
-const index: { id: string; name: string; short: string; layout: string; color: string }[] = [];
+const index: Record<string, unknown>[] = [];
 for (const c of CARS) {
   const meta = modelMeta(c.id);
   if (!meta) throw new Error(`sem data/models/${c.id}.json`);
@@ -134,7 +134,10 @@ for (const c of CARS) {
     model: { ...meta, wheels, glb: `res://assets/cars/${c.id}/${c.id}.glb` },
     params
   });
-  index.push({ id: c.id, name: c.name, short: c.short, layout: c.layout, color: c.color });
+  index.push({
+    id: c.id, name: c.name, short: c.short, layout: c.layout, color: c.color,
+    brand: c.brand, engine: c.engine, power: c.power, weight: c.weight, gears: c.gears
+  });
 }
 json('data/cars.json', index);
 console.log('acertos de', CARS.length, 'carros');

@@ -81,8 +81,11 @@ static func compute_layout_profile(viewport_size: Vector2, is_mobile := false) -
 	var profile := "desktop"
 	if vp.x < vp.y:
 		profile = "portrait"
-	elif vp.y <= 560.0 or (is_mobile and vp.y <= 640.0):
-		profile = "mobile_landscape"
+	elif is_mobile or vp.y <= 560.0:
+		if is_mobile and vp.y >= 700.0 and (vp.x / vp.y) < 1.55:
+			profile = "tablet"
+		else:
+			profile = "mobile_landscape"
 	elif vp.x >= 960.0 and vp.y > 560.0:
 		profile = "desktop"
 	else:
@@ -91,7 +94,8 @@ static func compute_layout_profile(viewport_size: Vector2, is_mobile := false) -
 	var usable_w := maxf(240.0, vp.x - float(safe.left) - float(safe.right))
 	var usable_h := maxf(240.0, vp.y - float(safe.top) - float(safe.bottom))
 
-	var header_h := 42 if profile == "mobile_landscape" else 56
+	var is_compact_mobile := (profile == "mobile_landscape" and vp.y <= 480.0)
+	var header_h := 42 if is_compact_mobile else (52 if profile == "mobile_landscape" else 56)
 	var show_center := (profile == "desktop" or profile == "tablet")
 
 	var pad_x := 32.0
@@ -125,16 +129,28 @@ static func compute_layout_profile(viewport_size: Vector2, is_mobile := false) -
 			cars_chip_h = 46
 			font_scale = clampf(vp.y / 820.0, 0.78, 0.95)
 		"mobile_landscape":
-			pad_x = 14.0
-			pad_y = 6.0
-			home_left_w = usable_w * 0.52
-			home_right_w = usable_w * 0.44
-			cars_panel_w = 235.0
-			cars_hide_aero = true
-			cars_pb_horizontal = true
-			cars_grid_cols = 7
-			cars_chip_h = 36
-			font_scale = clampf(vp.y / 440.0, 0.68, 0.88)
+			if is_compact_mobile:
+				pad_x = 14.0
+				pad_y = 6.0
+				home_left_w = usable_w * 0.52
+				home_right_w = usable_w * 0.44
+				cars_panel_w = 235.0
+				cars_hide_aero = true
+				cars_pb_horizontal = true
+				cars_grid_cols = 7
+				cars_chip_h = 36
+				font_scale = clampf(vp.y / 440.0, 0.68, 0.88)
+			else:
+				pad_x = clampf(vp.x * 0.022, 18.0, 36.0)
+				pad_y = clampf(vp.y * 0.015, 10.0, 20.0)
+				home_left_w = clampf(usable_w * 0.50, 420.0, 620.0)
+				home_right_w = clampf(usable_w * 0.42, 340.0, 520.0)
+				cars_panel_w = clampf(usable_w * 0.28, 300.0, 390.0)
+				cars_hide_aero = false
+				cars_pb_horizontal = true
+				cars_grid_cols = 5
+				cars_chip_h = 56
+				font_scale = clampf(vp.y / 760.0, 1.10, 1.35)
 		"portrait":
 			pad_x = 14.0
 			pad_y = 12.0

@@ -23,7 +23,7 @@ func near(c: Color, hex: String, tol := 0.02) -> bool:
 func _init() -> void:
 	var track := Track.new("res://data/track/track.json")
 	var ground := FlatGround.new()
-	var car := Car.load_car(ground, "porsche-992-gt3r")
+	var car := Car.load_car(ground, "corvette-c6r-gt3")
 	var timer := LapTimer.new(track)
 
 	print("cor dos pneus")
@@ -46,7 +46,7 @@ func _init() -> void:
 	check(Hud.tyre_use(car, 0) == 0.0, "roda no ar = 0")
 
 	print("setores e tempos")
-	var hud := Hud.new(car, timer, track, "porsche-992-gt3r", false)
+	var hud := Hud.new(car, timer, track, "corvette-c6r-gt3", false)
 	check(hud.sector_color(0, 30.0) == Hud.PURPLE, "sem referência = roxo")
 	hud.best_sectors = [30.0, 31.0, 32.0]
 	var best := LapTimer.Lap.new()
@@ -59,12 +59,12 @@ func _init() -> void:
 	check(LapTimer.format_time(95.123) == "1:35.123", "formato 1:35.123")
 	check(LapTimer.format_time(-1.0) == "-:--.---", "sem tempo")
 
-	print("painel do Porsche")
-	check(hud.dash, "Porsche tem painel próprio")
+	print("painel dedicado (DASH_CARS vazio)")
+	check(not hud.dash, "Corvette C6.R usa mostrador LMU padrão")
 	hud.set_view("perseguição")
 	check(not hud.dash_on, "fora do capô: só o mostrador LMU")
 	hud.set_view("capô")
-	check(hud.dash_on, "câmera de capô liga o painel")
+	check(not hud.dash_on, "câmera de capô sem painel próprio mantém mostrador LMU")
 	var hud2 := Hud.new(car, timer, track, "bmw-m4-gt3", false)
 	hud2.set_view("capô")
 	check(not hud2.dash_on, "M4 não tem painel próprio")

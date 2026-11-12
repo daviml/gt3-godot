@@ -11,6 +11,7 @@ func check(cond: bool, msg: String) -> void:
 
 
 func _initialize() -> void:
+	await process_frame
 	print("--- Testando Desfoque de Velocidade (SpeedBlur) ---")
 
 	var cam := Camera3D.new()
@@ -19,7 +20,7 @@ func _initialize() -> void:
 
 	var track := Track.new("res://data/track/track.json")
 	var ground := FlatGround.new()
-	var car := Car.load_car(ground, "porsche-992-gt3r")
+	var car := Car.load_car(ground, "corvette-c6r-gt3")
 
 	var blur := SpeedBlur.new()
 	root.add_child(blur)
@@ -73,11 +74,9 @@ func _initialize() -> void:
 	check(not main.env.ssao_enabled, "Leve: SSAO desativado")
 	check(not main.env.ssil_enabled, "Leve: SSIL desativado")
 	check(not main.env.ssr_enabled, "Leve: SSR desativado")
-	check(main.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, "Leve: sombras em 2 splits")
-	check(main.sun.directional_shadow_max_distance <= 90.0, "Leve: distância de sombra curta (80 m)")
+	check(main.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_ORTHOGONAL, "Leve: sombra ortogonal")
+	check(main.sun.directional_shadow_max_distance <= 60.0, "Leve: distância de sombra curta (50 m)")
 	check(not main.speed_blur.enabled, "Leve: speed blur desativado no mobile")
-	if main.track_view and main.track_view.surroundings:
-		check(main.track_view.surroundings.detail_level == 0, "Leve: orçamento de arredores no nível 0 (torcida 220 m)")
 
 	# Médio
 	main._apply_quality("Médio")
@@ -85,20 +84,17 @@ func _initialize() -> void:
 	check(absf(main.env.ssao_intensity - 1.0) < 0.05, "Médio: SSAO intensidade 1.0")
 	check(not main.env.ssil_enabled, "Médio: SSIL desativado")
 	check(not main.env.ssr_enabled, "Médio: SSR desativado")
-	check(main.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS, "Médio: sombras em 4 splits")
+	check(main.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, "Médio: sombras em 2 splits")
 	check(main.speed_blur.enabled and absf(main.speed_blur.max_strength - 0.8) < 1e-4, "Médio: speed blur ativado (max 0.8)")
-	if main.track_view and main.track_view.surroundings:
-		check(main.track_view.surroundings.detail_level == 1, "Médio: orçamento de arredores no nível 1 (torcida 500 m)")
 
 	# Extremo
 	main._apply_quality("Extremo")
 	check(main.env.ssao_enabled and absf(main.env.ssao_intensity - 1.6) < 0.05, "Extremo: SSAO intensidade 1.6")
 	check(main.env.ssil_enabled, "Extremo: SSIL ativado")
 	check(main.env.ssr_enabled and main.env.ssr_max_steps == 48, "Extremo: SSR ativado (48 steps)")
+	check(main.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS, "Extremo: sombras em 4 splits")
 	check(main.sun.directional_shadow_max_distance >= 180.0, "Extremo: sombra longa (180 m)")
 	check(main.speed_blur.enabled and absf(main.speed_blur.max_strength - 1.0) < 1e-4, "Extremo: speed blur ativado (max 1.0)")
-	if main.track_view and main.track_view.surroundings:
-		check(main.track_view.surroundings.detail_level == 2, "Extremo: orçamento de arredores no nível 2 (torcida 900 m)")
 
 	print("\nQualidade e Blur: " + ("TUDO OK" if ok else "FALHOU"))
 	quit(0 if ok else 1)

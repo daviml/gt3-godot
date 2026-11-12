@@ -86,7 +86,7 @@ static func get_preload_paths(p_car_id: String) -> Array[String]:
 	return paths
 
 
-func _init(p_car: Car = null, p_car_id: String = "porsche-992-gt3r", preloaded_streams: Dictionary = {}) -> void:
+func _init(p_car: Car = null, p_car_id: String = "corvette-c6r-gt3", preloaded_streams: Dictionary = {}) -> void:
 	_ensure_buses()
 	if p_car != null:
 		setup(p_car, p_car_id, preloaded_streams)

@@ -30,29 +30,29 @@ func _initialize() -> void:
 func run_tests() -> void:
 	print("--- 1. Testando Cache LRU de Carros (Game) ---")
 	Game.clear_car_cache()
-	var s1 := Game.load_car_scene("porsche-992-gt3r")
+	var s1 := Game.load_car_scene("corvette-c6r-gt3")
 	var s2 := Game.load_car_scene("bmw-m4-gt3")
 	var s3 := Game.load_car_scene("audi-r8-lms-gt3")
 	check(s1 != null and s2 != null and s3 != null, "3 PackedScenes carregados no cache")
-	check(Game.get_cached_car_scene("porsche-992-gt3r") == s1, "LRU touch no primeiro carro mantém ele no cache")
-	var s4 := Game.load_car_scene("ferrari-296-gt3")
+	check(Game.get_cached_car_scene("corvette-c6r-gt3") == s1, "LRU touch no primeiro carro mantém ele no cache")
+	var s4 := Game.load_car_scene("ferrari-488-gt3")
 	check(s4 != null, "4o carro carregado")
 	check(Game.get_cached_car_scene("bmw-m4-gt3") == null, "carro menos usado (bmw-m4-gt3) foi despejado pelo LRU (limite desktop=3)")
-	check(Game.get_cached_car_scene("porsche-992-gt3r") == s1, "carro mais recentemente tocado (porsche-992-gt3r) permaneceu")
-	check(CarAudio.get_preload_paths("porsche-992-gt3r").size() >= 15, "CarAudio.get_preload_paths retorna FX + loops do motor")
+	check(Game.get_cached_car_scene("corvette-c6r-gt3") == s1, "carro mais recentemente tocado (corvette-c6r-gt3) permaneceu")
+	check(CarAudio.get_preload_paths("corvette-c6r-gt3").size() >= 15, "CarAudio.get_preload_paths retorna FX + loops do motor")
 
 	print("\n--- 2. Testando Updater (preload inicial + entrada na Garagem) ---")
 	Game.clear_car_cache()
-	Game.car_id = "porsche-992-gt3r"
+	Game.car_id = "corvette-c6r-gt3"
 	var up_scene := load("res://scenes/updater.tscn") as PackedScene
 	var up := up_scene.instantiate()
 	root.add_child(up)
 	current_scene = up
 	var entered_garagem := await _wait_until(func(): return current_scene != null and current_scene.scene_file_path == "res://scenes/garagem.tscn", 900)
 	check(entered_garagem, "Updater entrou na garagem.tscn")
-	check(Game.get_cached_car_scene("porsche-992-gt3r") != null, "Updater pré-carregou o carro inicial no cache de Game")
+	check(Game.get_cached_car_scene("corvette-c6r-gt3") != null, "Updater pré-carregou o carro inicial no cache de Game")
 	var garagem := current_scene
-	check(garagem.view != null and garagem.view.id == "porsche-992-gt3r", "Garagem exibiu carro inicial")
+	check(garagem.view != null and garagem.view.id == "corvette-c6r-gt3", "Garagem exibiu carro inicial")
 
 	print("\n--- 3. Testando Garagem -> LoadingScreen -> Pista ---")
 	garagem._drive()
@@ -73,7 +73,7 @@ func run_tests() -> void:
 	var back_garagem := await _wait_until(func(): return current_scene != null and current_scene.scene_file_path == "res://scenes/garagem.tscn", 900)
 	check(back_garagem, "LoadingScreen voltou para scenes/garagem.tscn")
 	var garagem2 := current_scene
-	check(garagem2.view != null and garagem2.view.id == "porsche-992-gt3r", "Garagem restaurada com o carro selecionado")
+	check(garagem2.view != null and garagem2.view.id == "corvette-c6r-gt3", "Garagem restaurada com o carro selecionado")
 	check(garagem2.is_processing() and garagem2.is_processing_unhandled_input(), "Garagem responsiva após warmup")
 
 	print("\n--- 5. Testando Instanciação Direta de main.tscn e Timeout do Updater ---")

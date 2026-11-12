@@ -306,7 +306,7 @@ func ref_lap(params: Dictionary, ref_name: String) -> Dictionary:
 	return {"refbot_volta": t - lap_start if crossed >= 2 else NAN, "refbot_erro_max": max_err, "refbot_fora": off, "refbot_maxima": vmax}
 
 
-const REFS := {"porsche-992-gt3r": "interlagos-porsche", "audi-r8-lms-gt3": "interlagos-r8", "ford-mustang-gt3": "interlagos-mustang"}
+const REFS := {"audi-r8-lms-gt3": "interlagos-r8"}
 
 func measure(id: String, params: Dictionary, fast: bool) -> Dictionary:
 	var r := {}

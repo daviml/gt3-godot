@@ -1,6 +1,6 @@
 {
-  "version": 6,
+  "version": 7,
   "base_data_url": "https://github.com/daviml/gt3-godot/releases/download/v1.0/base_data.pck",
   "patch_url": "",
-  "changelog": "Versao 1.5: Carregamento assincrono da garagem, sem tela cinza e estudio otimizado."
+  "changelog": "Versao 1.6: UI responsiva para celular com fontes e botoes ampliados e minimapa limpo sem marcadores verdes."
 }

@@ -1,11 +1,11 @@
 [
   {
-    "id": "porsche-992-gt3r",
-    "uid": "b76c9b2ae2d548c3869426eac4ab8a19",
-    "name": "Porsche 911 GT3 R (992)",
+    "id": "corvette-c6r-gt3",
+    "uid": "bf18bb0effd54728a32a06aa1da75a54",
+    "name": "Chevrolet Corvette C6.R",
     "author": "Dave Love SketchFab",
     "license": "CC Attribution",
-    "url": "https://sketchfab.com/3d-models/2024-porsche-992-gt3-r-b76c9b2ae2d548c3869426eac4ab8a19"
+    "url": "https://sketchfab.com/3d-models/2010-chevrolet-corvette-c6r-bf18bb0effd54728a32a06aa1da75a54"
   },
   {
     "id": "bmw-m4-gt3",
@@ -22,22 +22,6 @@
     "author": "ᗩᒪE᙭. Kᗩ.🚗",
     "license": "CC Attribution-NonCommercial-NoDerivs",
     "url": "https://sketchfab.com/3d-models/bmw-m6-gt3-shiny-evil-27956e4ebaaa468980bc48e50106d5c6"
-  },
-  {
-    "id": "mercedes-amg-gt3",
-    "uid": "6a3f7e3455064721b74b7f0b66427a07",
-    "name": "Mercedes-AMG GT3",
-    "author": "vecarz",
-    "license": "CC Attribution-NonCommercial-ShareAlike",
-    "url": "https://sketchfab.com/3d-models/mercedes-amg-gt3-wwwvecarzcom-6a3f7e3455064721b74b7f0b66427a07"
-  },
-  {
-    "id": "ferrari-296-gt3",
-    "uid": "a463226115184535928ec75660c6571f",
-    "name": "Ferrari 296 GT3",
-    "author": "vecarz",
-    "license": "CC Attribution-NonCommercial",
-    "url": "https://sketchfab.com/3d-models/ferrari-296-gt3-wwwvecarzcom-a463226115184535928ec75660c6571f"
   },
   {
     "id": "ferrari-488-gt3",
@@ -72,35 +56,51 @@
     "url": "https://sketchfab.com/3d-models/2019-mclaren-720s-gt3-d5600ac3eed54b808ad3c154ca2c8f69"
   },
   {
-    "id": "ford-mustang-gt3",
-    "uid": "edc0d377ada74c8d8dcf12f719f81c65",
-    "name": "Ford Mustang GT3",
-    "author": "vecarz",
-    "license": "CC Attribution",
-    "url": "https://sketchfab.com/3d-models/ford-mustang-gt3-2024-wwwvecarzcom-edc0d377ada74c8d8dcf12f719f81c65"
-  },
-  {
-    "id": "corvette-c8r-gt3",
-    "uid": "82fe57ca25ee4e09a8b787ed9a2be3c0",
-    "name": "Corvette C8.R GT3",
-    "author": "vecarz",
-    "license": "CC Attribution",
-    "url": "https://sketchfab.com/3d-models/corvette-c8r-gt3tf-sport-wwwvecarzcom-82fe57ca25ee4e09a8b787ed9a2be3c0"
-  },
-  {
-    "id": "aston-vantage-gt3",
-    "uid": "fbd3494e950c40ecb536f1335296345d",
-    "name": "Aston Martin Vantage GT3",
-    "author": "Design Studio Poland",
-    "license": "CC Attribution",
-    "url": "https://sketchfab.com/3d-models/aston-martin-vantage-gt3-fbd3494e950c40ecb536f1335296345d"
-  },
-  {
     "id": "nissan-gtr-gt3",
     "uid": "1061f7970dc84b6dad0a363540fbc102",
     "name": "Nissan GT-R Nismo GT3",
     "author": "Ddiaz Design",
     "license": "CC Attribution-NonCommercial-ShareAlike",
     "url": "https://sketchfab.com/3d-models/2015-nissan-gt-r-nismo-gt3-r35-1061f7970dc84b6dad0a363540fbc102"
+  },
+  {
+    "id": "corvette-c7-gr3",
+    "uid": "c0039978bbfc47f89cbff8dd4aca570d",
+    "name": "Chevrolet Corvette C7 Gr.3",
+    "author": "kevin (ケビン)",
+    "license": "CC Attribution",
+    "url": "https://sketchfab.com/3d-models/2013-chevrolet-corvette-c7-gr3-c0039978bbfc47f89cbff8dd4aca570d"
+  },
+  {
+    "id": "acura-nsx-gt3",
+    "uid": "93a1dcff8da24d2ea6d5f912fbccc7e6",
+    "name": "Acura NSX GT3 Evo",
+    "author": "amogusstrikesback2",
+    "license": "CC Attribution",
+    "url": "https://sketchfab.com/3d-models/acura-nsx-gt3-evo-93a1dcff8da24d2ea6d5f912fbccc7e6"
+  },
+  {
+    "id": "bentley-continental-gt3-2020",
+    "uid": "ad6f9523a86a4c75a87b3c891cdb8d2b",
+    "name": "Bentley Continental GT3 (Gen 2 - 2020)",
+    "author": "OUTPISTON",
+    "license": "CC Attribution-NonCommercial-ShareAlike",
+    "url": "https://sketchfab.com/3d-models/2020-bentley-continental-gt3-ad6f9523a86a4c75a87b3c891cdb8d2b"
+  },
+  {
+    "id": "lamborghini-gallardo-gt3",
+    "uid": "85d82c5f3da041378c8807a448d26022",
+    "name": "Lamborghini Gallardo LP560 GT3",
+    "author": "Ddiaz Design",
+    "license": "CC Attribution-NonCommercial-ShareAlike",
+    "url": "https://sketchfab.com/3d-models/2011-lamborghini-gallardo-lp560-gt3-85d82c5f3da041378c8807a448d26022"
+  },
+  {
+    "id": "aston-v12-vantage-gt3",
+    "uid": "2673986fc0484af28291d85548f3c976",
+    "name": "Aston Martin V12 Vantage GT3",
+    "author": "OUTPISTON",
+    "license": "CC Attribution-NonCommercial-ShareAlike",
+    "url": "https://sketchfab.com/3d-models/2013-aston-martin-vantage-gt3-2673986fc0484af28291d85548f3c976"
   }
 ]

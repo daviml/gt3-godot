@@ -59,7 +59,7 @@ var high := true
 var manual_setup := false
 var _init_cli_args: PackedStringArray
 # referência do iRacing de cada carro que tem uma: o piloto automático segue a volta real
-const REFS := {"porsche-992-gt3r": "interlagos-porsche", "audi-r8-lms-gt3": "interlagos-r8", "ford-mustang-gt3": "interlagos-mustang"}
+const REFS := {"audi-r8-lms-gt3": "interlagos-r8"}
 
 
 
@@ -101,7 +101,7 @@ func _init_args() -> void:
 	if nick == "":
 		nick = "Piloto"
 	# --touch mostra os botões de toque no PC (o mouse vira dedo)
-	input.touch = OS.has_feature("mobile") or "--touch" in _init_cli_args
+	input.touch = OS.has_feature("mobile") or "--touch" in _init_cli_args or (OS.has_feature("web") and DisplayServer.is_touchscreen_available())
 
 
 func setup_step_track(pre_track: Track) -> void:
@@ -257,7 +257,7 @@ func _build_env(sky_tex: Texture2D = null) -> void:
 func _build_car(preloaded_streams: Dictionary = {}, start_paused := false) -> void:
 	if not FileAccess.file_exists("res://data/cars/%s.json" % car_id):
 		push_warning("carro desconhecido: %s" % car_id)
-		car_id = "porsche-992-gt3r"
+		car_id = "corvette-c6r-gt3"
 	# visual do carro (modelo, materiais, rodas com pinça parada e desfoque): scripts/render/car_view.gd
 	var q_lvl := Game.get_quality_level()
 	car_view = CarView.new(car_id, q_lvl >= 2, q_lvl == 0)

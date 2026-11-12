@@ -28,8 +28,8 @@ func _initialize() -> void:
 	log_lines.append("--- Testando Buses Nativas de Áudio da Godot ---")
 
 	var ground := FlatGround.new()
-	var porsche_car := Car.load_car(ground, "porsche-992-gt3r")
-	var audio := CarAudio.new(porsche_car, "porsche-992-gt3r")
+	var porsche_car := Car.load_car(ground, "bmw-m4-gt3")
+	var audio := CarAudio.new(porsche_car, "bmw-m4-gt3")
 	root.add_child(audio)
 	await process_frame
 
@@ -46,10 +46,10 @@ func _initialize() -> void:
 	var lpf := audio.engine_filter
 	check(lpf != null and lpf is AudioEffectLowPassFilter, "efeito é AudioEffectLowPassFilter nativo")
 
-	print("\n--- Testando Motor (Porsche 992 GT3 R - Banco tsp) ---")
-	log_lines.append("\n--- Testando Motor (Porsche 992 GT3 R - Banco tsp) ---")
+	print("\n--- Testando Motor (BMW M4 GT3 - Banco tsp) ---")
+	log_lines.append("\n--- Testando Motor (BMW M4 GT3 - Banco tsp) ---")
 	check(audio.engine_loops.size() == 10, "10 loops carregados para banco tsp")
-	check(not audio.sound_spec.get("turbo", false), "Porsche é aspirado (sem turbo)")
+	check(audio.sound_spec.get("turbo", false), "BMW M4 GT3 tem turbo")
 
 	# Marcha lenta (~1200 rpm)
 	porsche_car.rpm = 1200.0
@@ -83,8 +83,8 @@ func _initialize() -> void:
 
 	print("\n--- Testando Carro com Turbo (Ferrari 296 GT3) ---")
 	log_lines.append("\n--- Testando Carro com Turbo (Ferrari 296 GT3) ---")
-	var ferrari_car := Car.load_car(ground, "ferrari-296-gt3")
-	var ferrari_audio := CarAudio.new(ferrari_car, "ferrari-296-gt3")
+	var ferrari_car := Car.load_car(ground, "ferrari-488-gt3")
+	var ferrari_audio := CarAudio.new(ferrari_car, "ferrari-488-gt3")
 	root.add_child(ferrari_audio)
 	await process_frame
 

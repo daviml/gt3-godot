@@ -29,7 +29,7 @@ const NAVY := Color("#0d182e")
 ## cor do pneu pelo uso (0 = solto, 1 = no pico): azul → verde → amarelo → vermelho
 const TYRE_STOPS := [[0.0, Color("#3d8bff")], [0.45, Color("#2fd36b")], [0.8, Color("#f2cc30")], [1.02, Color("#ff3b30")]]
 ## carros com painel próprio na câmera de capô
-const DASH_CARS := ["porsche-992-gt3r"]
+const DASH_CARS := []
 const DASH_LEDS := 16
 const GAUGE_STYLES := ["barra", "circular"]
 const MAP_MODES := ["dynamic", "circuit"]
@@ -303,15 +303,16 @@ func _layout() -> void:
 	_ensure_styleboxes()
 	var s := get_viewport_rect().size
 	if touch:
-		_k = maxf(0.34, minf(1.15, minf(s.y / 860.0, s.x / 1760.0)))
-		_kb = maxf(0.42, minf(1.0, _k * 1.18))
-		_kp = _k
+		_k = clampf(s.y / 640.0, 1.10, 1.55)
+		_kb = clampf(s.y / 560.0, 1.25, 1.65)
+		_kp = clampf(s.y / 640.0, 1.15, 1.50)
+		_top_sc = clampf(s.y / 360.0, 1.35, 1.90)
 	else:
 		_k = maxf(0.62, minf(1.15, s.y / 860.0))
 		_kb = maxf(0.7, minf(1.05, _k * 0.92))
 		_kp = maxf(_k, minf(1.67, 1.67 * minf(s.x / 2552.0, s.y / 1268.0)))
+		_top_sc = clampf(s.y / 860.0, 0.85, 1.18)
 
-	_top_sc = clampf(s.y / 460.0, 0.82, 1.25) if touch else clampf(s.y / 860.0, 0.85, 1.18)
 	_fps_sb.set_corner_radius_all(roundi(4 * _top_sc))
 
 	var low_gpu := touch or quality_level <= 1
@@ -339,10 +340,10 @@ func _layout() -> void:
 	_hbar_sb.shadow_offset = Vector2(0, 5 * _kb)
 
 	var ins := _insets()
-	var timing_w := 250.0 * _kp
+	var timing_w := (270.0 if touch else 250.0) * _kp
 	var tr := Vector2(s.x - ins.size.x - 14 - timing_w, 14 + ins.position.y)
-	var map_size := Vector2(186, 202) * _kp
-	var map_pos := Vector2(tr.x - 8 * _kp - map_size.x, tr.y) if touch else Vector2(14 + ins.position.x, s.y - ins.size.y - 14 - map_size.y)
+	var map_size := Vector2(196, 212) * _kp
+	var map_pos := Vector2(tr.x - 10 * _kp - map_size.x, tr.y) if touch else Vector2(14 + ins.position.x, s.y - ins.size.y - 14 - map_size.y)
 	_update_map_layout(map_pos, _kp)
 
 
@@ -632,11 +633,51 @@ func _draw_toast(s: Vector2) -> void:
 	_text(_bold, r.position + Vector2(16 * sc, 7 * sc), toast_text, fs, Color(1, 1, 1, a))
 
 
+static func _clean_car_short(car_id: String) -> String:
+	var cid := car_id.to_lower()
+	if "mercedes" in cid or "amg" in cid:
+		return "AMG"
+	if "porsche" in cid or "992" in cid:
+		return "992"
+	if "ferrari" in cid or "488" in cid:
+		return "488"
+	if "corvette" in cid or "c6r" in cid:
+		return "C6R"
+	if "c7" in cid:
+		return "C7R"
+	if "m4" in cid:
+		return "M4"
+	if "m6" in cid:
+		return "M6"
+	if "huracan" in cid:
+		return "HUR"
+	if "gallardo" in cid:
+		return "GAL"
+	if "720s" in cid or "mclaren" in cid:
+		return "720S"
+	if "gtr" in cid or "nissan" in cid:
+		return "GTR"
+	if "bentley" in cid:
+		return "BEN"
+	if "nsx" in cid:
+		return "NSX"
+	if "vantage" in cid or "aston" in cid:
+		return "V12"
+	var parts := car_id.split("-")
+	return (parts[0].substr(0, 4) if parts.size() > 0 else car_id.substr(0, 4)).to_upper()
+
+
+func _get_car_short(car_id: String) -> String:
+	if _shorts.has(car_id) and String(_shorts[car_id]).length() <= 5:
+		return String(_shorts[car_id])
+	return _clean_car_short(car_id)
+
+
 # ------------------------------------------------------------------ melhores tempos (expansível)
 
 func _draw_board(pos: Vector2, sc: float) -> void:
-	var w := 300.0 * sc
-	var row := 27.0 * sc
+	var w := (330.0 if touch else 300.0) * sc
+	var row := (30.0 if touch else 27.0) * sc
 	var indices: Array[int] = []
 	if not records.is_empty():
 		if board_expanded or records.size() <= 3:
@@ -675,35 +716,38 @@ func _draw_board(pos: Vector2, sc: float) -> void:
 		if me:
 			draw_rect(Rect2(pos.x, y, w, row), Color(1, 1, 1, 0.11))
 		# posição
-		var pr := Rect2(pos.x + 12 * sc, y + 3.5 * sc, 22 * sc, 20 * sc)
+		var pr := Rect2(pos.x + 10 * sc, y + 3.5 * sc, 22 * sc, (22.0 if touch else 20.0) * sc)
 		draw_rect(pr, WHITE if i == 0 else Color(1, 1, 1, 0.1))
-		_text(_bold, pr.position + Vector2(0, 2 * sc), str(i + 1), 13 * sc, Color("#0b0d11") if i == 0 else WHITE, HORIZONTAL_ALIGNMENT_CENTER, pr.size.x)
-		# carro (filete na cor + sigla)
-		var cx := pos.x + 46 * sc
+		_text(_bold, pr.position + Vector2(0, 2 * sc), str(i + 1), (14.0 if touch else 13.0) * sc, Color("#0b0d11") if i == 0 else WHITE, HORIZONTAL_ALIGNMENT_CENTER, pr.size.x)
+		# carro (filete na cor + sigla curta garantida sem sobreposição)
+		var cx := pos.x + 40 * sc
 		draw_rect(Rect2(cx, y + 5.5 * sc, 3 * sc, 16 * sc), _colors.get(r.carId, Color.WHITE))
-		_text(_bold, Vector2(cx + 9 * sc, y + 5 * sc), String(_shorts.get(r.carId, r.carId)), 13 * sc, WHITE)
+		var c_short := _get_car_short(String(r.carId))
+		_text(_bold, Vector2(cx + 8 * sc, y + 5 * sc), c_short, (13.5 if touch else 13.0) * sc, WHITE, HORIZONTAL_ALIGNMENT_LEFT, 46 * sc)
 		# nick
-		_text(_font, Vector2(pos.x + 108 * sc, y + 4 * sc), String(r.nick), 14 * sc, WHITE, HORIZONTAL_ALIGNMENT_LEFT, 120 * sc)
+		var nick_x := pos.x + (100.0 if not touch else 108.0) * sc
+		var nick_max_w := maxf(40.0 * sc, w - (nick_x - pos.x) - (78.0 if touch else 70.0) * sc)
+		_text(_font, Vector2(nick_x, y + 4 * sc), String(r.nick), (14.0 if touch else 13.5) * sc, WHITE, HORIZONTAL_ALIGNMENT_LEFT, nick_max_w)
 		# tempo ou gap
 		var t := LapTimer.format_time(float(r.time)) if i == 0 else "+%.3f" % (float(r.time) - best)
 		var tw2 := _text_w(_font, t, 14 * sc)
-		_text(_font, Vector2(pos.x + w - 12 * sc - tw2, y + 4 * sc), t, 14 * sc, PURPLE if i == 0 else Color(1, 1, 1, 0.85))
+		_text(_font, Vector2(pos.x + w - 10 * sc - tw2, y + 4 * sc), t, 14 * sc, PURPLE if i == 0 else Color(1, 1, 1, 0.85))
 		y += row
 
 
 # ------------------------------------------------------------------ tempos (Best / Current / setores / delta)
 
 func _draw_timing(pos: Vector2, sc: float) -> void:
-	var w := 250.0 * sc
+	var w := (270.0 if touch else 250.0) * sc
 	var pad := 12.0 * sc
 	var t := timer
 	var invalid := t.current >= 0.0 and not t.valid
-	var h := (192.0 if invalid else 170.0) * sc
+	var h := ((200.0 if invalid else 176.0) if touch else (192.0 if invalid else 170.0)) * sc
 	_panel(Rect2(pos, Vector2(w, h)), sc, invalid)
 	var y := pos.y + 8 * sc
 	# curva atual (filete amarelo à esquerda)
 	draw_rect(Rect2(pos.x + pad, y, 3 * sc, 16 * sc), Color("#e3bd1c"))
-	_text(_bold, Vector2(pos.x + pad + 9 * sc, y), section.to_upper(), 13 * sc, Color(1, 1, 1, 0.9))
+	_text(_bold, Vector2(pos.x + pad + 9 * sc, y), section.to_upper(), (14.0 if touch else 13.0) * sc, Color(1, 1, 1, 0.9))
 	y += 22 * sc
 	if invalid:
 		var pulse := 0.79 + 0.21 * sin(_time * 5.2)
@@ -716,18 +760,18 @@ func _draw_timing(pos: Vector2, sc: float) -> void:
 		_text(_bold, Vector2(pos.x + pad, ry + vs * 0.42 - 6 * sc), label, 12 * sc, dim)
 		var vw := _text_w(f, value, vs)
 		_text(f, Vector2(pos.x + w - pad - vw, ry), value, vs, vc)
-	row.call(y, "BEST", LapTimer.format_time(t.best.time if t.best else -1.0), 19 * sc, PURPLE, _font)
-	y += 22 * sc
+	row.call(y, "BEST", LapTimer.format_time(t.best.time if t.best else -1.0), 20 * sc, PURPLE, _font)
+	y += 23 * sc
 	var cur_c := WHITE if t.valid else RED
-	row.call(y, "CURRENT", LapTimer.format_time(t.current), 30 * sc, cur_c, _bold)
+	row.call(y, "CURRENT", LapTimer.format_time(t.current), (32.0 if touch else 30.0) * sc, cur_c, _bold)
 	if not t.valid and t.current >= 0.0:
 		var cw := _text_w(_bold, LapTimer.format_time(t.current), 30 * sc)
 		draw_line(Vector2(pos.x + w - pad - cw, y + 18 * sc), Vector2(pos.x + w - pad, y + 18 * sc), RED, 2 * sc)
-	y += 38 * sc
+	y += 39 * sc
 	# setores: 3 caixas
 	var bw := (w - 2 * pad - 6 * sc) / 3.0
 	for i in 3:
-		var r := Rect2(pos.x + pad + i * (bw + 3 * sc), y, bw, 22 * sc)
+		var r := Rect2(pos.x + pad + i * (bw + 3 * sc), y, bw, (24.0 if touch else 22.0) * sc)
 		var border := Color(1, 1, 1, 0.14)
 		var bg := Color(1, 1, 1, 0.04)
 		var txt := ""
@@ -737,6 +781,29 @@ func _draw_timing(pos: Vector2, sc: float) -> void:
 			bg = Color(c, 0.2)
 			txt = "%.2f" % t.sectors[i]
 		draw_rect(r, bg)
+		draw_rect(r, border, false, 1.0 * sc)
+		_text(_font, r.position + Vector2(6 * sc, 5 * sc), "S%d" % (i + 1), 11 * sc, Color(1, 1, 1, 0.5))
+		var tw := _text_w(_font, txt, 13 * sc)
+		_text(_font, Vector2(r.end.x - 6 * sc - tw, r.position.y + 3.5 * sc), txt, 13 * sc, WHITE)
+	y += (30.0 if touch else 28.0) * sc
+	# delta: barra do centro para a esquerda (ganhando, verde) ou para a direita (perdendo, vermelho); cheia = 1 s
+	var dr := Rect2(pos.x + pad, y, w - 2 * pad, 18 * sc)
+	if not is_nan(t.delta):
+		var d := t.delta
+		draw_rect(dr, Color(1, 1, 1, 0.05))
+		var half := dr.size.x / 2.0
+		var bw2 := minf(1.0, absf(d)) * half
+		var cx := dr.position.x + half
+		if d < 0.0:
+			draw_rect(Rect2(cx - bw2, dr.position.y, bw2, dr.size.y), Color(GREEN, 0.75))
+		else:
+			draw_rect(Rect2(cx, dr.position.y, bw2, dr.size.y), Color(1.0, 70 / 255.0, 60 / 255.0, 0.75))
+		draw_line(Vector2(cx, dr.position.y), Vector2(cx, dr.end.y), Color(1, 1, 1, 0.35), 1.0)
+		var ds := ("−" if d < 0.0 else "+") + "%.2f" % absf(d)
+		_text(_bold, Vector2(dr.position.x, dr.position.y + 1 * sc), ds, 14 * sc, WHITE, HORIZONTAL_ALIGNMENT_CENTER, dr.size.x)
+	y += 24 * sc
+	var last := t.last
+	row.call(y, "ÚLTIMA", LapTimer.format_time(last.time if last else -1.0), 19 * sc, WHITE if (last == null or last.valid) else RED, _font)
 		draw_rect(r, border, false, 1.0 * sc)
 		_text(_font, r.position + Vector2(6 * sc, 5 * sc), "S%d" % (i + 1), 11 * sc, Color(1, 1, 1, 0.5))
 		var tw := _text_w(_font, txt, 13 * sc)
@@ -910,11 +977,6 @@ func _draw_map(pos: Vector2, sc: float) -> void:
 		draw_polyline(_map_draw_pts, Color(0, 0, 0, 0.6), 7 * sc, aa)
 		draw_polyline(_map_draw_pts, Color(235 / 255.0, 238 / 255.0, 242 / 255.0, 0.9), 3.5 * sc, aa)
 		draw_line(_map_finish_draw[0], _map_finish_draw[1], Color("#e5483b"), 2.5 * sc, aa)
-		for cr in _corners:
-			var cp := _map_origin + _to_map(cr.pos) * sc
-			draw_circle(cp, 5.0 * sc, Color(20 / 255.0, 24 / 255.0, 34 / 255.0, 0.85))
-			draw_arc(cp, 5.0 * sc, 0, TAU, 14, ACCENT, 1.0 * sc, aa)
-			_text(_bold, cp - Vector2(5.0 * sc, 4.0 * sc), str(cr.number), 7.0 * sc, WHITE, HORIZONTAL_ALIGNMENT_CENTER, 10.0 * sc)
 		var c := _map_origin + _to_map(car.pos) * sc
 		draw_circle(c, 5.5 * sc, Color.BLACK)
 		draw_circle(c, 4.0 * sc, car_color)
@@ -1050,32 +1112,6 @@ func _draw_radar(pos: Vector2, sc: float, aa: bool) -> void:
 		draw_multiline(_radar_kerb_r_segs, ACCENT, 2.0 * sc, false)
 	if not _radar_cline_segs.is_empty():
 		draw_multiline(_radar_cline_segs, Color(235 / 255.0, 238 / 255.0, 245 / 255.0, 0.9), 2.2 * sc, aa)
-
-	# curvas visíveis dentro do círculo do radar
-	var nc := _next_corner()
-	var closest: Dictionary = nc[0]
-	var max_cr := R - 7.5 * sc
-	for cr in _corners:
-		var cp: Vector3 = cr.pos
-		var kx := cx + ((cp.x - car_pos.x) * cos_a - (cp.z - car_pos.z) * sin_a) * sc_m
-		var ky := cy + ((cp.x - car_pos.x) * sin_a + (cp.z - car_pos.z) * cos_a) * sc_m
-		var kpt := Vector2(kx, ky)
-		if kpt.distance_to(rc) <= max_cr:
-			var is_next := not closest.is_empty() and int(closest.number) == int(cr.number)
-			if is_next:
-				draw_circle(kpt, 16 * sc, Color(34 / 255.0, 197 / 255.0, 94 / 255.0, 0.26))
-				draw_arc(kpt, 13.5 * sc, 0, TAU, 20, Color(74 / 255.0, 222 / 255.0, 128 / 255.0, 0.6), 2.0 * sc, aa)
-				draw_circle(kpt, 10.0 * sc, Color("#22c55e"))
-				var fs := maxi(6, roundi(10.0 * sc))
-				draw_string(_bold, kpt + Vector2(-10 * sc, _bold.get_ascent(fs) * 0.36), str(cr.number), HORIZONTAL_ALIGNMENT_CENTER, 20 * sc, fs, Color.WHITE)
-				var nfs := maxi(6, roundi(8.5 * sc))
-				draw_string(_bold, kpt + Vector2(-50 * sc, -15 * sc) + Vector2(1, 1), String(cr.name), HORIZONTAL_ALIGNMENT_CENTER, 100 * sc, nfs, Color(0, 0, 0, 0.75))
-				draw_string(_bold, kpt + Vector2(-50 * sc, -15 * sc), String(cr.name), HORIZONTAL_ALIGNMENT_CENTER, 100 * sc, nfs, Color.WHITE)
-			else:
-				draw_circle(kpt, 8.0 * sc, Color(22 / 255.0, 101 / 255.0, 52 / 255.0, 0.9))
-				draw_arc(kpt, 8.0 * sc, 0, TAU, 16, Color("#4ade80"), 1.5 * sc, aa)
-				var fs2 := maxi(6, roundi(8.0 * sc))
-				draw_string(_bold, kpt + Vector2(-8 * sc, _bold.get_ascent(fs2) * 0.36), str(cr.number), HORIZONTAL_ALIGNMENT_CENTER, 16 * sc, fs2, Color.WHITE)
 
 	# feixe de farol + seta do carro do jogador
 	_cone_pts[0] = cc

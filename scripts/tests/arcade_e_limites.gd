@@ -46,7 +46,7 @@ func _test_offtime_reset_at_finish() -> void:
 	if i_off < 0:
 		check(false, "amostra fora da pista encontrada")
 		return
-	var car := Car.load_car(track, "porsche-992-gt3r")
+	var car := Car.load_car(track, "corvette-c6r-gt3")
 	var timer := LapTimer.new(track)
 	var half := absf(car.wheels[0].mount.x)
 	# simula estar com 4 rodas fora por 0.16 s no fim da volta anterior
@@ -80,7 +80,7 @@ func _test_arcade_grip_and_no_rollover() -> void:
 	var sim_peak_lat := 0.0
 	for m in [["sim", 1.0], ["arcade", 2.0]]:
 		var ground := FlatGround.new()
-		var car_data := Game.get_car_data("porsche-992-gt3r")
+		var car_data := Game.get_car_data("corvette-c6r-gt3")
 		var car := Car.new(ground, car_data.params)
 		car.grip_scale = m[1]
 		car.assists.abs = true
@@ -107,7 +107,7 @@ func _test_arcade_grip_and_no_rollover() -> void:
 			check(max_lat_g > sim_peak_lat * 1.4, "arcade gera bem mais g lateral que o simulador (%.2f vs %.2f)" % [max_lat_g, sim_peak_lat])
 
 	# Teste extra na pista real passando em zebras com 2.0x grip a alta velocidade (usando RefBot Porsche)
-	var car_arc := Car.load_car(track, "porsche-992-gt3r")
+	var car_arc := Car.load_car(track, "corvette-c6r-gt3")
 	car_arc.grip_scale = 2.0
 	car_arc.assists.abs = true
 	car_arc.assists.tc = true
@@ -137,7 +137,7 @@ func _test_records_separation_and_api() -> void:
 	lap_arc.time = 74.500
 	lap_arc.sectors = [23.0, 27.5, 24.0]
 
-	check(Records.save_lap("DaviSim", "porsche-992-gt3r", lap_sim, "sim"), "grava recorde no modo sim")
+	check(Records.save_lap("DaviSim", "corvette-c6r-gt3", lap_sim, "sim"), "grava recorde no modo sim")
 	check(Records.save_lap("DaviArc", "bmw-m4-gt3", lap_arc, "arcade"), "grava recorde no modo arcade")
 	var top_sim := Records.top(8, "sim")
 	var top_arc := Records.top(8, "arcade")
@@ -148,11 +148,11 @@ func _test_records_separation_and_api() -> void:
 
 	check(Records.ranking_url("sim").ends_with("/api/ranking?modo=godot-sim"), "URL ranking sim aponta para godot-sim")
 	check(Records.ranking_url("arcade").ends_with("/api/ranking?modo=godot-arcade"), "URL ranking arcade aponta para godot-arcade")
-	var payload = JSON.parse_string(Records.build_volta_payload("Davi", "porsche-992-gt3r", lap_arc, "arcade"))
+	var payload = JSON.parse_string(Records.build_volta_payload("Davi", "corvette-c6r-gt3", lap_arc, "arcade"))
 	check(payload is Dictionary and payload.get("modo") == "godot-arcade" and payload.get("valid") == true, "payload POST inclui modo godot-arcade")
 
 	# Segurança contra API desatualizada: resposta sem 'modo' igual ao esperado é rejeitada
-	var legacy_body := JSON.stringify({"voltas": [{"nick": "Web", "carId": "porsche-992-gt3r", "time": 90.0}]}).to_utf8_buffer()
+	var legacy_body := JSON.stringify({"voltas": [{"nick": "Web", "carId": "corvette-c6r-gt3", "time": 90.0}]}).to_utf8_buffer()
 	var parsed_legacy := Records.parse_ranking_response(200, legacy_body, "godot-sim")
 	check(not bool(parsed_legacy.get("ok", false)), "rejeita resposta sem campo modo (evita misturar ranking web)")
 

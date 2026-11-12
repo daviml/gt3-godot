@@ -34,6 +34,7 @@ common/max_physics_steps_per_frame.mobile=2
 environment/defaults/default_clear_color=Color(0.043, 0.051, 0.063, 1)
 renderer/rendering_method="forward_plus"
 renderer/rendering_method.mobile="mobile"
+renderer/rendering_method.web="gl_compatibility"
 anti_aliasing/quality/msaa_3d=2
 anti_aliasing/quality/msaa_3d.mobile=0
 anti_aliasing/quality/use_taa=false
