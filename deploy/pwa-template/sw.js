@@ -1,5 +1,5 @@
 // Service Worker para GT3 Time Attack PWA
-const CACHE_NAME = 'gt3-time-attack-v3';
+const CACHE_NAME = 'gt3-time-attack-v4';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -47,7 +47,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Demais arquivos (shell HTML, manifest, ícones, scripts): Stale-While-Revalidate
+  // Para navegação HTML (index.html), busca da rede primeiro para pegar updates imediatos
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('index.html') || url.pathname === '/' || url.pathname.endsWith('sw.js')) {
+    event.respondWith(
+      fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache)).catch(() => {});
+        }
+        return networkResponse;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Demais arquivos (manifest, ícones, scripts): Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       const fetchPromise = fetch(event.request).then((networkResponse) => {
