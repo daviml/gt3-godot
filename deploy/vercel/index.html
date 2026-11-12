@@ -395,7 +395,7 @@
 		window.addEventListener('click', unlockAudioContext, { passive: true, capture: true });
 		window.addEventListener('keydown', unlockAudioContext, { passive: true, capture: true });
 
-		const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":161675652,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+		const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":161675460,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 		const GODOT_THREADS_ENABLED = false;
 		const engine = new Engine(GODOT_CONFIG);
 
@@ -443,7 +443,7 @@
 				}
 			} catch(e) {}
 
-			// Baixa os chunks particionados em paralelo
+			// Caso contrário, baixa os chunks particionados em paralelo
 			const parts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
 			let totalLen = 0;
 			for (const part of parts) totalLen += part.length;
@@ -519,11 +519,16 @@
 
 				// 3. Monta o pacote de dados no filesystem virtual do Godot
 				stepLabel.innerText = 'Montando dados da pista e física...';
+				try {
+					engine.copyToFS('index.pck', pckBuffer);
+				} catch (fsErr) {
+					console.warn('copyToFS falhou, usando preloader:', fsErr);
+				}
 				await engine.preloadFile(pckBuffer, 'index.pck');
 
 				// 4. Inicia a execução do jogo
 				stepLabel.innerText = 'Pronto para a largada!';
-				await engine.start({ args: ['--main-pack', 'index.pck'] });
+				await engine.start();
 
 				// Transição suave para o jogo
 				statusOverlay.style.transition = 'opacity 0.4s ease-out';
