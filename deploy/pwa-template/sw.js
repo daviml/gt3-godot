@@ -1,5 +1,5 @@
 // Service Worker para GT3 Time Attack PWA
-const CACHE_NAME = 'gt3-time-attack-v1';
+const CACHE_NAME = 'gt3-time-attack-v2';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -42,7 +42,7 @@ self.addEventListener('fetch', (event) => {
   // Arquivos pesados de engine e assets (.pck e .wasm):
   // Deixa o HTTP cache nativo do navegador (gerenciado via vercel.json immutable)
   // tratar, evitando estouro de cota (QuotaExceededError) no Cache Storage do iOS Safari.
-  if (url.pathname.endsWith('.pck') || url.pathname.endsWith('.wasm')) {
+  if (url.pathname.endsWith('.pck') || url.pathname.endsWith('.wasm') || url.pathname.includes('.pck.part')) {
     event.respondWith(fetch(event.request));
     return;
   }

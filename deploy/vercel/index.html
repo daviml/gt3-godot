@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" prefix="og: https://ogp.me/ns#">
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -27,6 +27,12 @@
 	<meta property="og:image:width" content="1200">
 	<meta property="og:image:height" content="630">
 	<meta property="og:image:alt" content="GT3 Time Attack - Tela de Carregamento em Interlagos">
+
+	<!-- Tags de compatibilidade para WhatsApp e Schema.org -->
+	<meta itemprop="name" content="GT3 Time Attack &middot; Interlagos">
+	<meta itemprop="description" content="Simulador de corrida GT3 em Interlagos direto no navegador. Física realista, 13 carros e ranking de voltas. Jogue grátis sem baixar!">
+	<meta itemprop="image" content="https://gt3-godot.vercel.app/og.jpg">
+	<link rel="image_src" href="https://gt3-godot.vercel.app/og.jpg">
 
 	<!-- Twitter Cards -->
 	<meta name="twitter:card" content="summary_large_image">
@@ -389,18 +395,17 @@
 		window.addEventListener('click', unlockAudioContext, { passive: true, capture: true });
 		window.addEventListener('keydown', unlockAudioContext, { passive: true, capture: true });
 
-		const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":161675460,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+		const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":161675652,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 		const GODOT_THREADS_ENABLED = false;
 		const engine = new Engine(GODOT_CONFIG);
 
 		// Lista de chunks particionados para contornar o limite de 100MB do GitHub e Vercel
 		const PCK_PARTS = ["index.pck.part0", "index.pck.part1", "index.pck.part2", "index.pck.part3"];
-		const ESTIMATED_PCK_SIZE = 161675460;
+		const ESTIMATED_PCK_SIZE = 161675652;
 
 		async function fetchWithProgress(url, onChunk) {
 			const res = await fetch(url);
 			if (!res.ok) {
-				if (res.status === 404) return null;
 				throw new Error(`HTTP ${res.status} ao baixar ${url}`);
 			}
 			const reader = res.body.getReader();
@@ -438,9 +443,8 @@
 				}
 			} catch(e) {}
 
-			// Caso contrário, baixa os chunks particionados em paralelo
-			const rawParts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
-			const parts = rawParts.filter((p) => p !== null);
+			// Baixa os chunks particionados em paralelo
+			const parts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
 			let totalLen = 0;
 			for (const part of parts) totalLen += part.length;
 
