@@ -394,6 +394,10 @@
 		window.addEventListener('keydown', unlockAudioContext, { passive: true, capture: true });
 
 		const GODOT_CONFIG = $GODOT_CONFIG;
+		if (!GODOT_CONFIG.args || GODOT_CONFIG.args.length === 0) {
+			GODOT_CONFIG.args = ['--main-pack', 'index.pck'];
+		}
+		GODOT_CONFIG.mainPack = 'index.pck';
 		const GODOT_THREADS_ENABLED = $GODOT_THREADS_ENABLED;
 		const engine = new Engine(GODOT_CONFIG);
 
@@ -525,13 +529,18 @@
 				try {
 					engine.copyToFS('index.pck', pckBuffer);
 				} catch (fsErr) {
-					console.warn('copyToFS falhou, usando preloader:', fsErr);
+					console.warn('copyToFS index.pck falhou:', fsErr);
+				}
+				try {
+					engine.copyToFS('/index.pck', pckBuffer);
+				} catch (fsErr) {
+					// opcional
 				}
 				await engine.preloadFile(pckBuffer, 'index.pck');
 
 				// 4. Inicia a execução do jogo
 				stepLabel.innerText = 'Pronto para a largada!';
-				await engine.start();
+				await engine.start({ args: ['--main-pack', 'index.pck'] });
 
 				// Transição suave para o jogo
 				statusOverlay.style.transition = 'opacity 0.4s ease-out';
