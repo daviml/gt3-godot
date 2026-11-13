@@ -436,6 +436,7 @@
 			"index.pck.part3"
 		];
 		const ESTIMATED_PCK_SIZE = 161675460;
+		const PCK_VERSION = "0";
 
 		async function fetchWithProgress(url, onChunk) {
 			const res = await fetch(url);
@@ -477,8 +478,8 @@
 				}
 			} catch(e) {}
 
-			// Baixa os chunks particionados em paralelo
-			const parts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
+			// Baixa os chunks particionados em paralelo (com cache-buster por build)
+			const parts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(`${p}?v=${PCK_VERSION}`, onChunk)));
 			let totalLen = 0;
 			for (const part of parts) totalLen += part.length;
 

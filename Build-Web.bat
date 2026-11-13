@@ -65,6 +65,9 @@ powershell -NoProfile -Command ^
     "    $html = [System.IO.File]::ReadAllText($htmlPath);" ^
     "    $html = [System.Text.RegularExpressions.Regex]::Replace($html, 'const PCK_PARTS = \[[^\]]*\];', 'const PCK_PARTS = [' + $partsJson + '];');" ^
     "    $html = [System.Text.RegularExpressions.Regex]::Replace($html, 'const ESTIMATED_PCK_SIZE = \d+;', 'const ESTIMATED_PCK_SIZE = ' + $totalSize + ';');" ^
+    "    $q = [char]34;" ^
+    "    $buildVer = Get-Date -Format 'yyyyMMddHHmmss';" ^
+    "    $html = [System.Text.RegularExpressions.Regex]::Replace($html, 'const PCK_VERSION = ' + $q + '[^' + $q + ']*' + $q + ';', 'const PCK_VERSION = ' + $q + $buildVer + $q + ';');" ^
     "    [System.IO.File]::WriteAllText($htmlPath, $html);" ^
     "    Write-Host '  [OK] index.html sincronizado com ' $idx ' partes e tamanho total ' $totalSize ' bytes.';" ^
     "  }" ^

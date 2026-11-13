@@ -422,13 +422,18 @@
 		window.addEventListener('touchend', requestMobileFullscreen, { passive: true, capture: true });
 		window.addEventListener('click', requestMobileFullscreen, { passive: true, capture: true });
 
-		const GODOT_CONFIG = {"args":["--main-pack","index.pck"],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":161675460,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4,"mainPack":"index.pck"};
+		const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":162350524,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+		if (!GODOT_CONFIG.args || GODOT_CONFIG.args.length === 0) {
+			GODOT_CONFIG.args = ['--main-pack', 'index.pck'];
+		}
+		GODOT_CONFIG.mainPack = 'index.pck';
 		const GODOT_THREADS_ENABLED = false;
 		const engine = new Engine(GODOT_CONFIG);
 
 		// Lista de chunks particionados para contornar o limite de 100MB do GitHub e Vercel
 		const PCK_PARTS = ["index.pck.part0", "index.pck.part1", "index.pck.part2", "index.pck.part3"];
-		const ESTIMATED_PCK_SIZE = 161675652;
+		const ESTIMATED_PCK_SIZE = 162350524;
+		const PCK_VERSION = "20261113125626";
 
 		async function fetchWithProgress(url, onChunk) {
 			const res = await fetch(url);
@@ -470,8 +475,8 @@
 				}
 			} catch(e) {}
 
-			// Caso contrário, baixa os chunks particionados em paralelo
-			const parts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(p, onChunk)));
+			// Baixa os chunks particionados em paralelo (com cache-buster por build)
+			const parts = await Promise.all(PCK_PARTS.map((p) => fetchWithProgress(`${p}?v=${PCK_VERSION}`, onChunk)));
 			let totalLen = 0;
 			for (const part of parts) totalLen += part.length;
 
