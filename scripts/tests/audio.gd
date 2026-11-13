@@ -81,35 +81,33 @@ func _initialize() -> void:
 	audio.update(0.016)
 	check(audio.engine_overall_gain > 0.0, "corte de limitador atuando")
 
-	print("\n--- Testando Carro com Turbo (Ferrari 296 GT3) ---")
-	log_lines.append("\n--- Testando Carro com Turbo (Ferrari 296 GT3) ---")
+	print("\n--- Testando Carro com Turbo Desativado no Áudio (Ferrari 296 GT3) ---")
+	log_lines.append("\n--- Testando Carro com Turbo Desativado no Áudio (Ferrari 296 GT3) ---")
 	var ferrari_car := Car.load_car(ground, "ferrari-488-gt3")
 	var ferrari_audio := CarAudio.new(ferrari_car, "ferrari-488-gt3")
 	root.add_child(ferrari_audio)
 	await process_frame
 
-	check(ferrari_audio.sound_spec.get("turbo", false), "Ferrari 296 tem turbo ativo")
-	check(ferrari_audio.turbo_player != null, "player de turbo spool inicializado")
+	check(ferrari_audio.sound_spec.get("turbo", false), "Ferrari 296 mantém spec turbo no JSON")
+	check(ferrari_audio.turbo_player == null, "player de turbo spool desativado")
 
-	# Turbo spool em alta rotação com acelerador
+	# Sem assobio de turbo em alta rotação com acelerador
 	ferrari_car.rpm = 7000.0
 	ferrari_car.throttle_out = 1.0
 	for step in 10:
 		ferrari_audio.update(0.02)
-	check(ferrari_audio.turbo_gain > 0.08, "turbo assobiando em alta rotação (ganho %.3f)" % ferrari_audio.turbo_gain)
-	check(ferrari_audio.turbo_pitch > 1.2, "pitch do turbo elevado com o giro (%.2f)" % ferrari_audio.turbo_pitch)
+	check(ferrari_audio.turbo_gain == 0.0, "sem ganho de turbo em alta rotação (ganho %.3f)" % ferrari_audio.turbo_gain)
 
-	# Válvula de alívio (blow-off) ao tirar o pé
+	# Sem válvula de alívio (blow-off) ao tirar o pé
 	ferrari_audio.last_throttle = 0.95
 	ferrari_car.throttle_out = 0.05
 	ferrari_audio.update(0.016)
-	# Confere se algum player do pool disparou
 	var fired_blowoff := false
 	for p in ferrari_audio.oneshot_pool:
 		if p.stream == ferrari_audio.fx_streams.get("turbo3") and p.playing:
 			fired_blowoff = true
 			break
-	check(fired_blowoff, "válvula de alívio (blow-off) disparou ao soltar acelerador em alto giro")
+	check(not fired_blowoff, "válvula de alívio (blow-off) não dispara")
 
 	print("\n--- Testando Efeitos FX (Troca de Marcha, Pneu, Grama, Brita, Vento, Zebra) ---")
 	log_lines.append("\n--- Testando Efeitos FX (Troca de Marcha, Pneu, Grama, Brita, Vento, Zebra) ---")

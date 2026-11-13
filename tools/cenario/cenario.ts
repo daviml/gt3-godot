@@ -77,7 +77,7 @@ async function run() {
     const custom = sm.onBeforeCompile !== THREE.Material.prototype.onBeforeCompile;
     let out: THREE.Material | null = m;
     if (ph === 'asphalt_track' && custom) out = new THREE.MeshStandardMaterial({ name: 'asfalto' });
-    else if (ph === 'leafy_grass') out = new THREE.MeshStandardMaterial({ name: 'grama' });
+    else if (ph === 'leafy_grass') out = new THREE.MeshStandardMaterial({ name: 'grama', roughness: 0.99 });
     else if (ph) out = new THREE.MeshStandardMaterial({ name: `ph:${ph}`, color: sm.color, side: sm.side });
     else if (sm.map && phName(sm.normalMap) === 'asphalt_track') {
       // tinta sobre o asfalto (paintOn): a cor pintada fica; relevo e rugosidade do asfalto o Godot põe
@@ -147,7 +147,7 @@ async function run() {
     out.quaternion.copy(mesh.quaternion);
     out.scale.copy(mesh.scale);
     // ordem de desenho e sombra no nome (o glTF não guarda): o Godot lê
-    out.name = `o${mesh.renderOrder}_s${mesh.castShadow ? 1 : 0}`;
+    out.name = `${mesh.userData.essential ? 'ess_' : ''}o${mesh.renderOrder}_s${mesh.castShadow ? 1 : 0}`;
     remove.push(mesh);
     add.push([mesh.parent!, out]);
     count('malhas');

@@ -28,11 +28,17 @@ func _initialize() -> void:
 func _run() -> void:
 	var out_dir := "build/compare/godot_atual"
 	var quality := 2
+	var only: PackedStringArray = []
+	var bench := false
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out_dir = a.substr(6)
 		elif a.begins_with("--quality="):
 			quality = int(a.substr(10))
+		elif a.begins_with("--only="):
+			only = a.substr(7).split(",")
+		elif a == "--bench":
+			bench = true
 
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://" + out_dir))
 
@@ -57,6 +63,8 @@ func _run() -> void:
 
 	for cp in CHECKPOINTS:
 		var cname: String = cp[0]
+		if not only.is_empty() and not (cname in only):
+			continue
 		var s: float = cp[1]
 		var p0: Vector3 = track.P[track.index_at(s)]
 		var p1: Vector3 = track.P[track.index_at(s + 4.0)]
@@ -69,6 +77,13 @@ func _run() -> void:
 		chase.update(1.0 / 60.0, 1.0)
 		await process_frame
 		await process_frame
+		if bench:
+			var t0 := Time.get_ticks_usec()
+			var frames := 30
+			for _f in frames:
+				await process_frame
+			var ms := (Time.get_ticks_usec() - t0) / 1000.0 / frames
+			print("bench %s (q=%d): %.2f ms/frame (%.1f FPS)" % [cname, quality, ms, 1000.0 / maxf(ms, 0.001)])
 		var img := root.get_texture().get_image()
 		var path := "%s/%s.png" % [out_dir, cname]
 		img.save_png(ProjectSettings.globalize_path("res://" + path))

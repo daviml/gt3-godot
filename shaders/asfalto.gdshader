@@ -27,19 +27,20 @@ void fragment() {
 	vec2 uv = ground / 4.0;
 	if (fast_mode) {
 		vec3 c = texture(albedo_tex, uv).rgb;
-		c = c * vec3(1.06, 1.01, 0.92) + vec3(0.02, 0.018, 0.015);
-		c *= 0.94 + 0.12 * a_noise(ground / 18.0 + 7.0);
+		c = c * vec3(1.16, 1.08, 0.93) + vec3(0.022, 0.020, 0.016);
+		float patch_n = a_noise(ground / 22.0 + 7.0) * 0.65 + a_noise(ground / 5.5 + 3.0) * 0.35;
+		c *= 0.86 + 0.28 * patch_n;
 		ALBEDO = c;
-		ROUGHNESS = 0.82;
+		ROUGHNESS = 0.84;
 		METALLIC = 0.0;
 	} else {
 		vec3 c = texture(albedo_tex, uv).rgb;
 		c = mix(c, texture(albedo_tex, uv * 0.23 + 0.41).rgb, 0.4);
-		c = c * vec3(1.06, 1.01, 0.92) + vec3(0.02, 0.018, 0.015);
+		c = c * vec3(1.24, 1.14, 0.96) + vec3(0.032, 0.028, 0.022);
 		float big = a_noise(ground / 45.0) * 0.65 + a_noise(ground / 18.0 + 13.0) * 0.35;
 		float newer = smoothstep(0.6, 0.68, big);
 		float older = smoothstep(0.36, 0.28, big);
-		c *= mix(vec3(1.0), vec3(0.68, 0.69, 0.72), newer);
+		c *= mix(vec3(1.0), vec3(0.70, 0.71, 0.74), newer);
 		c *= mix(vec3(1.0), vec3(1.14, 1.13, 1.10), older);
 		c *= 0.92 + 0.16 * a_noise(ground / 7.0 + 3.0);
 		ALBEDO = c;

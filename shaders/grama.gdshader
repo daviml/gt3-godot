@@ -6,7 +6,7 @@ shader_type spatial;
 render_mode cull_disabled;
 
 uniform bool fast_mode = false;
-uniform vec3 base_color = vec3(0.502, 0.597, 0.314); // 0xbccb98 do web, em linear
+uniform vec3 base_color = vec3(0.44, 0.70, 0.26); // verde-oliva natural calibrado ao LMU, em linear
 uniform sampler2D grass_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D grass_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D grass_arm : filter_linear_mipmap_anisotropic, repeat_enable;
@@ -29,12 +29,12 @@ void fragment() {
 	vec2 uv = ground / 6.0;
 	if (fast_mode) {
 		vec3 green = texture(grass_tex, uv).rgb;
-		float n = vnoise(ground * 0.02) * 0.7 + vnoise(ground * 0.08) * 0.3;
+		float n = vnoise(ground * 0.018) * 0.65 + vnoise(ground * 0.07) * 0.35;
 		float lg = dot(green, vec3(0.3, 0.59, 0.11));
-		vec3 olive = green * vec3(0.95, 0.92, 0.48);
-		vec3 straw = vec3(lg) * vec3(1.28, 0.98, 0.42);
-		float dry_k = smoothstep(0.35, 0.75, n);
-		ALBEDO = base_color * mix(olive, straw, dry_k * 0.75) * (0.86 + 0.28 * vnoise(ground * 0.035 + 7.0));
+		vec3 olive = mix(vec3(lg), green, 1.30) * vec3(0.78, 1.08, 0.44);
+		vec3 straw = vec3(lg) * vec3(1.18, 0.92, 0.38);
+		float dry_k = smoothstep(0.56, 0.86, n);
+		ALBEDO = base_color * mix(olive, straw, dry_k * 0.45) * (0.86 + 0.28 * vnoise(ground * 0.035 + 7.0));
 		ROUGHNESS = 0.92;
 		METALLIC = 0.0;
 	} else {

@@ -202,11 +202,7 @@ func _build_nodes() -> void:
 	if fx_streams.has("wind"):
 		wind_player = _create_loop_player(fx_streams["wind"], "Wind")
 
-	# 6. FX Contínuo: Turbo Spool (se o carro tiver turbo)
-	if sound_spec.get("turbo", false) and fx_streams.has("turbo5"):
-		turbo_player = _create_loop_player(fx_streams["turbo5"], "FX")
-
-	# 7. Pool de One-Shots (trocas de marcha, alívio de turbo, batidas na zebra)
+	# 6. Pool de One-Shots (trocas de marcha, batidas na zebra)
 	for i in POOL_SIZE:
 		var p := AudioStreamPlayer.new()
 		p.bus = "FX"
@@ -337,29 +333,9 @@ func update(dt: float) -> void:
 			_pause_player(pl)
 
 	# -------------------------------------------------------------
-	# 2. Turbo e Válvula de Alívio (Blow-Off)
+	# 2. Turbo desativado (som agudo/incômodo removido)
 	# -------------------------------------------------------------
-	if turbo_player:
-		var spool := pow(rpm / limiter_rpm, 2.0) * thr
-		var target_turbo_gain := spool * 0.18
-		if target_turbo_gain <= 0.001 and turbo_gain <= 0.001:
-			turbo_gain = 0.0
-			_pause_player(turbo_player)
-		else:
-			var target_turbo_pitch := 0.6 + (rpm / limiter_rpm) * 0.9
-			turbo_gain = lerpf(target_turbo_gain, turbo_gain, exp(-safe_dt / 0.12))
-			turbo_pitch = lerpf(target_turbo_pitch, turbo_pitch, exp(-safe_dt / 0.10))
-			if turbo_gain <= 0.001 and target_turbo_gain <= 0.001:
-				turbo_gain = 0.0
-				_pause_player(turbo_player)
-			else:
-				_play_player(turbo_player, turbo_gain)
-				turbo_player.pitch_scale = turbo_pitch
-
-		# Válvula de alívio ao tirar o pé repentinamente em rotação média/alta
-		if last_throttle > 0.75 and thr < 0.25 and rpm > limiter_rpm * 0.55:
-			play_oneshot("turbo3", 0.22, 1.6)
-
+	turbo_gain = 0.0
 	last_throttle = thr
 
 	# -------------------------------------------------------------

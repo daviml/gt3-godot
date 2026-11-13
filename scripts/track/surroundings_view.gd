@@ -127,9 +127,9 @@ static func _sub_arrays(arr: Array, tri: PackedInt32Array) -> Array:
 # A torcida em cartões e a mata ganham distância de corte adequada para alta taxa de quadros no mobile.
 const DETAIL := [
 	{"level": 0, "crowd": 0.0, "trees": 0.0, "towers": 0.0},     # 0 = Mínimo (sem torcida, sem torres, sem mata)
-	{"level": 1, "crowd": 180.0, "trees": 1200.0, "towers": 1800.0}, # 1 = Leve (60 fps S22)
+	{"level": 1, "crowd": 260.0, "trees": 1200.0, "towers": 1800.0}, # 1 = Leve (60 fps S22)
 	{"level": 2, "crowd": 400.0, "trees": 2400.0, "towers": 0.0},    # 2 = Médio
-	{"level": 3, "crowd": 0.0, "trees": 0.0, "towers": 0.0},         # 3 = Extremo (0 = ilimitado)
+	{"level": 3, "crowd": 400.0, "trees": 2400.0, "towers": 0.0},    # 3 = Extremo (cópia do Médio nos detalhes da pista)
 ]
 
 

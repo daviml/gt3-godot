@@ -19,15 +19,15 @@ void vertex() {
 
 void fragment() {
 	bool is_roof = abs(wnorm.y) > 0.7;
-	float win = is_roof ? -1.0 : 2.0;
+	float win = is_roof ? -1.0 : UV2.x;
 	vec2 fac = is_roof ? wpos.xz : vec2(abs(wnorm.x) > abs(wnorm.z) ? wpos.z : wpos.x, wpos.y);
 	vec3 c = COLOR.rgb;
 	vec3 pl = texture(plaster, fac / 4.0).rgb;
 	float glass = 0.0;
 	if (win < -0.5) {
-		c *= 0.75 + 0.5 * pl.r;
+		c *= 0.50 + 0.35 * pl.r;
 	} else {
-		c *= 0.6 + 0.8 * pl.g;
+		c *= 0.45 + 0.40 * pl.g;
 		if (win > 0.5) {
 			bool house = win < 1.5;
 			float bay = house ? 3.6 : 3.0;

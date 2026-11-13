@@ -22,10 +22,10 @@ void vertex() {
 }
 
 void fragment() {
-	vec3 c = v_col;
+	vec3 c = v_col * 0.70;
 	float glass = 0.0;
 	if (abs(v_n.y) > 0.5) {
-		c = vec3(0.52, 0.52, 0.5) * (0.85 + 0.3 * t_h(floor(v_w.xz / 3.0)));
+		c = vec3(0.42, 0.42, 0.40) * (0.85 + 0.3 * t_h(floor(v_w.xz / 3.0)));
 	} else {
 		float u = abs(v_n.x) > abs(v_n.z) ? v_w.z : v_w.x;
 		float floor_h = 2.9;
@@ -45,7 +45,7 @@ void fragment() {
 			// laje da varanda (faixa clara) e guarda-corpo (faixa escura translúcida) em cada andar
 			float slab = step(f.y, 0.22) * (1.0 - ground);
 			float rail = step(0.22, f.y) * step(f.y, 1.05) * (1.0 - stair) * (1.0 - ground);
-			c = mix(c, vec3(0.93, 0.92, 0.89), slab * 0.8);
+			c = mix(c, vec3(0.70, 0.69, 0.67), slab * 0.8);
 			c = mix(c, c * 0.55, rail * 0.6);
 		}
 		// térreo mais escuro (portaria, garagem) e sujeira escorrida embaixo

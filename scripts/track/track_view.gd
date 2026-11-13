@@ -79,7 +79,7 @@ func set_detail(level: int) -> void:
 		var mi: MeshInstance3D = entry.mi
 		if mi:
 			if minimal:
-				mi.visibility_range_end = CULL_SECONDARY_MIN
+				mi.visibility_range_end = 450.0 if entry.get("essential", false) else CULL_SECONDARY_MIN
 			elif level == 1:
 				mi.visibility_range_end = CULL_SECONDARY_LEVE
 			else:
@@ -97,7 +97,9 @@ func _fix(n: Node) -> void:
 		meshes += 1
 		var order := 0
 		var shadow := true
-		var m := _name_re.search(mi.name)
+		var is_essential := String(mi.name).begins_with("ess_")
+		var clean_name: String = String(mi.name).substr(4) if is_essential else String(mi.name)
+		var m := _name_re.search(clean_name)
 		if m:
 			order = int(m.get_string(1))
 			shadow = m.get_string(2) == "1"
@@ -129,13 +131,13 @@ func _fix(n: Node) -> void:
 		# Detalhes secundários (postes, alambrado, cones, placas, detalhes de pit/arquibancada)
 		# são cortados mais perto no Mínimo (300 m) e com sombra até 550 m nos demais presets.
 		if order == 0 and not is_primary_surface and not is_building_surface and not is_barrier_surface and maxf(ext.x, ext.z) <= 450.0:
-			if maxf(ext.x, ext.z) > 12.0 or ext.y > 3.5:
+			if not is_essential and (maxf(ext.x, ext.z) > 12.0 or ext.y > 3.5):
 				_minimal_hide_meshes.append(mi)
-			_cull_meshes.append({"mi": mi, "shadow": shadow})
+			_cull_meshes.append({"mi": mi, "shadow": shadow, "essential": is_essential})
 			mi.visibility_range_end_margin = 0.0
 			mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
 			if detail_level == 0:
-				mi.visibility_range_end = CULL_SECONDARY_MIN
+				mi.visibility_range_end = 450.0 if is_essential else CULL_SECONDARY_MIN
 			elif detail_level == 1:
 				mi.visibility_range_end = CULL_SECONDARY_LEVE
 			else:
@@ -161,7 +163,7 @@ func _material(src: Material, order: int) -> Material:
 		var ph := nm.substr(3)
 		var o := ORMMaterial3D.new()
 		o.albedo_texture = _tex(ph + "_diff")
-		o.albedo_color = bm.albedo_color * (Color(0.72, 0.71, 0.69) if ph.begins_with("concrete_wall") else Color.WHITE)
+		o.albedo_color = bm.albedo_color * (Color(0.56, 0.55, 0.53) if ph.begins_with("concrete_wall") else Color.WHITE)
 		o.normal_enabled = true
 		o.normal_texture = _tex(ph + "_nor_gl")
 		o.orm_texture = _tex(ph + "_arm")
@@ -171,6 +173,9 @@ func _material(src: Material, order: int) -> Material:
 	elif bm:
 		var d := bm.duplicate() as BaseMaterial3D
 		d.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		if order == 0 and nm != "pinta" and d.albedo_texture == null and d.albedo_color.get_luminance() > 0.55:
+			# Evita que paredes lisas claras (ex.: fundo dos boxes/paddock) estourem em branco puro sob sun.light_energy = 2.8
+			d.albedo_color = Color(d.albedo_color.r * 0.65, d.albedo_color.g * 0.65, d.albedo_color.b * 0.65, d.albedo_color.a)
 		if nm == "pinta":
 			d.normal_enabled = true
 			d.normal_texture = _tex("asphalt_track_nor_gl")
