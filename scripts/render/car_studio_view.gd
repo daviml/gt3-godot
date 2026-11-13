@@ -244,6 +244,8 @@ func apply_studio_quality() -> void:
 			studio_env.glow_bloom = 0.03
 	if key_light:
 		key_light.shadow_enabled = studio_quality_level >= 1
+	if view:
+		view.blob_shadow_enabled = studio_quality_level == 0
 
 
 func set_cars_framing(enabled: bool, vp_size := Vector2.ZERO) -> void:
@@ -369,6 +371,7 @@ func _mount_car(car_id: String, scene: PackedScene = null) -> void:
 		view.queue_free()
 		view = null
 	view = CarView.new(car_id, vitrine_mode, studio_quality_level == 0)
+	view.blob_shadow_enabled = studio_quality_level == 0
 	pivot.add_child(view)
 	var p: Dictionary = view.data.params
 	var mw: Array = view.data.model.wheels

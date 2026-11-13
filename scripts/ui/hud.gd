@@ -551,7 +551,7 @@ func _draw_top_bar(top_center: Vector2) -> float:
 	var fps_w := _text_w(_bold, fps_num, fs) + _text_w(_font, fps_lbl, fs) + 14.0 * sc
 	var menu_lbl := "MENU"
 	var menu_w := 14.0 * sc + _text_w(_bold, menu_lbl, fs * 0.92) + 16.0 * sc
-	var icon_w := 28.0 * sc
+	var icon_w := 44.0 * sc
 
 	var total_w := fps_w
 	if not menu_open:

@@ -9,12 +9,12 @@ extends Node3D
 
 const WHEELS := ["FL", "FR", "RL", "RR"]
 ## carros com envelopamento fosco: pintura sem verniz e peças sem espelhar o céu
-const MATTE := []
+const MATTE := ["bentley-continental-gt3-2020"]
 ## tempo de exposição do desfoque da roda (1/60 s, como uma câmera de TV)
 const SHUTTER := 1.0 / 60.0
 const GHOSTS := 6
 
-static var _paint := RegEx.create_from_string("(?i)carpaint|paint(?!ed)|colou?r|body|livery|decal|alex_ka")
+static var _paint := RegEx.create_from_string("(?i)carpaint|paint(?!ed)|colou?r|body|livery|decal|alex_ka|(?:^|_)ext(?:\\.|$)")
 static var _non_metal := RegEx.create_from_string("(?i)plastic|carbon|kevlar|glass|window|windshield|light|lamp|led|lcd|display|tyre|tire(?!.*(brake|hub|disk|wheel))|rubber|borracha|alcantara|seat|belt|net|occlusion|painted")
 static var _metal := RegEx.create_from_string("(?i)chrome|disc|disk|rotor|rim|wheel|hub|exhaust|exalt|escapamento|mirror|metal|screw|welding|fuel|tamp|hook|brake")
 
@@ -45,6 +45,15 @@ var simple_materials := false:
 			return
 		simple_materials = v
 		_apply_material_mode()
+## sombra de contato sob o chassi (ativa apenas quando não há sombra direcional do sol)
+var blob_shadow_enabled := true:
+	set(v):
+		if blob_shadow_enabled == v:
+			return
+		blob_shadow_enabled = v
+		if _blob_shadow:
+			_blob_shadow.visible = blob_shadow_enabled
+var _blob_shadow: MeshInstance3D
 var _blur_sources: Array[MeshInstance3D] = []
 var _mat_states: Array[Dictionary] = []
 
@@ -92,6 +101,8 @@ func _build_blob_shadow(p: Dictionary) -> void:
 	mat.no_depth_test = false
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.visible = blob_shadow_enabled
+	_blob_shadow = mi
 	add_child(mi)
 
 

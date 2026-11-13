@@ -835,6 +835,7 @@ func _set_quality(level: int) -> void:
 	if car_view:
 		car_view.blur_enabled = level >= 2
 		car_view.simple_materials = level == 0
+		car_view.blob_shadow_enabled = level == 0
 
 	# 8. Física e HUD por orçamento (Mínimo limita sub-passos a 4 / 240 Hz mesmo no Desktop)
 	if car:
