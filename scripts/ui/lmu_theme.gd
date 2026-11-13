@@ -108,6 +108,7 @@ static func compute_layout_profile(viewport_size: Vector2, is_mobile := false) -
 	var cars_grid_cols := 7
 	var cars_chip_h := 52
 	var font_scale := 1.0
+	var ui_scale := 1.0
 
 	match profile:
 		"desktop":
@@ -119,18 +120,20 @@ static func compute_layout_profile(viewport_size: Vector2, is_mobile := false) -
 			cars_grid_cols = 7
 			cars_chip_h = 52
 			font_scale = clampf(minf(vp.x / 1600.0, vp.y / 900.0), 0.85, 1.12)
+			ui_scale = 1.0
 		"tablet":
 			pad_x = 20.0
 			pad_y = 14.0
 			home_left_w = usable_w * 0.48
 			home_right_w = minf(340.0, usable_w * 0.44)
-			cars_panel_w = 260.0
+			cars_panel_w = 280.0
 			cars_grid_cols = 5
-			cars_chip_h = 46
+			cars_chip_h = 52
 			font_scale = clampf(vp.y / 820.0, 0.78, 0.95)
+			ui_scale = 1.12
 		"mobile_landscape":
 			if is_compact_mobile:
-				pad_x = 14.0
+				pad_x = 12.0
 				pad_y = 6.0
 				home_left_w = usable_w * 0.52
 				home_right_w = usable_w * 0.44
@@ -139,29 +142,32 @@ static func compute_layout_profile(viewport_size: Vector2, is_mobile := false) -
 				cars_pb_horizontal = true
 				cars_grid_cols = 7
 				cars_chip_h = 36
-				font_scale = clampf(vp.y / 440.0, 0.68, 0.88)
+				font_scale = clampf(vp.y / 440.0, 0.74, 0.94)
+				ui_scale = 1.18
 			else:
-				pad_x = clampf(vp.x * 0.025, 24.0, 48.0)
-				pad_y = clampf(vp.y * 0.018, 12.0, 22.0)
+				pad_x = clampf(vp.x * 0.018, 16.0, 32.0)
+				pad_y = clampf(vp.y * 0.014, 10.0, 18.0)
 				home_left_w = clampf(usable_w * 0.52, 520.0, 920.0)
 				home_right_w = clampf(usable_w * 0.42, 420.0, 680.0)
-				cars_panel_w = clampf(usable_w * 0.30, 340.0, 480.0)
+				cars_panel_w = clampf(usable_w * 0.34, 380.0, 540.0)
 				cars_hide_aero = false
 				cars_pb_horizontal = true
 				cars_grid_cols = 5
-				cars_chip_h = 72
+				cars_chip_h = 84
 				font_scale = clampf(vp.y / 600.0, 1.35, 1.85)
+				ui_scale = 1.26
 		"portrait":
-			pad_x = 14.0
-			pad_y = 12.0
+			pad_x = 12.0
+			pad_y = 10.0
 			home_left_w = usable_w - pad_x * 2.0
 			home_right_w = usable_w - pad_x * 2.0
 			cars_panel_w = usable_w - pad_x * 2.0
 			cars_hide_aero = false
 			cars_pb_horizontal = true
 			cars_grid_cols = 3
-			cars_chip_h = 44
-			font_scale = clampf(vp.x / 460.0, 0.72, 0.92)
+			cars_chip_h = 56
+			font_scale = clampf(vp.x / 440.0, 0.78, 0.98)
+			ui_scale = 1.18
 
 	return {
 		"profile": profile,
@@ -186,6 +192,7 @@ static func compute_layout_profile(viewport_size: Vector2, is_mobile := false) -
 		"cars_grid_cols": cars_grid_cols,
 		"cars_chip_height": cars_chip_h,
 		"font_scale": font_scale,
+		"ui_scale": ui_scale,
 	}
 
 

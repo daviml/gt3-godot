@@ -6,8 +6,9 @@ class_name InputReader
 extends RefCounted
 
 const DEADZONE := 0.08
-## >1 deixa o centro do analógico mais suave
+## >1 deixa o centro do analógico mais suave (Simulador e Arcade)
 const STEER_LINEARITY := 1.6
+const STEER_LINEARITY_ARCADE := 1.9
 
 ## celular: os botões de toque usam a direção antiga (rampa constante e limite próprio)
 var touch := false
@@ -82,6 +83,26 @@ func read_devices() -> Dictionary:
 	return raw
 
 
+## Rampa progressiva estilo "direção elétrica" para analógico (controle e toque proporcional):
+## mais suave perto do centro e em alta velocidade (reta), mais direta em curvas e rápida no retorno.
+static func _step_steer_ramp(cur: float, target: float, dt: float, speed_ms: float, arcade_blend: float) -> float:
+	var returning := absf(target) < absf(cur) or (target * cur < 0.0)
+	var rate: float
+	if returning:
+		rate = 8.0
+	else:
+		var speed_t := clampf((speed_ms - 18.0) / 45.0, 0.0, 1.0)
+		var prog := clampf(absf(cur) / 0.35, 0.0, 1.0)
+		var start_low := lerpf(3.8, 3.0, arcade_blend)
+		var start_high := lerpf(2.8, 2.0, arcade_blend)
+		var full_low := lerpf(5.0, 4.5, arcade_blend)
+		var full_high := lerpf(4.2, 3.5, arcade_blend)
+		var min_rate := lerpf(start_low, start_high, speed_t)
+		var max_rate := lerpf(full_low, full_high, speed_t)
+		rate = lerpf(min_rate, max_rate, prog)
+	return cur + clampf(target - cur, -rate * dt, rate * dt)
+
+
 func update(dt: float, speed_ms: float) -> void:
 	filter(dt, speed_ms, read_devices())
 
@@ -92,6 +113,7 @@ func filter(dt: float, speed_ms: float, raw: Dictionary) -> void:
 	# e o resto do curso do analógico/botão vira precisão em vez de excesso.
 	# No Arcade (grip_scale > 1), o limite sobe na mesma proporção.
 	var limit := minf(1.0, steer_limit(speed_ms) * grip_scale)
+	var arcade_blend := clampf(grip_scale - 1.0, 0.0, 1.0)
 
 	# teclado / toque (digitais): segurar vira progressivamente — toque curto corrige, segurar vai ao batente
 	var target := (1.0 if raw.right else 0.0) - (1.0 if raw.left else 0.0)
@@ -120,10 +142,12 @@ func filter(dt: float, speed_ms: float, raw: Dictionary) -> void:
 	# com a mesma limitação de velocidade do analógico do controle; pedais proporcionais com filtro de 0,05 s
 	var tm := touch_mode if allow_touch else "legacy"
 	if tm != "legacy":
-		var target_analog: float = (raw.get("tilt_steer", float(touch_axes.get("steer", 0.0))) if tm == "inclinar" else float(touch_axes.get("steer", 0.0))) * old_limit
-		var rate := 5.0 if absf(target_analog) > absf(_analog_steer) else 8.0
-		_analog_steer += clampf(target_analog - _analog_steer, -rate * dt, rate * dt)
-		cur_steer = _analog_steer
+		var raw_analog: float = raw.get("tilt_steer", float(touch_axes.get("steer", 0.0))) if tm == "inclinar" else float(touch_axes.get("steer", 0.0))
+		var target_analog := clampf(raw_analog, -1.0, 1.0)
+		if arcade_blend > 0.0:
+			target_analog = signf(target_analog) * pow(absf(target_analog), lerpf(1.0, 1.18, arcade_blend))
+		_analog_steer = _step_steer_ramp(_analog_steer, target_analog, dt, speed_ms, arcade_blend)
+		cur_steer = _analog_steer * old_limit
 		if tm != "inclinar":
 			var k := 1.0 - exp(-dt / 0.05)
 			_analog_gas += (float(touch_axes.get("gas", 0.0)) - _analog_gas) * k
@@ -147,10 +171,9 @@ func filter(dt: float, speed_ms: float, raw: Dictionary) -> void:
 	if pad != null:
 		var ax: float = pad.x
 		var mag := maxf(0.0, (absf(ax) - DEADZONE) / (1.0 - DEADZONE))
-		var stick := signf(ax) * pow(mag, STEER_LINEARITY)
-		# limita a velocidade do volante: um tranco no analógico vira em ~0,2 s em vez de num quadro só
-		var pad_rate := 5.0 if absf(stick) > absf(_pad_steer) else 8.0
-		_pad_steer += clampf(stick - _pad_steer, -pad_rate * dt, pad_rate * dt)
+		var linearity := lerpf(STEER_LINEARITY, STEER_LINEARITY_ARCADE, arcade_blend)
+		var stick := signf(ax) * pow(mag, linearity)
+		_pad_steer = _step_steer_ramp(_pad_steer, stick, dt, speed_ms, arcade_blend)
 		var pad_steer := _pad_steer * limit
 		var pad_thr: float = pad.rt
 		var pad_brk: float = pad.lt

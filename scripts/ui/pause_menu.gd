@@ -127,3 +127,5 @@ func handle_back() -> bool:
 func close() -> void:
 	is_open = false
 	visible = false
+	if lmu_menu:
+		lmu_menu.cleanup_pause_studio()

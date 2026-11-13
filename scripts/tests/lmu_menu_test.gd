@@ -169,7 +169,13 @@ func run_tests() -> void:
 	check(not pmenu.handle_back(), "handle_back() na Home retorna false para main.gd fechar o menu")
 	pmenu.update_fps(60)
 	check(pmenu.lmu_menu.live_fps == 60, "update_fps alimenta o LmuMenu ao vivo")
+	pmenu.lmu_menu.switch_view("cars")
+	await _frames(2)
+	check(pmenu.lmu_menu._pause_studio != null and is_instance_valid(pmenu.lmu_menu._pause_studio), "PAUSE/cars instancia estúdio 3D padrão em SubViewport")
+	check(not pmenu.lmu_menu._backdrop.visible, "PAUSE/cars oculta backdrop para exibir estúdio 3D")
 	pmenu.close()
+	await _frames(2)
+	check(pmenu.lmu_menu._pause_studio == null, "PauseMenu.close() libera estúdio 3D da pausa")
 	check(not pmenu.is_open and not pmenu.visible, "PauseMenu fecha corretamente")
 	pmenu.queue_free()
 

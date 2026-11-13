@@ -136,6 +136,9 @@ var shared_records_by_mode := {}
 var layout_profile := {}
 
 var _backdrop: _Backdrop
+var _pause_studio_container: SubViewportContainer
+var _pause_studio_vp: SubViewport
+var _pause_studio: CarStudioView
 var _root_vbox: VBoxContainer
 var _header_panel: PanelContainer
 var _header_hbox: HBoxContainer
@@ -304,6 +307,8 @@ func set_selected_car(car_id: String, emit_sig := false) -> void:
 		return
 	current_car_id = car_id
 	Game.save_car(car_id)
+	if _pause_studio != null and is_instance_valid(_pause_studio):
+		_pause_studio.show_car_by_id(car_id)
 	if active_view == "cars" and _car_hero_name != null:
 		_refresh_cars_view_data()
 	elif is_inside_tree():
@@ -426,7 +431,48 @@ func _build_shell() -> void:
 
 
 func _is_transparent_studio_view() -> bool:
-	return context == Context.GARAGE and active_view == "cars"
+	return active_view == "cars"
+
+
+func cleanup_pause_studio() -> void:
+	if _pause_studio_container != null and is_instance_valid(_pause_studio_container):
+		_pause_studio_container.queue_free()
+	_pause_studio_container = null
+	_pause_studio_vp = null
+	_pause_studio = null
+
+
+func _sync_pause_studio(vp_size: Vector2) -> void:
+	var need_studio := (context == Context.PAUSE and active_view == "cars" and visible)
+	if not need_studio:
+		cleanup_pause_studio()
+		return
+	if _pause_studio_container == null or not is_instance_valid(_pause_studio_container):
+		_pause_studio_container = SubViewportContainer.new()
+		_pause_studio_container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_pause_studio_container.stretch = true
+		_pause_studio_container.mouse_filter = Control.MOUSE_FILTER_STOP
+		_pause_studio_container.gui_input.connect(func(e: InputEvent):
+			if _pause_studio != null and is_instance_valid(_pause_studio):
+				_pause_studio.handle_drag_event(e)
+		)
+		add_child(_pause_studio_container)
+		move_child(_pause_studio_container, 1)
+
+		_pause_studio_vp = SubViewport.new()
+		_pause_studio_vp.own_world_3d = true
+		_pause_studio_vp.transparent_bg = false
+		_pause_studio_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		_pause_studio_vp.msaa_3d = Viewport.MSAA_2X if Game.get_quality_level() >= 2 else Viewport.MSAA_DISABLED
+		_pause_studio_container.add_child(_pause_studio_vp)
+
+		_pause_studio = CarStudioView.new()
+		_pause_studio_vp.add_child(_pause_studio)
+		_pause_studio.setup(cars, current_car_id, false, false)
+		_pause_studio.show_car_by_id(current_car_id)
+
+	if _pause_studio != null and is_instance_valid(_pause_studio):
+		_pause_studio.set_cars_framing(true, vp_size)
 
 
 func _rebuild_all() -> void:
@@ -434,12 +480,15 @@ func _rebuild_all() -> void:
 		return
 	if layout_profile.is_empty():
 		layout_profile = LmuTheme.compute_layout_profile(Vector2(1920.0, 1080.0), Game.is_mobile_platform() or is_touch_device)
-	_sync_full_rect(Vector2(layout_profile.get("viewport_size", Vector2(1920.0, 1080.0))))
+	var vp_size := Vector2(layout_profile.get("viewport_size", Vector2(1920.0, 1080.0)))
+	_sync_full_rect(vp_size)
+	_sync_pause_studio(vp_size)
 
 	var transparent_center := _is_transparent_studio_view()
+	var has_pause_studio := (_pause_studio_container != null and is_instance_valid(_pause_studio_container))
 	_backdrop.visible = not transparent_center
 	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE if transparent_center else Control.MOUSE_FILTER_STOP
-	mouse_filter = Control.MOUSE_FILTER_IGNORE if transparent_center else Control.MOUSE_FILTER_STOP
+	mouse_filter = Control.MOUSE_FILTER_IGNORE if (transparent_center and not has_pause_studio) else Control.MOUSE_FILTER_STOP
 
 	_rebuild_header()
 	_rebuild_view()
@@ -943,6 +992,7 @@ func _build_home_view() -> void:
 func _build_cars_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
+	var cfs := fs * float(lp.get("ui_scale", 1.0))
 	var is_portrait: bool = (lp.profile == "portrait")
 	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
 	var mouse_pass := _is_transparent_studio_view()
@@ -1047,7 +1097,7 @@ func _build_cars_view() -> void:
 	var mv := VBoxContainer.new()
 	mv.add_theme_constant_override("separation", 4 if is_compact else 6)
 	mode_sec.add_child(mv)
-	mv.add_child(LmuTheme.make_label("MODO DE PILOTAGEM", roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_MUTED, 700))
+	mv.add_child(LmuTheme.make_label("MODO DE PILOTAGEM", roundi((10 if is_compact else 12) * cfs), LmuTheme.TEXT_MUTED, 700))
 
 	var mgrid := HBoxContainer.new()
 	mgrid.add_theme_constant_override("separation", 6)
@@ -1056,7 +1106,7 @@ func _build_cars_view() -> void:
 		var m_id: String = m_entry[0]
 		var mb := Button.new()
 		mb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		mb.custom_minimum_size.y = 32 if is_compact else 46
+		mb.custom_minimum_size.y = roundi((34 if is_compact else 48) * float(lp.get("ui_scale", 1.0)))
 		LmuTheme.apply_button_styles(mb, "active" if current_mode == m_id else "outline", 4, 6, 4)
 		mb.pressed.connect(func(): _set_mode(m_id))
 		var mbv := VBoxContainer.new()
@@ -1065,23 +1115,23 @@ func _build_cars_view() -> void:
 		mbv.add_theme_constant_override("separation", 0)
 		mbv.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		mb.add_child(mbv)
-		var mn := LmuTheme.make_label(m_entry[1], roundi((10 if is_compact else 13) * fs), Color.WHITE, 800)
+		var mn := LmuTheme.make_label(m_entry[1], roundi((11 if is_compact else 13.5) * cfs), Color.WHITE, 800)
 		mn.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		mbv.add_child(mn)
 		if not is_compact:
-			var md := LmuTheme.make_label(m_entry[2], roundi(10 * fs), LmuTheme.TEXT_MUTED, 500)
+			var md := LmuTheme.make_label(m_entry[2], roundi(10.5 * cfs), LmuTheme.TEXT_MUTED, 500)
 			md.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			mbv.add_child(md)
 		mgrid.add_child(mb)
 
 	# 2. Ficha Técnica (5 linhas no desktop, 4 no mobile landscape ocultando Downforce)
 	var specs_sec := PanelContainer.new()
-	specs_sec.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.BG_PANEL, LmuTheme.BORDER_SUBTLE, 6, 9 if is_compact else 14, 5 if is_compact else 10))
+	specs_sec.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.BG_PANEL, LmuTheme.BORDER_SUBTLE, 6, 10 if is_compact else 14, 6 if is_compact else 10))
 	panel_col.add_child(specs_sec)
 	var sv := VBoxContainer.new()
-	sv.add_theme_constant_override("separation", 2 if is_compact else 5)
+	sv.add_theme_constant_override("separation", 3 if is_compact else 6)
 	specs_sec.add_child(sv)
-	sv.add_child(LmuTheme.make_label("FICHA TÉCNICA DO GT3", roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_MUTED, 700))
+	sv.add_child(LmuTheme.make_label("FICHA TÉCNICA DO GT3", roundi((10 if is_compact else 12) * cfs), LmuTheme.TEXT_MUTED, 700))
 
 	var spec_keys := [
 		["power", "Potência Estimada"],
@@ -1098,35 +1148,35 @@ func _build_cars_view() -> void:
 			sv.add_child(_make_h_divider(0.06))
 		var sr := HBoxContainer.new()
 		sv.add_child(sr)
-		var kl := LmuTheme.make_label(sk[1], roundi((10 if is_compact else 13) * fs), LmuTheme.TEXT_MUTED, 500)
+		var kl := LmuTheme.make_label(sk[1], roundi((11 if is_compact else 13.5) * cfs), LmuTheme.TEXT_MUTED, 500)
 		kl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		sr.add_child(kl)
-		var vl := LmuTheme.make_label("--", roundi((10 if is_compact else 13) * fs), Color.WHITE, 700)
+		var vl := LmuTheme.make_label("--", roundi((11 if is_compact else 13.5) * cfs), Color.WHITE, 700)
 		vl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		sr.add_child(vl)
 		_car_spec_vals[sk[0]] = vl
 
 	# 3. Melhor Tempo Pessoal
 	var pb_sec := PanelContainer.new()
-	pb_sec.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.BG_PANEL, Color(LmuTheme.ACCENT_GREEN.r, LmuTheme.ACCENT_GREEN.g, LmuTheme.ACCENT_GREEN.b, 0.42), 6, 9 if is_compact else 14, 5 if is_compact else 10))
+	pb_sec.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.BG_PANEL, Color(LmuTheme.ACCENT_GREEN.r, LmuTheme.ACCENT_GREEN.g, LmuTheme.ACCENT_GREEN.b, 0.42), 6, 10 if is_compact else 14, 6 if is_compact else 10))
 	panel_col.add_child(pb_sec)
 	var pbv := VBoxContainer.new()
 	pbv.add_theme_constant_override("separation", 2)
 	pb_sec.add_child(pbv)
-	pbv.add_child(LmuTheme.make_label("SEU MELHOR TEMPO", roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_MUTED, 700))
+	pbv.add_child(LmuTheme.make_label("SEU MELHOR TEMPO", roundi((10 if is_compact else 12) * cfs), LmuTheme.TEXT_MUTED, 700))
 
 	if bool(lp.cars_pb_horizontal):
 		var pbh := HBoxContainer.new()
 		pbv.add_child(pbh)
-		_car_pb_time_lbl = LmuTheme.make_label("--:--.---", roundi(15 * fs), LmuTheme.ACCENT_GREEN, 800)
+		_car_pb_time_lbl = LmuTheme.make_label("--:--.---", roundi(16 * cfs), LmuTheme.ACCENT_GREEN, 800)
 		_car_pb_time_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		pbh.add_child(_car_pb_time_lbl)
-		_car_pb_sub_lbl = LmuTheme.make_label("", roundi(9 * fs), LmuTheme.TEXT_MUTED, 500)
+		_car_pb_sub_lbl = LmuTheme.make_label("", roundi(10.5 * cfs), LmuTheme.TEXT_MUTED, 500)
 		pbh.add_child(_car_pb_sub_lbl)
 	else:
-		_car_pb_time_lbl = LmuTheme.make_label("--:--.---", roundi(24 * fs), LmuTheme.ACCENT_GREEN, 800)
+		_car_pb_time_lbl = LmuTheme.make_label("--:--.---", roundi(24 * cfs), LmuTheme.ACCENT_GREEN, 800)
 		pbv.add_child(_car_pb_time_lbl)
-		_car_pb_sub_lbl = LmuTheme.make_label("", roundi(11 * fs), LmuTheme.TEXT_MUTED, 500)
+		_car_pb_sub_lbl = LmuTheme.make_label("", roundi(11.5 * cfs), LmuTheme.TEXT_MUTED, 500)
 		pbv.add_child(_car_pb_sub_lbl)
 
 	# Barra Inferior: Toolbar (Filtros + Ações) + Grade 7 colunas (13 carros)
@@ -1159,7 +1209,7 @@ func _build_cars_view() -> void:
 		var f_id: String = fl[0]
 		var fb := Button.new()
 		fb.text = fl[1]
-		fb.add_theme_font_size_override("font_size", roundi((10 if is_compact else 12) * fs))
+		fb.add_theme_font_size_override("font_size", roundi((11 if is_compact else 12.5) * cfs))
 		LmuTheme.apply_button_styles(fb, "primary" if category_filter == f_id else "outline", 3, 8 if is_compact else 12, 3 if is_compact else 6)
 		fb.pressed.connect(func():
 			category_filter = f_id
@@ -1221,7 +1271,7 @@ func _build_cars_view() -> void:
 			continue
 		var cid := String(c.get("id", ""))
 		var ccol := Color(String(c.get("color", "#e10600")))
-		var chip := _create_car_chip(c, ccol, chip_h, is_compact, fs)
+		var chip := _create_car_chip(c, ccol, chip_h, is_compact, cfs)
 		grid.add_child(chip)
 		_cars_grid_nodes[cid] = chip
 
@@ -1250,13 +1300,13 @@ func _create_car_chip(c: Dictionary, ccol: Color, chip_h: int, is_compact: bool,
 	btn.add_child(box)
 
 	if chip_h >= 46:
-		var br := LmuTheme.make_label(String(c.get("brand", c.get("short", ""))), roundi(9.5 * fs), LmuTheme.TEXT_MUTED, 700)
+		var br := LmuTheme.make_label(String(c.get("brand", c.get("short", ""))), roundi(10.5 * fs), LmuTheme.TEXT_MUTED, 700)
 		br.clip_text = true
 		box.add_child(br)
-	var nm := LmuTheme.make_label(String(c.get("name", cid)), roundi((11.5 if is_compact else 12.5) * fs), Color.WHITE, 700)
+	var nm := LmuTheme.make_label(String(c.get("name", cid)), roundi((12 if is_compact else 13.5) * fs), Color.WHITE, 700)
 	nm.clip_text = true
 	box.add_child(nm)
-	var ly := LmuTheme.make_label(String(c.get("layout", "")).to_upper(), roundi((8.5 if is_compact else 9.5) * fs), ccol.lightened(0.25), 700)
+	var ly := LmuTheme.make_label(String(c.get("layout", "")).to_upper(), roundi((9.5 if is_compact else 10.5) * fs), ccol.lightened(0.25), 700)
 	ly.clip_text = true
 	box.add_child(ly)
 
@@ -1357,6 +1407,8 @@ func _step_car(delta: int) -> void:
 func _build_settings_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
+	var ui_s := float(lp.get("ui_scale", 1.0))
+	var cfs := fs * ui_s
 	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
 
 	var outer := _make_padded_container(float(lp.pad_x), float(lp.pad_y))
@@ -1366,7 +1418,7 @@ func _build_settings_view() -> void:
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	col.add_theme_constant_override("separation", 8 if is_compact else 14)
+	col.add_theme_constant_override("separation", 10 if is_compact else 16)
 	outer.add_child(col)
 
 	# Barra horizontal das 5 abas (underline LMU)
@@ -1375,15 +1427,15 @@ func _build_settings_view() -> void:
 	col.add_child(tab_bar_wrap)
 
 	var tab_bar := HBoxContainer.new()
-	tab_bar.add_theme_constant_override("separation", 4 if is_compact else 10)
+	tab_bar.add_theme_constant_override("separation", 6 if is_compact else 12)
 	tab_bar_wrap.add_child(tab_bar)
 
 	for tab_id in SETTINGS_TABS:
 		var tb := Button.new()
 		tb.text = SETTINGS_TAB_LABELS[tab_id]
-		tb.custom_minimum_size.y = roundi((38 if is_compact else 44) * fs)
-		tb.add_theme_font_size_override("font_size", roundi((12.5 if is_compact else 14) * fs))
-		LmuTheme.apply_button_styles(tb, "tab_active" if active_settings_tab == tab_id else "tab_idle", 0, 12 if is_compact else 16, 7 if is_compact else 10)
+		tb.custom_minimum_size.y = roundi((40 if is_compact else 48) * cfs)
+		tb.add_theme_font_size_override("font_size", roundi((13 if is_compact else 15) * cfs))
+		LmuTheme.apply_button_styles(tb, "tab_active" if active_settings_tab == tab_id else "tab_idle", 0, 14 if is_compact else 18, 8 if is_compact else 10)
 		tb.pressed.connect(func():
 			active_settings_tab = tab_id
 			_rebuild_all()
@@ -1396,8 +1448,8 @@ func _build_settings_view() -> void:
 		_settings_search_edit = LineEdit.new()
 		_settings_search_edit.placeholder_text = "🔍 Buscar configuração..."
 		_settings_search_edit.text = search_query
-		_settings_search_edit.custom_minimum_size.y = roundi(34 * fs)
-		_settings_search_edit.add_theme_font_size_override("font_size", roundi(12.5 * fs))
+		_settings_search_edit.custom_minimum_size.y = roundi(38 * cfs)
+		_settings_search_edit.add_theme_font_size_override("font_size", roundi(13.5 * cfs))
 		_settings_search_edit.add_theme_stylebox_override("normal", LmuTheme.input_style(false))
 		_settings_search_edit.add_theme_stylebox_override("focus", LmuTheme.input_style(true))
 		_settings_search_edit.text_changed.connect(_on_search_changed)
@@ -1411,12 +1463,13 @@ func _build_settings_view() -> void:
 
 	var content := VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 6 if is_compact else 10)
+	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 8 if is_compact else 12)
 	scroll.add_child(content)
 
-	_populate_settings_tab(content, is_compact, fs)
+	_populate_settings_tab(content, is_compact, cfs)
 
-	_settings_empty_lbl = LmuTheme.make_label("Nenhuma configuração encontrada nesta aba para a busca atual.", roundi(13 * fs), LmuTheme.TEXT_MUTED, 500)
+	_settings_empty_lbl = LmuTheme.make_label("Nenhuma configuração encontrada nesta aba para a busca atual.", roundi(14 * cfs), LmuTheme.TEXT_MUTED, 500)
 	_settings_empty_lbl.visible = false
 	content.add_child(_settings_empty_lbl)
 
@@ -1427,9 +1480,9 @@ func _build_settings_view() -> void:
 	col.add_child(footer)
 	var back_btn := Button.new()
 	back_btn.text = "APLICAR & VOLTAR"
-	back_btn.custom_minimum_size = Vector2(roundi(170 * fs), roundi((40 if is_compact else 44) * fs))
-	back_btn.add_theme_font_size_override("font_size", roundi((12 if is_compact else 13) * fs))
-	LmuTheme.apply_button_styles(back_btn, "outline", 4, 16, 7 if is_compact else 8)
+	back_btn.custom_minimum_size = Vector2(roundi(190 * cfs), roundi((42 if is_compact else 48) * cfs))
+	back_btn.add_theme_font_size_override("font_size", roundi((13 if is_compact else 14) * cfs))
+	LmuTheme.apply_button_styles(back_btn, "outline", 4, 18, 8)
 	back_btn.pressed.connect(func(): switch_view("home"))
 	footer.add_child(back_btn)
 
@@ -1461,19 +1514,24 @@ func _apply_settings_filter() -> void:
 
 func _add_setting_row(parent: Control, title: String, desc: String, keywords: String, control: Control, is_compact: bool, fs: float, visible_cond := true) -> PanelContainer:
 	var row_panel := PanelContainer.new()
-	row_panel.add_theme_stylebox_override("panel", LmuTheme.panel_style(Color(1, 1, 1, 0.03), LmuTheme.BORDER_SOFT, 5, 12, 6 if is_compact else 10))
+	var is_mobile_ui := float(layout_profile.get("ui_scale", 1.0)) > 1.05
+	var pad_v := 8 if is_compact else (14 if is_mobile_ui else 10)
+	row_panel.add_theme_stylebox_override("panel", LmuTheme.panel_style(Color(1, 1, 1, 0.03), LmuTheme.BORDER_SOFT, 6, 16 if is_mobile_ui else 12, pad_v))
+	if is_mobile_ui and not is_compact:
+		row_panel.custom_minimum_size.y = roundi(62 * fs)
 	parent.add_child(row_panel)
 
 	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 12)
+	h.add_theme_constant_override("separation", 14)
 	row_panel.add_child(h)
 
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 2)
+	info.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	info.add_theme_constant_override("separation", 4 if is_mobile_ui else 2)
 	h.add_child(info)
-	info.add_child(LmuTheme.make_label(title, roundi((13 if is_compact else 15) * fs), Color.WHITE, 700))
-	var dl := LmuTheme.make_label(desc, roundi((10 if is_compact else 12) * fs), LmuTheme.TEXT_MUTED, 500)
+	info.add_child(LmuTheme.make_label(title, roundi((14 if is_compact else 16) * fs), Color.WHITE, 700))
+	var dl := LmuTheme.make_label(desc, roundi((11 if is_compact else 13) * fs), LmuTheme.TEXT_MUTED, 500)
 	dl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(dl)
 
@@ -1490,8 +1548,8 @@ func _add_setting_row(parent: Control, title: String, desc: String, keywords: St
 
 func _make_badge(txt: String, col := LmuTheme.TEXT_WHITE, border := LmuTheme.BORDER_SUBTLE, fs := 1.0) -> PanelContainer:
 	var p := PanelContainer.new()
-	p.add_theme_stylebox_override("panel", LmuTheme.panel_style(Color(1, 1, 1, 0.08), border, 4, 10, 4))
-	p.add_child(LmuTheme.make_label(txt, roundi(12 * fs), col, 700))
+	p.add_theme_stylebox_override("panel", LmuTheme.panel_style(Color(1, 1, 1, 0.08), border, 4, 12, 6))
+	p.add_child(LmuTheme.make_label(txt, roundi(13 * fs), col, 700))
 	return p
 
 
@@ -1776,6 +1834,7 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 func _build_records_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
+	var cfs := fs * float(lp.get("ui_scale", 1.0))
 	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
 
 	var outer := _make_padded_container(float(lp.pad_x), float(lp.pad_y))
@@ -1795,8 +1854,8 @@ func _build_records_view() -> void:
 	var hv := VBoxContainer.new()
 	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(hv)
-	hv.add_child(LmuTheme.make_label("QUADRO OFICIAL DE TEMPOS · INTERLAGOS", roundi((17 if is_compact else 26) * fs), Color.WHITE, 800))
-	hv.add_child(LmuTheme.make_label("Top 15 voltas válidas no modo %s" % Game.MODE_NAMES.get(records_mode, records_mode).to_upper(), roundi((10 if is_compact else 13) * fs), LmuTheme.TEXT_MUTED, 500))
+	hv.add_child(LmuTheme.make_label("QUADRO OFICIAL DE TEMPOS · INTERLAGOS", roundi((18 if is_compact else 26) * cfs), Color.WHITE, 800))
+	hv.add_child(LmuTheme.make_label("Top 15 voltas válidas no modo %s" % Game.MODE_NAMES.get(records_mode, records_mode).to_upper(), roundi((11 if is_compact else 13.5) * cfs), LmuTheme.TEXT_MUTED, 500))
 
 	var m_switch := HBoxContainer.new()
 	m_switch.add_theme_constant_override("separation", 6)
@@ -1805,8 +1864,8 @@ func _build_records_view() -> void:
 		var rm_id: String = rm[0]
 		var b := Button.new()
 		b.text = rm[1]
-		b.add_theme_font_size_override("font_size", roundi((11 if is_compact else 13) * fs))
-		LmuTheme.apply_button_styles(b, "primary" if records_mode == rm_id else "outline", 4, 12, 5)
+		b.add_theme_font_size_override("font_size", roundi((11.5 if is_compact else 13.5) * cfs))
+		LmuTheme.apply_button_styles(b, "primary" if records_mode == rm_id else "outline", 4, 14, 7)
 		b.pressed.connect(func():
 			records_mode = rm_id
 			_rebuild_view()
@@ -1817,20 +1876,20 @@ func _build_records_view() -> void:
 	var pb := _car_pb(current_car_id, records_mode)
 	var car_info := current_car()
 	var pb_bar := PanelContainer.new()
-	pb_bar.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.BG_PANEL_DEEP, LmuTheme.BORDER_SUBTLE, 5, 12, 6))
+	pb_bar.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.BG_PANEL_DEEP, LmuTheme.BORDER_SUBTLE, 5, 14, 8))
 	col.add_child(pb_bar)
 	var pbh := HBoxContainer.new()
 	pbh.add_theme_constant_override("separation", 12)
 	pb_bar.add_child(pbh)
-	var pb_left := LmuTheme.make_label("SEU MELHOR (%s · %s):" % [current_nick, String(car_info.get("name", current_car_id))], roundi((11 if is_compact else 13) * fs), LmuTheme.TEXT_SLATE, 700)
+	var pb_left := LmuTheme.make_label("SEU MELHOR (%s · %s):" % [current_nick, String(car_info.get("name", current_car_id))], roundi((11.5 if is_compact else 13.5) * cfs), LmuTheme.TEXT_SLATE, 700)
 	pb_left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	pbh.add_child(pb_left)
 	if not pb.is_empty():
 		var secs: Array = pb.get("sectors", [])
 		var sec_txt := "%.2fs · %.2fs · %.2fs" % [float(secs[0]), float(secs[1]), float(secs[2])] if secs.size() == 3 else "--"
-		pbh.add_child(LmuTheme.make_label("%s  [%s]" % [LapTimer.format_time(float(pb.get("time", 0.0))), sec_txt], roundi((12 if is_compact else 14) * fs), LmuTheme.ACCENT_GREEN, 800))
+		pbh.add_child(LmuTheme.make_label("%s  [%s]" % [LapTimer.format_time(float(pb.get("time", 0.0))), sec_txt], roundi((12.5 if is_compact else 14.5) * cfs), LmuTheme.ACCENT_GREEN, 800))
 	else:
-		pbh.add_child(LmuTheme.make_label("--:--.---", roundi((12 if is_compact else 14) * fs), LmuTheme.TEXT_DIM, 700))
+		pbh.add_child(LmuTheme.make_label("--:--.---", roundi((12.5 if is_compact else 14.5) * cfs), LmuTheme.TEXT_DIM, 700))
 
 	# Lista Top 15
 	var recs: Array = Records.top(15, records_mode)
@@ -1879,14 +1938,14 @@ func _build_records_view() -> void:
 			row.add_child(rh)
 
 			var pos_p := PanelContainer.new()
-			pos_p.custom_minimum_size = Vector2(26, 22)
+			pos_p.custom_minimum_size = Vector2(roundi(28 * cfs), roundi(24 * cfs))
 			pos_p.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.ACCENT_AMBER if i == 0 else Color(1, 1, 1, 0.1), Color.TRANSPARENT, 3, 4, 1))
-			var pl := LmuTheme.make_label("%d" % (i + 1), roundi(12 * fs), Color("#0b0d10") if i == 0 else Color.WHITE, 800)
+			var pl := LmuTheme.make_label("%d" % (i + 1), roundi(12.5 * cfs), Color("#0b0d10") if i == 0 else Color.WHITE, 800)
 			pl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 			pos_p.add_child(pl)
 			rh.add_child(pos_p)
 
-			var nl := LmuTheme.make_label(r_nick, roundi((12 if is_compact else 14) * fs), Color.WHITE, 700)
+			var nl := LmuTheme.make_label(r_nick, roundi((12.5 if is_compact else 14.5) * cfs), Color.WHITE, 700)
 			nl.custom_minimum_size.x = 100 if is_compact else 160
 			nl.clip_text = true
 			rh.add_child(nl)
@@ -1897,7 +1956,7 @@ func _build_records_view() -> void:
 			dot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 			rh.add_child(dot)
 
-			var cl := LmuTheme.make_label(c_name, roundi((11 if is_compact else 13) * fs), LmuTheme.TEXT_SLATE, 500)
+			var cl := LmuTheme.make_label(c_name, roundi((11.5 if is_compact else 13.5) * cfs), LmuTheme.TEXT_SLATE, 500)
 			cl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			cl.clip_text = true
 			rh.add_child(cl)
@@ -1905,10 +1964,10 @@ func _build_records_view() -> void:
 			var secs: Array = r.get("sectors", [])
 			if lp.profile != "portrait" and secs.size() == 3:
 				var sl_txt := "%.2fs · %.2fs · %.2fs" % [float(secs[0]), float(secs[1]), float(secs[2])]
-				rh.add_child(LmuTheme.make_label(sl_txt, roundi((10 if is_compact else 12) * fs), LmuTheme.TEXT_MUTED, 500))
+				rh.add_child(LmuTheme.make_label(sl_txt, roundi((10.5 if is_compact else 12.5) * cfs), LmuTheme.TEXT_MUTED, 500))
 
-			var tl := LmuTheme.make_label(LapTimer.format_time(float(r.get("time", 0.0))), roundi((13 if is_compact else 15) * fs), LmuTheme.ACCENT_GREEN, 800)
-			tl.custom_minimum_size.x = 78
+			var tl := LmuTheme.make_label(LapTimer.format_time(float(r.get("time", 0.0))), roundi((13.5 if is_compact else 15.5) * cfs), LmuTheme.ACCENT_GREEN, 800)
+			tl.custom_minimum_size.x = roundi(82 * cfs)
 			tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			rh.add_child(tl)
 
@@ -1917,8 +1976,8 @@ func _build_records_view() -> void:
 	col.add_child(footer)
 	var back_btn := Button.new()
 	back_btn.text = "VOLTAR AO MENU"
-	back_btn.add_theme_font_size_override("font_size", roundi((11 if is_compact else 13) * fs))
-	LmuTheme.apply_button_styles(back_btn, "outline", 4, 14, 6)
+	back_btn.add_theme_font_size_override("font_size", roundi((12 if is_compact else 14) * cfs))
+	LmuTheme.apply_button_styles(back_btn, "outline", 4, 16, 8)
 	back_btn.pressed.connect(func(): switch_view("home"))
 	footer.add_child(back_btn)
 
@@ -1928,6 +1987,7 @@ func _build_records_view() -> void:
 func _build_help_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
+	var cfs := fs * float(lp.get("ui_scale", 1.0))
 	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
 	var is_portrait: bool = (lp.profile == "portrait")
 
@@ -1941,7 +2001,7 @@ func _build_help_view() -> void:
 	col.add_theme_constant_override("separation", 10 if is_compact else 14)
 	outer.add_child(col)
 
-	col.add_child(LmuTheme.make_label("GUIA DE CONTROLES & PILOTAGEM", roundi((18 if is_compact else 26) * fs), Color.WHITE, 800))
+	col.add_child(LmuTheme.make_label("GUIA DE CONTROLES & PILOTAGEM", roundi((19 if is_compact else 26) * cfs), Color.WHITE, 800))
 
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1986,10 +2046,11 @@ func _build_help_view() -> void:
 		cards_host.add_child(card)
 
 		var cv := VBoxContainer.new()
-		cv.add_theme_constant_override("separation", 10)
+		cv.size_flags_vertical = Control.SIZE_EXPAND_FILL
+		cv.add_theme_constant_override("separation", 12)
 		card.add_child(cv)
-		cv.add_child(LmuTheme.make_label(cd[0], roundi((14 if is_compact else 16) * fs), Color.WHITE, 800))
-		var body_lbl := LmuTheme.make_label(cd[1], roundi((12 if is_compact else 13.5) * fs), LmuTheme.TEXT_SLATE, 500)
+		cv.add_child(LmuTheme.make_label(cd[0], roundi((15 if is_compact else 17) * cfs), Color.WHITE, 800))
+		var body_lbl := LmuTheme.make_label(cd[1], roundi((12.5 if is_compact else 14) * cfs), LmuTheme.TEXT_SLATE, 500)
 		body_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		cv.add_child(body_lbl)
 
@@ -1998,8 +2059,8 @@ func _build_help_view() -> void:
 	col.add_child(footer)
 	var back_btn := Button.new()
 	back_btn.text = "VOLTAR AO MENU"
-	back_btn.custom_minimum_size = Vector2(roundi(160 * fs), roundi(42 * fs))
-	back_btn.add_theme_font_size_override("font_size", roundi((12 if is_compact else 13) * fs))
+	back_btn.custom_minimum_size = Vector2(roundi(180 * cfs), roundi(46 * cfs))
+	back_btn.add_theme_font_size_override("font_size", roundi((12.5 if is_compact else 14) * cfs))
 	LmuTheme.apply_button_styles(back_btn, "outline", 4, 16, 8)
 	back_btn.pressed.connect(func(): switch_view("home"))
 	footer.add_child(back_btn)
