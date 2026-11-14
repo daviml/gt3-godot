@@ -9,9 +9,25 @@
 class_name SurroundingsView
 extends Node3D
 
-const TOWERS := "res://data/track/torres.json"
-const HORIZON := "res://data/track/horizonte.json"
-const HORIZON_TEX := "res://assets/track/horizonte.png"
+## arquivos da pista atual (Game.track_id). Torres e horizonte são opcionais: pista sem prédios em volta tem
+## torres.json ausente ou [], e sem horizonte.json não há cilindro.
+static func towers_path() -> String:
+	return Game.track_data_path("torres.json")
+
+
+static func horizon_path() -> String:
+	return Game.track_data_path("horizonte.json")
+
+
+static func horizon_tex_path() -> String:
+	return Game.track_asset_path("horizonte.png")
+
+
+static func read_horizon() -> Dictionary:
+	if not FileAccess.file_exists(horizon_path()):
+		return {}
+	var v = JSON.parse_string(FileAccess.get_file_as_string(horizon_path()))
+	return v if v is Dictionary else {}
 
 var towers := 0
 var preloaded_towers: Array = []
@@ -175,9 +191,11 @@ func _range(g: GeometryInstance3D, end: float) -> void:
 
 
 func _build_towers() -> void:
-	var a: Array = preloaded_towers if not preloaded_towers.is_empty() else JSON.parse_string(FileAccess.get_file_as_string(TOWERS))
+	var a: Array = preloaded_towers if not preloaded_towers.is_empty() else TrackView.read_json_array(towers_path())
 	preloaded_towers = []
 	towers = a.size() / 8
+	if towers == 0:
+		return
 	# caixa de 1 m com a base em y = 0 (como o BoxGeometry().translate(0, 0.5, 0) do web): o shader mede a
 	# altura do andar a partir da base
 	var arr := BoxMesh.new().get_mesh_arrays()
@@ -209,8 +227,10 @@ func _build_towers() -> void:
 
 
 func _build_horizon() -> void:
-	var h: Dictionary = preloaded_horizon if not preloaded_horizon.is_empty() else JSON.parse_string(FileAccess.get_file_as_string(HORIZON))
+	var h: Dictionary = preloaded_horizon if not preloaded_horizon.is_empty() else read_horizon()
 	preloaded_horizon = {}
+	if h.is_empty():
+		return
 	var r: float = h.radius
 	var half: float = h.height / 2.0
 	var n: int = h.segments
@@ -234,8 +254,8 @@ func _build_horizon() -> void:
 		st.add_index(i + 3)
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/horizonte.gdshader")
-	if ResourceLoader.exists(HORIZON_TEX):
-		mat.set_shader_parameter("tex", load(HORIZON_TEX))
+	if ResourceLoader.exists(horizon_tex_path()):
+		mat.set_shader_parameter("tex", load(horizon_tex_path()))
 	var mi := MeshInstance3D.new()
 	mi.name = "Horizonte"
 	mi.mesh = st.commit()

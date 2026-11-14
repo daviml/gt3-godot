@@ -5,11 +5,9 @@ extends Control
 
 const TRACK_SCENE := "res://scenes/main.tscn"
 const GARAGEM_SCENE := "res://scenes/garagem.tscn"
-const CENARIO_GLB := "res://assets/track/cenario.glb"
 const SKY_HDR := "res://assets/sky/ceu_2k.hdr"
 
 const TRACK_PRELOAD_RESOURCES := [
-	"res://assets/track/horizonte.png",
 	"res://assets/trees/arvores_cor.png",
 	"res://assets/trees/arvores_normal.png",
 	"res://assets/textures/asphalt_track_diff.png",
@@ -75,6 +73,75 @@ const TRACK_OUTLINE := [
 	Vector2(-0.3093, 0.0051), Vector2(-0.302, 0.0349), Vector2(-0.2948, 0.0645), Vector2(-0.2873, 0.0942),
 	Vector2(-0.2795, 0.1237), Vector2(-0.2717, 0.1532), Vector2(-0.264, 0.1828),
 ]
+
+
+## textos da pista na tela de load (Interlagos mantém os de antes)
+static func track_title(full: bool) -> String:
+	if Game.track_id == "interlagos":
+		return "AUTÓDROMO DE INTERLAGOS" if full else "INTERLAGOS"
+	return Game.track_name(not full).to_upper()
+
+
+static var _outline_cache := {}
+
+
+## Contorno da pista atual para os mapas (ver outline_for).
+static func track_outline() -> Array:
+	return outline_for(Game.track_id)
+
+
+## Contorno de uma pista: Interlagos usa o traçado oficial acima; as outras, as amostras do track.json (x, z)
+## normalizadas para caber em [-0.5, 0.5] (≈150 pontos). Também usado nos cartões de pista do menu.
+static func outline_for(id: String) -> Array:
+	if id == "interlagos":
+		return TRACK_OUTLINE
+	if _outline_cache.has(id):
+		return _outline_cache[id]
+	var path := String(Game.get_track_info(id).get("data_dir", "")) + "track.json"
+	var d = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+	if not (d is Dictionary):
+		return TRACK_OUTLINE
+	var n := int(d.n)
+	var st := int(d.stride)
+	var s: Array = d.s
+	var pts: Array = []
+	var k := maxi(1, n / 150)
+	var lo := Vector2(INF, INF)
+	var hi := Vector2(-INF, -INF)
+	for i in range(0, n, k):
+		var v := Vector2(s[i * st], s[i * st + 2])
+		pts.append(v)
+		lo = Vector2(minf(lo.x, v.x), minf(lo.y, v.y))
+		hi = Vector2(maxf(hi.x, v.x), maxf(hi.y, v.y))
+	var span := maxf(hi.x - lo.x, hi.y - lo.y)
+	var mid := (lo + hi) * 0.5
+	var out: Array = []
+	for v in pts:
+		out.append((v - mid) / span)
+	_outline_cache[id] = out
+	return out
+
+
+## comprimento com separador de milhar ("3.602")
+static func meters(v: int) -> String:
+	var txt := str(v)
+	return txt if txt.length() <= 3 else txt.left(txt.length() - 3) + "." + txt.right(3)
+
+
+## textos da tela de load para pistas que não são Interlagos (Interlagos mantém os de antes)
+static func _track_meta() -> String:
+	var t := Game.get_track_info()
+	return "%s  ·  %s M" % [String(t.get("name", "")).to_upper(), meters(int(t.get("length_m", 0)))]
+
+
+static func _track_footer() -> String:
+	var t := Game.get_track_info()
+	return "%s  ·  %d CURVAS" % [String(t.get("location", t.get("country", ""))).to_upper(), int(t.get("corners", 0))]
+
+
+static func _track_sub() -> String:
+	var t := Game.get_track_info()
+	return "%s M · %d CURVAS" % [meters(int(t.get("length_m", 0))), int(t.get("corners", 0))]
 
 
 class _BackdropGraphic extends Control:
@@ -165,10 +232,11 @@ class _BackdropGraphic extends Control:
 			var ghost_scale := s.y * 0.62
 			var ghost_center := Vector2(s.x * 0.11, s.y * 0.56)
 			var ghost_pts := PackedVector2Array()
-			ghost_pts.resize(TRACK_OUTLINE.size() + 1)
-			for i in TRACK_OUTLINE.size():
-				ghost_pts[i] = ghost_center + TRACK_OUTLINE[i] * ghost_scale
-			ghost_pts[TRACK_OUTLINE.size()] = ghost_pts[0]
+			var outline := LoadingScreen.track_outline()
+			ghost_pts.resize(outline.size() + 1)
+			for i in outline.size():
+				ghost_pts[i] = ghost_center + outline[i] * ghost_scale
+			ghost_pts[outline.size()] = ghost_pts[0]
 			draw_polyline(ghost_pts, Color(accent.r, accent.g, accent.b, 0.08), 5.0, true)
 
 
@@ -183,17 +251,18 @@ class _VisualWidget extends Control:
 	var _last_size := Vector2.ZERO
 
 	func _ensure_points() -> void:
-		if _loop_pts.size() == TRACK_OUTLINE.size() + 1 and _last_size == size:
+		var outline := LoadingScreen.track_outline()
+		if _loop_pts.size() == outline.size() + 1 and _last_size == size:
 			return
 		_last_size = size
 		var pad := 26.0
 		var usable := Vector2(maxf(40.0, size.x - pad * 2.0), maxf(40.0, size.y - pad * 2.0))
 		var sc := minf(usable.x / 0.66, usable.y / 1.02)
 		var center := size * 0.5
-		_loop_pts.resize(TRACK_OUTLINE.size() + 1)
-		for i in TRACK_OUTLINE.size():
-			_loop_pts[i] = center + TRACK_OUTLINE[i] * sc
-		_loop_pts[TRACK_OUTLINE.size()] = _loop_pts[0]
+		_loop_pts.resize(outline.size() + 1)
+		for i in outline.size():
+			_loop_pts[i] = center + outline[i] * sc
+		_loop_pts[outline.size()] = _loop_pts[0]
 
 	func _draw() -> void:
 		if size.x <= 10.0 or size.y <= 10.0:
@@ -409,7 +478,7 @@ func _build_ui() -> void:
 	_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_backdrop.accent = _accent_ui
 	_backdrop.bold_font = _bold_font
-	_backdrop.watermark_top = "INTERLAGOS" if _target == "track" else "GARAGEM GT3"
+	_backdrop.watermark_top = LoadingScreen.track_title(false) if _target == "track" else "GARAGEM GT3"
 	_backdrop.watermark_bottom = String(_car_info.get("short", "GT3")).to_upper()
 	_layer.add_child(_backdrop)
 
@@ -435,7 +504,7 @@ func _build_ui() -> void:
 	_header_bar.add_child(_top_brand_lbl)
 
 	_top_meta_lbl = _make_label(
-		"AUTÓDROMO JOSÉ CARLOS PACE  ·  4.309 M" if _target == "track" else "ESTÚDIO DE VITRINE  ·  BOXES",
+		("AUTÓDROMO JOSÉ CARLOS PACE  ·  4.309 M" if Game.track_id == "interlagos" else _track_meta()) if _target == "track" else "ESTÚDIO DE VITRINE  ·  BOXES",
 		18,
 		Color("#94a3b8"),
 		_font
@@ -454,7 +523,7 @@ func _build_ui() -> void:
 	_layer.add_child(_footer_bar)
 
 	_bot_left_lbl = _make_label(
-		"SÃO PAULO, BRASIL  ·  15 CURVAS" if _target == "track" else "SELEÇÃO DE VEÍCULOS GT3",
+		("SÃO PAULO, BRASIL  ·  15 CURVAS" if Game.track_id == "interlagos" else _track_footer()) if _target == "track" else "SELEÇÃO DE VEÍCULOS GT3",
 		16,
 		Color(1, 1, 1, 0.45),
 		_font
@@ -521,7 +590,7 @@ func _build_ui() -> void:
 	badge_panel.add_child(_badge_lbl)
 
 	_title_lbl = _make_label(
-		"AUTÓDROMO DE INTERLAGOS" if _target == "track" else "GARAGEM GT3",
+		LoadingScreen.track_title(true) if _target == "track" else "GARAGEM GT3",
 		24,
 		Color("#cbd5e1"),
 		_bold_font
@@ -653,7 +722,7 @@ func _build_ui() -> void:
 	right_vbox.add_child(_right_title_lbl)
 
 	_right_sub_lbl = _make_label(
-		"4.309 M · 15 CURVAS" if _target == "track" else "RETORNANDO À GARAGEM",
+		("4.309 M · 15 CURVAS" if Game.track_id == "interlagos" else _track_sub()) if _target == "track" else "RETORNANDO À GARAGEM",
 		15,
 		Color("#94a3b8"),
 		_font
@@ -738,7 +807,7 @@ func _get_car_spec_items() -> Array:
 	if _car_info.is_empty() or _car_data.is_empty():
 		return [
 			["CATEGORIA", "GT3"],
-			["CIRCUITO", "INTERLAGOS"],
+			["CIRCUITO", LoadingScreen.track_title(false)],
 			["MODO", "TIME ATTACK"],
 		]
 	var p: Dictionary = _car_data.get("params", {})
@@ -800,7 +869,8 @@ func _load_to_track() -> void:
 
 	# 1. 0–45%: dispara threaded load de cenario.glb, main.tscn e carro (se não estiver em cache)
 	#    enquanto lê os JSONs da pista fatiados entre frames.
-	var stage1_paths: Array[String] = [CENARIO_GLB, TRACK_SCENE]
+	var cenario_glb := TrackView.glb_path()
+	var stage1_paths: Array[String] = [cenario_glb, TRACK_SCENE]
 	var car_glb := ""
 	if Game.get_cached_car_scene(_car_id) == null:
 		car_glb = Game.get_car_glb_path(_car_id)
@@ -808,24 +878,24 @@ func _load_to_track() -> void:
 			stage1_paths.append(car_glb)
 
 	_request_threaded_batch(stage1_paths)
-	await _step(4.0, "Lendo traçado de Interlagos...")
+	await _step(4.0, "Lendo traçado de %s..." % Game.track_name())
 
-	var track_json := JSON.parse_string(FileAccess.get_file_as_string("res://data/track/track.json")) as Dictionary
+	var track_json := JSON.parse_string(FileAccess.get_file_as_string(Game.track_data_path("track.json"))) as Dictionary
 	await _step(10.0, "Construindo referencial da pista...")
 
 	var track := Track.new("", track_json)
 	track_json = {}
 	await _step(15.0, "Lendo dados de vegetação...")
 
-	var trees_data: Array = JSON.parse_string(FileAccess.get_file_as_string(TrackView.TREES))
+	var trees_data: Array = TrackView.read_json_array(TrackView.trees_path())
 	await _step(20.0, "Lendo dados dos arredores...")
 
-	var towers_data: Array = JSON.parse_string(FileAccess.get_file_as_string(SurroundingsView.TOWERS))
-	var horizon_data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SurroundingsView.HORIZON))
+	var towers_data: Array = TrackView.read_json_array(SurroundingsView.towers_path())
+	var horizon_data: Dictionary = SurroundingsView.read_horizon()
 	await _step(24.0, "Carregando cenário 3D da pista...")
 
 	var stage1_res := await _await_threaded_batch(stage1_paths, 24.0, 45.0, "Carregando cenário 3D da pista...")
-	var cenario_scene := stage1_res.get(CENARIO_GLB) as PackedScene
+	var cenario_scene := stage1_res.get(cenario_glb) as PackedScene
 	var main_scene := stage1_res.get(TRACK_SCENE) as PackedScene
 	if car_glb != "" and stage1_res.get(car_glb) is PackedScene:
 		Game.cache_car_scene(_car_id, stage1_res[car_glb] as PackedScene)
@@ -837,7 +907,7 @@ func _load_to_track() -> void:
 		stage2_paths.append(p)
 	if ResourceLoader.exists(SKY_HDR):
 		stage2_paths.append(SKY_HDR)
-	for p in TRACK_PRELOAD_RESOURCES:
+	for p in [SurroundingsView.horizon_tex_path()] + TRACK_PRELOAD_RESOURCES:
 		if ResourceLoader.exists(p) and not p in stage2_paths:
 			stage2_paths.append(p)
 

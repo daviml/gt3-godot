@@ -130,11 +130,19 @@ func _init(t: Track, c: Car, reference: Dictionary, opts := {}) -> void:
 		for m in range(-8, 1):
 			var j := (i + m + n) % n
 			kv = minf(kv, (t.T[(j + 5) % n].y - t.T[(j - 5 + n) % n].y) / (10.0 * Track.STEP))
+		# camber a favor da curva (só pistas com bank): o lado de fora mais alto segura mais, (μ + tg φ)/(1 − μ tg φ)
+		var tb := 0.0
+		if t.has_bank:
+			var turn := (b.x - a.x) * (c3.z - a.z) - (b.z - a.z) * (c3.x - a.x)  # > 0 = curva para a direita
+			tb = tan(-t.bank[i] * signf(turn))
 		var v := 90.0
 		for _it in 4:
 			var g_flat := g0 + (g1 - g0) * minf(1.0, v * v / (70.0 * 70.0))
 			var crest := maxf(0.56, 1.0 + (v * v * kv / Car.G) * 0.80)
-			v = minf(90.0, sqrt(g_flat * crest * Car.G / maxf(kk, 1e-5)))
+			var mu := g_flat * crest
+			if t.has_bank:
+				mu = (mu + tb) / maxf(0.3, 1.0 - mu * tb)
+			v = minf(90.0, sqrt(mu * Car.G / maxf(kk, 1e-5)))
 		v_cap[i] = v
 	# saída: onde o limite da curva ficou abaixo da referência, só volta a ela acelerando como o carro real
 	var acc_t: Array = opts.get("accel_g", ACCEL_GT3)

@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://blmkswul3la3w"
-path.s3tc="res://.godot/imported/arvores_cor.png-e5bf38617fc1f83157f0a23daa2304dd.s3tc.ctex"
-path.etc2="res://.godot/imported/arvores_cor.png-e5bf38617fc1f83157f0a23daa2304dd.etc2.ctex"
+path.bptc="res://.godot/imported/arvores_cor.png-e5bf38617fc1f83157f0a23daa2304dd.bptc.ctex"
+path.astc="res://.godot/imported/arvores_cor.png-e5bf38617fc1f83157f0a23daa2304dd.astc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -13,12 +13,12 @@ metadata={
 [deps]
 
 source_file="res://assets/trees/arvores_cor.png"
-dest_files=["res://.godot/imported/arvores_cor.png-e5bf38617fc1f83157f0a23daa2304dd.s3tc.ctex", "res://.godot/imported/arvores_cor.png-e5bf38617fc1f83157f0a23daa2304dd.etc2.ctex"]
+dest_files=["res://.godot/imported/arvores_cor.png-e5bf38617fc1f83157f0a23daa2304dd.bptc.ctex", "res://.godot/imported/arvores_cor.png-e5bf38617fc1f83157f0a23daa2304dd.astc.ctex"]
 
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality=true
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0

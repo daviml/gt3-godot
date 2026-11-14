@@ -25,6 +25,8 @@ func _is_crowd(n: Node) -> bool:
 
 
 func _initialize() -> void:
+	# teste de Interlagos: não depende da última pista escolhida no jogo (user://jogo.cfg)
+	Game.track_id = Game.DEFAULT_TRACK
 	_run.call_deferred()
 
 
@@ -40,8 +42,8 @@ func _run() -> void:
 	var mm := mmi.multimesh
 	check(mm.instance_count > 1000, "anel com %d torres (> 1.000)" % mm.instance_count)
 	# (no modo headless o MultiMesh não guarda as transformações: confere pelos dados exportados)
-	var a: Array = JSON.parse_string(FileAccess.get_file_as_string(SurroundingsView.TOWERS))
-	var hz_data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SurroundingsView.HORIZON))
+	var a: Array = JSON.parse_string(FileAccess.get_file_as_string(SurroundingsView.towers_path()))
+	var hz_data: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SurroundingsView.horizon_path()))
 	var hmin := INF
 	var hmax := 0.0
 	var rmin := INF

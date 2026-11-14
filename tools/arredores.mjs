@@ -2,17 +2,26 @@
 //   data/track/torres.json         anel de torres: [x, base, z, giro, largura, altura, profundidade, cor] × n
 //   data/track/horizonte.json      cilindro do horizonte (centro, raio, altura, segmentos)
 //   assets/track/horizonte.png     textura do horizonte (morros e cidade em camadas, já azulados)
-// uso (de REPOS/gt3-godot/tools): node arredores.mjs
+// uso (de REPOS/gt3-godot/tools): node arredores.mjs [--track=<id>]   (sem --track: Interlagos)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
 
+// --out=<pasta>: grava lá em vez do projeto (conferência, sem sobrescrever o que existe)
+const outRoot = process.argv.find(a => a.startsWith('--out='))?.slice(6);
 const out = p => {
-  const f = fileURLToPath(new URL(`../${p}`, import.meta.url));
-  mkdirSync(fileURLToPath(new URL('.', new URL(`../${p}`, import.meta.url))), { recursive: true });
+  const f = outRoot ? `${outRoot}/${p}` : fileURLToPath(new URL(`../${p}`, import.meta.url));
+  mkdirSync(dirname(f), { recursive: true });
   return f;
 };
+// --track=<id>: outra pista (módulos e dados trocados no vite.config.ts); sem ela, Interlagos nos caminhos de sempre
+const trackArg = process.argv.find(a => a.startsWith('--track='))?.slice(8) ?? 'interlagos';
+const other = trackArg !== 'interlagos';
+const dataDir = other ? `data/tracks/${trackArg}/` : 'data/track/';
+const assetDir = other ? `assets/tracks/${trackArg}/` : 'assets/track/';
+process.env.TRACK = trackArg;
 const server = await createServer({ configFile: fileURLToPath(new URL('cenario/vite.config.ts', import.meta.url)), server: { port: 5198 } });
 await server.listen();
 let browser;
@@ -32,10 +41,10 @@ try {
   await page.waitForFunction(() => 'exportar' in window, null, { timeout: 120000 });
   const r = await page.evaluate(() => window.exportar());
   if (!r.horizon) throw new Error('horizonte não encontrado');
-  writeFileSync(out('data/track/torres.json'), JSON.stringify(r.towers));
+  writeFileSync(out(dataDir + 'torres.json'), JSON.stringify(r.towers));
   const { png, ...h } = r.horizon;
-  writeFileSync(out('data/track/horizonte.json'), JSON.stringify(h));
-  writeFileSync(out('assets/track/horizonte.png'), Buffer.from(png, 'base64'));
+  writeFileSync(out(dataDir + 'horizonte.json'), JSON.stringify(h));
+  writeFileSync(out(assetDir + 'horizonte.png'), Buffer.from(png, 'base64'));
   console.log(`torres: ${r.towers.length / 8}, horizonte:`, JSON.stringify(h));
 } finally {
   await browser.close();

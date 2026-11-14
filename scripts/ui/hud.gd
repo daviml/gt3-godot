@@ -702,7 +702,8 @@ func _draw_board(pos: Vector2, sc: float) -> void:
 	_text(_bold, pos + Vector2(12 * sc, 7 * sc), "MELHORES TEMPOS", 12 * sc, Color(1, 1, 1, 0.92))
 	var dim := Color(1, 1, 1, 0.45)
 	var chev := "▴" if board_expanded else "▾"
-	var track_lbl := ("INTERLAGOS · ARCADE " if arcade else "INTERLAGOS ") + chev
+	var tname := "INTERLAGOS" if Game.track_id == Game.DEFAULT_TRACK else Game.track_name().to_upper()
+	var track_lbl := (tname + " · ARCADE " if arcade else tname + " ") + chev
 	var tw := _text_w(_font, track_lbl, 12 * sc)
 	_text(_font, pos + Vector2(w - 12 * sc - tw, 7 * sc), track_lbl, 12 * sc, Color("#ff5e57") if arcade else dim)
 	var y := pos.y + 28 * sc
@@ -814,7 +815,27 @@ func _build_corners() -> void:
 		return
 	var L := track.length
 	# Interlagos (comprimento ~4309 m): usa os 15 nomes oficiais refinados pelo pico de curvatura
-	if absf(L - 4309.0) < 250.0 or not track.sections.is_empty():
+	var is_interlagos := Game.track_id == Game.DEFAULT_TRACK
+	if not is_interlagos and not track.sections.is_empty():
+		# outras pistas: um marcador por trecho com nome (track.json → sections), no pico de curvatura do trecho
+		var num := 1
+		for sec in track.sections:
+			var s0 := float(sec.s0)
+			var s1 := float(sec.s1)
+			if s1 < s0:
+				s1 += L
+			var best_i := track.index_at(s0)
+			var max_curv := -1.0
+			var s_val := s0
+			while s_val <= s1:
+				var i := track.index_at(s_val)
+				if absf(track.curv[i]) > max_curv:
+					max_curv = absf(track.curv[i])
+					best_i = i
+				s_val += Track.STEP
+			_corners.append({"number": num, "name": String(sec.name), "s": best_i * Track.STEP, "pos": track.P[best_i]})
+			num += 1
+	elif is_interlagos and (absf(L - 4309.0) < 250.0 or not track.sections.is_empty()):
 		for def in INTERLAGOS_CORNERS:
 			var target_s: float = def[2]
 			var best_i := 0

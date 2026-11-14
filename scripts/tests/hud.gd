@@ -21,6 +21,8 @@ func near(c: Color, hex: String, tol := 0.02) -> bool:
 
 
 func _init() -> void:
+	# teste de Interlagos: não depende da última pista escolhida no jogo (user://jogo.cfg)
+	Game.track_id = Game.DEFAULT_TRACK
 	var track := Track.new("res://data/track/track.json")
 	var ground := FlatGround.new()
 	var car := Car.load_car(ground, "corvette-c6r-gt3")

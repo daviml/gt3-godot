@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://oty15p6pl45a"
-path.s3tc="res://.godot/imported/lamborghini-huracan-gt3_2.jpg-aed04a0c8aeadda22990a14afa39bffe.s3tc.ctex"
-path.etc2="res://.godot/imported/lamborghini-huracan-gt3_2.jpg-aed04a0c8aeadda22990a14afa39bffe.etc2.ctex"
+path.bptc="res://.godot/imported/lamborghini-huracan-gt3_2.jpg-aed04a0c8aeadda22990a14afa39bffe.bptc.ctex"
+path.astc="res://.godot/imported/lamborghini-huracan-gt3_2.jpg-aed04a0c8aeadda22990a14afa39bffe.astc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -16,12 +16,12 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/cars/lamborghini-huracan-gt3/lamborghini-huracan-gt3_2.jpg"
-dest_files=["res://.godot/imported/lamborghini-huracan-gt3_2.jpg-aed04a0c8aeadda22990a14afa39bffe.s3tc.ctex", "res://.godot/imported/lamborghini-huracan-gt3_2.jpg-aed04a0c8aeadda22990a14afa39bffe.etc2.ctex"]
+dest_files=["res://.godot/imported/lamborghini-huracan-gt3_2.jpg-aed04a0c8aeadda22990a14afa39bffe.bptc.ctex", "res://.godot/imported/lamborghini-huracan-gt3_2.jpg-aed04a0c8aeadda22990a14afa39bffe.astc.ctex"]
 
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality=true
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
@@ -41,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=1024
+process/size_limit=2048
 detect_3d/compress_to=1

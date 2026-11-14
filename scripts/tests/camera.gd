@@ -47,21 +47,23 @@ func _initialize() -> void:
 		car.step(DT, 0, 0, 0)
 	var chase := ChaseCamera.new(cam, car)
 	chase.update(FRAME)
-	check(is_equal_approx(chase.dist.value, 6.8), "parado: 6,8 m atrás (%.2f m)" % chase.dist.value)
-	check(absf(cam.position.y - car.pos.y - 1.85) < 0.01, "1,85 m acima do carro (%.2f m)" % (cam.position.y - car.pos.y))
-	check(is_equal_approx(chase.fov.value, 50.0), "FOV 50° parado (%.1f°)" % chase.fov.value)
+	# valores da câmera padrão ajustada pelo Davi (14/11/2026) para dar sensação de velocidade: mais perto e
+	# mais baixa, FOV maior e abrindo mais com a velocidade
+	check(is_equal_approx(chase.dist.value, 5.3), "parado: 5,3 m atrás (%.2f m)" % chase.dist.value)
+	check(absf(cam.position.y - car.pos.y - 1.55) < 0.01, "1,55 m acima do carro (%.2f m)" % (cam.position.y - car.pos.y))
+	check(is_equal_approx(chase.fov.value, 55.0), "FOV 55° parado (%.1f°)" % chase.fov.value)
 	var d_max := [0.0]
 	drive(car, chase, 2.0, func(): return [0, 1, 0], func(c): d_max[0] = maxf(d_max[0], c.dist.value))
-	check(d_max[0] > 6.92 and d_max[0] < 7.1, "acelerando, se afasta ~15–20 cm (máx. %.2f m)" % d_max[0])
+	check(d_max[0] > 5.55 and d_max[0] < 5.9, "acelerando, se afasta ~25–50 cm (máx. %.2f m)" % d_max[0])
 	drive(car, chase, 16.0, func(): return [0, 1, 0], func(_c): pass)
 	var kmh := car.speed() * 3.6
-	var fov_alvo := 50.0 + minf(3.5, car.speed() * 0.045)
-	check(chase.fov.value > 50.5 and absf(chase.fov.value - fov_alvo) < 0.1, "FOV abre com a velocidade: %.1f° a %.0f km/h (alvo %.1f°; +3,5° a partir de 280 km/h)" % [chase.fov.value, kmh, fov_alvo])
+	var fov_alvo := 55.0 + minf(9.5, kmh * 0.034) + chase.gl.value * 1.4
+	check(chase.fov.value > 57.0 and absf(chase.fov.value - fov_alvo) < 0.3, "FOV abre com a velocidade: %.1f° a %.0f km/h (alvo %.1f°; +9,5° a partir de 280 km/h)" % [chase.fov.value, kmh, fov_alvo])
 	var d_min := [99.0]
 	var g_min := [0.0]
 	drive(car, chase, 2.5, func(): return [0, 0, 1], func(c): d_min[0] = minf(d_min[0], c.dist.value); g_min[0] = minf(g_min[0], car.g_long))
-	var d_alvo := 6.8 + 0.16 * maxf(g_min[0], -2.2)
-	check(absf(d_min[0] - d_alvo) < 0.04, "freando (%.1f g), chega %.0f cm para a frente (alvo %.0f cm; ~35 cm a 2,2 g)" % [g_min[0], (6.8 - d_min[0]) * 100.0, (6.8 - d_alvo) * 100.0])
+	var d_alvo := 5.3 + 0.34 * maxf(g_min[0], -2.2)
+	check(absf(d_min[0] - d_alvo) < 0.06, "freando (%.1f g), chega %.0f cm para a frente (alvo %.0f cm; ~75 cm a 2,2 g)" % [g_min[0], (5.3 - d_min[0]) * 100.0, (5.3 - d_alvo) * 100.0])
 	check(chase.shake.value < 1e-3, "sem tremida na reta lisa abaixo de 250 km/h")
 
 	print("volta do RefBot (Audi R8), câmera a 60 Hz")
@@ -104,8 +106,8 @@ func _initialize() -> void:
 		st.cy = [st.cy[1], car.pos.y])
 	check(st.lag <= 6.01, "atraso no rumo nunca passa de 6° (máx. %.2f°)" % st.lag)
 	check(st.lag > 2.0, "nas curvas aparece um pouco da lateral (atraso máx. %.2f°)" % st.lag)
-	check(st.dmin > 6.3 and st.dmax < 7.1, "distância entre 6,3 e 7,1 m (%.2f–%.2f m)" % [st.dmin, st.dmax])
-	check(st.fmax <= 53.5, "FOV no máximo 53,5° (%.1f° a %.0f km/h)" % [st.fmax, st.vmax])
+	check(st.dmin > 4.5 and st.dmax < 6.0, "distância entre 4,5 e 6,0 m (%.2f–%.2f m)" % [st.dmin, st.dmax])
+	check(st.fmax <= 66.0, "FOV no máximo 66° (%.1f° a %.0f km/h)" % [st.fmax, st.vmax])
 	check(st.kerb_frames > 0 and st.shake <= 0.0181, "tremida leve na zebra (máx. %.1f mm, %d de %d quadros)" % [st.shake * 1000.0, st.kerb_frames, st.frames])
 	check(st.jy < st.car_jy * 0.5, "altura calma: solavanco da câmera %.2f cm/quadro² (carro: %.2f)" % [st.jy * 100.0, st.car_jy * 100.0])
 

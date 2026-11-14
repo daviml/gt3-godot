@@ -24,6 +24,8 @@ func _wait_until(pred: Callable, max_frames := 600) -> bool:
 
 
 func _initialize() -> void:
+	# teste de Interlagos: não depende da última pista escolhida no jogo (user://jogo.cfg)
+	Game.track_id = Game.DEFAULT_TRACK
 	run_tests.call_deferred()
 
 
