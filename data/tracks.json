@@ -1,0 +1,120 @@
+[
+  {
+    "id": "interlagos",
+    "name": "Autódromo José Carlos Pace (Interlagos)",
+    "short": "Interlagos",
+    "country": "Brasil",
+    "length_m": 4309,
+    "corners": 15,
+    "data_dir": "res://data/track/",
+    "assets_dir": "res://assets/track/",
+    "sun_u": 0.5947,
+    "sun_elev": 48.0,
+    "records": {
+      "sim": "user://recordes-interlagos-v3.json",
+      "arcade": "user://recordes-interlagos-godot-arcade.json"
+    },
+    "remote_key": "",
+    "refs": {
+      "audi-r8-lms-gt3": "interlagos-r8"
+    },
+    "min_lap": {
+      "sim": 85.0,
+      "arcade": 60.0
+    },
+    "location": "São Paulo, Brasil"
+  },
+  {
+    "id": "laguna-seca",
+    "name": "WeatherTech Raceway Laguna Seca",
+    "short": "Laguna Seca",
+    "country": "EUA",
+    "length_m": 3602,
+    "corners": 11,
+    "data_dir": "res://data/tracks/laguna-seca/",
+    "assets_dir": "res://assets/tracks/laguna-seca/",
+    "sun_u": 0.5947,
+    "sun_elev": 58.0,
+    "records": {
+      "sim": "user://recordes-laguna-seca-v1.json",
+      "arcade": "user://recordes-laguna-seca-arcade-v1.json"
+    },
+    "remote_key": "laguna-seca",
+    "refs": {
+      "acura-nsx-gt3": "laguna-seca-nsx",
+      "bmw-m4-gt3": "laguna-seca-m4",
+      "ferrari-488-gt3": "laguna-seca-ferrari",
+      "audi-r8-lms-gt3": "laguna-seca-m4"
+    },
+    "min_lap": {
+      "sim": 65.0,
+      "arcade": 45.0
+    },
+    "visual": {
+      "asfalto": {
+        "color_mul": [
+          0.84,
+          0.85,
+          0.93
+        ],
+        "color_add": [
+          0.018,
+          0.018,
+          0.021
+        ],
+        "fast_mul": [
+          0.8,
+          0.81,
+          0.89
+        ],
+        "fast_add": [
+          0.014,
+          0.014,
+          0.017
+        ]
+      },
+      "grama": {
+        "base_color": [
+          0.98,
+          0.86,
+          0.58
+        ],
+        "dry_lo": 0.05,
+        "dry_mix": 0.92,
+        "lush_amt": 0.12,
+        "straw_tint": [
+          1.42,
+          1.12,
+          0.6
+        ],
+        "soil_color": [
+          0.62,
+          0.5,
+          0.34
+        ],
+        "fast_dry_lo": 0.1,
+        "fast_dry_mix": 0.88,
+        "fast_straw_tint": [
+          1.3,
+          1.02,
+          0.5
+        ]
+      },
+      "brita": {
+        "sand_color": [
+          0.45,
+          0.3,
+          0.12
+        ]
+      },
+      "impostor": {
+        "foliage_tint": [
+          0.52,
+          0.64,
+          0.46
+        ]
+      }
+    },
+    "location": "Monterey, Califórnia, EUA"
+  }
+]

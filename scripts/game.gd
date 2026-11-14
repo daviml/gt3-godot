@@ -23,6 +23,9 @@ static var _car_scene_cache: Dictionary = {}
 static var _car_scene_order: Array[String] = []
 static var _car_data_cache: Dictionary = {}
 static var _cars_list_cache: Array = []
+static var _tracks_cache: Array = []
+## pista escolhida (data/tracks.json; --track=<id> na linha de comando tem prioridade). Pista sem dados → interlagos
+static var track_id := _load_track()
 
 
 static func is_mobile_platform() -> bool:
@@ -237,3 +240,92 @@ static func weight_distribution_for_layout(layout: String) -> String:
 			return "43% / 57%"
 		_:
 			return "49% / 51%"
+
+
+# ------------------------------------------------------------------ pistas (data/tracks.json)
+
+const TRACKS_JSON := "res://data/tracks.json"
+const DEFAULT_TRACK := "interlagos"
+
+
+## Pistas do índice, cada uma com `available` (o track.json dela existe). Interlagos fica nas pastas antigas
+## (res://data/track/, res://assets/track/); as outras em data/tracks/<id>/ e assets/tracks/<id>/.
+static func get_tracks_list() -> Array:
+	if _tracks_cache.is_empty():
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string(TRACKS_JSON)) if FileAccess.file_exists(TRACKS_JSON) else null
+		if parsed is Array:
+			for t in parsed:
+				if t is Dictionary:
+					# precisa da pista (física) e do cenário (o GLB importado: ResourceLoader vale também no export)
+					t["available"] = FileAccess.file_exists(String(t.get("data_dir", "")) + "track.json") \
+						and ResourceLoader.exists(String(t.get("assets_dir", "")) + "cenario.glb")
+					_tracks_cache.append(t)
+		if _tracks_cache.is_empty():
+			# sem índice: só Interlagos, como antes do multi-pista
+			_tracks_cache.append({"id": DEFAULT_TRACK, "name": "Interlagos", "short": "Interlagos",
+				"data_dir": "res://data/track/", "assets_dir": "res://assets/track/", "available": true,
+				"sun_u": 0.5947, "sun_elev": 48.0, "refs": {"audi-r8-lms-gt3": "interlagos-r8"}})
+	return _tracks_cache
+
+
+static func get_available_tracks() -> Array:
+	return get_tracks_list().filter(func(t): return bool(t.get("available", false)))
+
+
+static func get_track_info(id := "") -> Dictionary:
+	var want := id if id != "" else track_id
+	for t in get_tracks_list():
+		if String(t.get("id", "")) == want:
+			return t
+	return {}
+
+
+static func is_track_available(id: String) -> bool:
+	return bool(get_track_info(id).get("available", false))
+
+
+static func track_data_path(file: String) -> String:
+	return String(get_track_info().get("data_dir", "res://data/track/")) + file
+
+
+static func track_asset_path(file: String) -> String:
+	return String(get_track_info().get("assets_dir", "res://assets/track/")) + file
+
+
+static func track_name(short := true) -> String:
+	var t := get_track_info()
+	return String(t.get("short" if short else "name", t.get("name", "Interlagos")))
+
+
+## referência do iRacing para o piloto automático do carro nesta pista ("" = sem referência, usa o Bot)
+static func track_ref_for_car(id: String) -> String:
+	var refs = get_track_info().get("refs", {})
+	return String(refs.get(id, "")) if refs is Dictionary else ""
+
+
+static func set_track(id: String) -> void:
+	if not is_track_available(id):
+		push_warning("[pista] '%s' sem dados, ficando em %s" % [id, track_id])
+		return
+	track_id = id
+	set_setting("garagem", "pista", id)
+
+
+static func _load_track() -> String:
+	var want := String(get_setting("garagem", "pista", DEFAULT_TRACK))
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--track="):
+			want = a.substr(8)
+	if want != DEFAULT_TRACK and not _track_available_static(want):
+		push_warning("[pista] '%s' indisponível (sem track.json), usando %s" % [want, DEFAULT_TRACK])
+		print("[pista] '%s' indisponível (sem track.json), usando %s" % [want, DEFAULT_TRACK])
+		return DEFAULT_TRACK
+	return want
+
+
+## versão que não depende de track_id (chamada na inicialização da variável estática)
+static func _track_available_static(id: String) -> bool:
+	for t in get_tracks_list():
+		if String(t.get("id", "")) == id:
+			return bool(t.get("available", false))
+	return false

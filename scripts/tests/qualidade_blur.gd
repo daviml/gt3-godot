@@ -11,6 +11,8 @@ func check(cond: bool, msg: String) -> void:
 
 
 func _initialize() -> void:
+	# teste de Interlagos: não depende da última pista escolhida no jogo (user://jogo.cfg)
+	Game.track_id = Game.DEFAULT_TRACK
 	await process_frame
 	print("--- Testando Desfoque de Velocidade (SpeedBlur) ---")
 
@@ -85,7 +87,7 @@ func _initialize() -> void:
 	check(not main.env.ssil_enabled, "Médio: SSIL desativado")
 	check(not main.env.ssr_enabled, "Médio: SSR desativado")
 	check(main.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS, "Médio: sombras em 2 splits")
-	check(main.speed_blur.enabled and absf(main.speed_blur.max_strength - 0.8) < 1e-4, "Médio: speed blur ativado (max 0.8)")
+	check(not main.speed_blur.enabled, "Médio: speed blur desligado (o Davi tirou em 14/11/2026: deixava a imagem feia)")
 
 	# Extremo
 	main._apply_quality("Extremo")
@@ -94,7 +96,7 @@ func _initialize() -> void:
 	check(main.env.ssr_enabled and main.env.ssr_max_steps == 48, "Extremo: SSR ativado (48 steps)")
 	check(main.sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS, "Extremo: sombras em 4 splits")
 	check(main.sun.directional_shadow_max_distance >= 180.0, "Extremo: sombra longa (180 m)")
-	check(main.speed_blur.enabled and absf(main.speed_blur.max_strength - 1.0) < 1e-4, "Extremo: speed blur ativado (max 1.0)")
+	check(not main.speed_blur.enabled, "Extremo: speed blur desligado (decisão do Davi, 14/11/2026)")
 
 	print("\nQualidade e Blur: " + ("TUDO OK" if ok else "FALHOU"))
 	quit(0 if ok else 1)

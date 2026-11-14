@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cmcbd43pfeole"
-path.s3tc="res://.godot/imported/asphalt_track_diff.png-6d3c9c5b4265804f7f5f41619df002f3.s3tc.ctex"
-path.etc2="res://.godot/imported/asphalt_track_diff.png-6d3c9c5b4265804f7f5f41619df002f3.etc2.ctex"
+path.bptc="res://.godot/imported/asphalt_track_diff.png-6d3c9c5b4265804f7f5f41619df002f3.bptc.ctex"
+path.astc="res://.godot/imported/asphalt_track_diff.png-6d3c9c5b4265804f7f5f41619df002f3.astc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -13,12 +13,12 @@ metadata={
 [deps]
 
 source_file="res://assets/textures/asphalt_track_diff.png"
-dest_files=["res://.godot/imported/asphalt_track_diff.png-6d3c9c5b4265804f7f5f41619df002f3.s3tc.ctex", "res://.godot/imported/asphalt_track_diff.png-6d3c9c5b4265804f7f5f41619df002f3.etc2.ctex"]
+dest_files=["res://.godot/imported/asphalt_track_diff.png-6d3c9c5b4265804f7f5f41619df002f3.bptc.ctex", "res://.godot/imported/asphalt_track_diff.png-6d3c9c5b4265804f7f5f41619df002f3.astc.ctex"]
 
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality=true
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0

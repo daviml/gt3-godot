@@ -1,19 +1,28 @@
 // Exporta o cenário da pista do jogo web para o Godot (ver tools/cenario/cenario.ts):
 //   assets/track/cenario.glb       malhas e texturas da pista e dos arredores
 //   data/track/arvores_pos.json    árvores: [x, y, z, tamanho, espécie, giro, tom] × n
-// uso (de REPOS/gt3-godot/tools): node cenario.mjs
+// uso (de REPOS/gt3-godot/tools): node cenario.mjs [--track=<id>]   (sem --track: Interlagos)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
 import { NodeIO } from '@gltf-transform/core';
 import { dedup, prune, weld } from '@gltf-transform/functions';
 
+// --out=<pasta>: grava lá em vez do projeto (conferência, sem sobrescrever o que existe)
+const outRoot = process.argv.find(a => a.startsWith('--out='))?.slice(6);
 const out = p => {
-  const f = fileURLToPath(new URL(`../${p}`, import.meta.url));
-  mkdirSync(fileURLToPath(new URL('.', new URL(`../${p}`, import.meta.url))), { recursive: true });
+  const f = outRoot ? `${outRoot}/${p}` : fileURLToPath(new URL(`../${p}`, import.meta.url));
+  mkdirSync(dirname(f), { recursive: true });
   return f;
 };
+// --track=<id>: outra pista (módulos e dados trocados no vite.config.ts); sem ela, Interlagos nos caminhos de sempre
+const trackArg = process.argv.find(a => a.startsWith('--track='))?.slice(8) ?? 'interlagos';
+const other = trackArg !== 'interlagos';
+const dataDir = other ? `data/tracks/${trackArg}/` : 'data/track/';
+const assetDir = other ? `assets/tracks/${trackArg}/` : 'assets/track/';
+process.env.TRACK = trackArg;
 const server = await createServer({ configFile: fileURLToPath(new URL('cenario/vite.config.ts', import.meta.url)), server: { port: 5199 } });
 await server.listen();
 let browser;
@@ -37,8 +46,8 @@ try {
   const doc = await io.readBinary(new Uint8Array(rawGlb));
   await doc.transform(weld(), dedup(), prune());
   const glb = Buffer.from(await io.writeBinary(doc));
-  writeFileSync(out('assets/track/cenario.glb'), glb);
-  writeFileSync(out('data/track/arvores_pos.json'), JSON.stringify(r.trees));
+  writeFileSync(out(assetDir + 'cenario.glb'), glb);
+  writeFileSync(out(dataDir + 'arvores_pos.json'), JSON.stringify(r.trees));
   console.log(`cenario.glb ${(glb.length / 1e6).toFixed(1)} MB (antes ${(rawGlb.length / 1e6).toFixed(1)} MB),`, JSON.stringify(r.stats));
   console.log('trechos:', r.sections.join(', '));
 } finally {

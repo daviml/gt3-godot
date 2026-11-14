@@ -20,3 +20,6 @@ deploy/vercel/index.pck
 # instalador Windows
 Build-Windows.bat
 deploy/windows/
+
+# token do ranking (GitHub gt3-tempos) - nunca versionar
+segredos.cfg

@@ -38,8 +38,10 @@ renderer/rendering_method.web="gl_compatibility"
 anti_aliasing/quality/msaa_3d=2
 anti_aliasing/quality/msaa_3d.mobile=0
 anti_aliasing/quality/use_taa=false
-textures/default_filters/anisotropic_filtering_level=4
-textures/default_filters/anisotropic_filtering_level.mobile=2
+textures/default_filters/anisotropic_filtering_level=16
+textures/default_filters/anisotropic_filtering_level.mobile=4
+textures/default_filters/texture_mipmap_bias=-0.25
+textures/default_filters/texture_mipmap_bias.mobile=-0.05
 lights_and_shadows/directional_shadow/size=4096
 lights_and_shadows/directional_shadow/size.mobile=1024
 lights_and_shadows/directional_shadow/soft_shadow_filter_quality=2
@@ -53,5 +55,5 @@ textures/vram_compression/import_etc2_astc=true
 texture={
 "compress/mode": 2,
 "mipmaps/generate": true,
-"process/size_limit": 1024
+"process/size_limit": 2048
 }

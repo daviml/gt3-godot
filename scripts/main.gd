@@ -11,8 +11,9 @@
 # Cronometragem (etapa 4): R volta para o grid e zera a volta; N = nick (recordes por nick e carro).
 extends Node3D
 
-const SUN_U := 0.5947
-const SUN_ELEV := deg_to_rad(48.0)
+## sol da pista atual (data/tracks.json; Interlagos: 0,5947 e 48°)
+var SUN_U := float(Game.get_track_info().get("sun_u", 0.5947))
+var SUN_ELEV := deg_to_rad(float(Game.get_track_info().get("sun_elev", 48.0)))
 
 var track: Track
 var track_view: TrackView
@@ -58,8 +59,8 @@ var car_data: Dictionary
 var high := true
 var manual_setup := false
 var _init_cli_args: PackedStringArray
-# referência do iRacing de cada carro que tem uma: o piloto automático segue a volta real
-const REFS := {"audi-r8-lms-gt3": "interlagos-r8"}
+# referência do iRacing de cada carro que tem uma nesta pista (data/tracks.json → refs): o piloto automático
+# segue a volta real
 
 
 
@@ -70,7 +71,7 @@ func _ready() -> void:
 		set_process(false)
 		set_process_unhandled_input(false)
 		return
-	track = Track.new("res://data/track/track.json")
+	track = Track.new(Game.track_data_path("track.json"))
 	_build_env()
 	# pista e arredores exportados do jogo web (etapa 7): scripts/track/track_view.gd
 	track_view = TrackView.new()
@@ -105,7 +106,7 @@ func _init_args() -> void:
 
 
 func setup_step_track(pre_track: Track) -> void:
-	track = pre_track if pre_track != null else Track.new("res://data/track/track.json")
+	track = pre_track if pre_track != null else Track.new(Game.track_data_path("track.json"))
 
 
 func setup_step_env(sky_tex: Texture2D = null) -> void:
@@ -139,13 +140,14 @@ func setup_step_hud_and_quality() -> void:
 
 
 func _create_bot():
-	if REFS.has(car_id):
+	var ref := Game.track_ref_for_car(car_id)
+	if ref != "":
 		# malha de giro: segue o traçado real do iRacing sem passar da zebra (Porsche 1:35,9 e Mustang 1:33,6 válidas).
 		# A volta do R8 passa 2,3 m além da zebra na Descida do Lago: ele continua com o traçado contido.
 		var opts := {"yaw_p": 2.0, "hold_line": 0.02}
-		if car_id == "audi-r8-lms-gt3":
+		if car_id == "audi-r8-lms-gt3" and Game.track_id == "interlagos":
 			opts = {"yaw_p": 2.0, "line_gain": 0.4, "hold_line": 0.02, "edge": [-0.3, 0.5]}
-		return RefBot.new(track, car, RefBot.load_ref(REFS[car_id]), opts)
+		return RefBot.new(track, car, RefBot.load_ref(ref), opts)
 	return Bot.new(track, car)
 
 
@@ -830,10 +832,10 @@ func _set_quality(level: int) -> void:
 	if track_view:
 		track_view.set_detail(level)
 
-	# 6. Desfoque radial de velocidade (apenas em Médio e Extremo)
+	# 6. Desfoque radial de velocidade (desativado para preservar a nitidez da imagem)
 	if speed_blur:
-		speed_blur.enabled = level >= 2
-		speed_blur.max_strength = 0.8 if level == 2 else 1.0
+		speed_blur.enabled = false
+		speed_blur.max_strength = 0.0
 
 	# 7. Desfoque das rodas e simplificação de materiais do carro
 	if car_view:

@@ -30,6 +30,10 @@ var curv: PackedFloat32Array
 var length := 0.0
 ## trechos com nome (S do Senna, Curva do Sol...): [{name, s0, s1}]
 var sections: Array = []
+## inclinação lateral (camber, rad, + = lado direito mais alto) por amostra; só em pistas com "bank" no track.json
+## (Interlagos não tem: R fica horizontal, exatamente como antes)
+var bank := PackedFloat32Array()
+var has_bank := false
 
 # resultado do último locate (evita alocar no loop de física)
 var li := 0
@@ -65,6 +69,15 @@ func _init(path := "", data: Dictionary = {}) -> void:
 		wall_l.append(s[o + 14]); wall_r.append(s[o + 15])
 	length = n * STEP
 	sections = d.get("sections", [])
+	# camber: gira a lateral em torno da tangente (mesma conta do tools/tracks/bank.ts, usada no cenário)
+	if d.has("bank"):
+		has_bank = true
+		var b: Array = d.bank
+		for i in n:
+			var th := float(b[i])
+			bank.append(th)
+			R[i] = (R[i] * cos(th) + N[i] * sin(th)).normalized()
+			N[i] = R[i].cross(T[i]).normalized()
 	# curvatura pela variação de rumo em ±5 amostras (igual ao web)
 	for i in n:
 		var a := T[(i - 5 + n) % n]
@@ -151,7 +164,8 @@ func locate(p: Vector3, hint: int, win := 12) -> void:
 	lr = R[i].lerp(R[j], f).normalized()
 	ln = N[i].lerp(N[j], f).normalized()
 	var off := p - lcenter
-	ld = off.x * lr.x + off.z * lr.z
+	# com camber, a lateral é medida ao longo da pista inclinada (a altura acima dela fica na normal)
+	ld = off.dot(lr) if has_bank else off.x * lr.x + off.z * lr.z
 	lwl = lerpf(wl[i], wl[j], f); lwr = lerpf(wr[i], wr[j], f)
 	# zebra que começa/termina entre as amostras: vale a mais larga das duas (como no web)
 	lkl = maxf(kerb_l[i], kerb_l[j]); lkr = maxf(kerb_r[i], kerb_r[j])

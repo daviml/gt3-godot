@@ -12,8 +12,22 @@
 class_name TrackView
 extends Node3D
 
-const GLB := "res://assets/track/cenario.glb"
-const TREES := "res://data/track/arvores_pos.json"
+## arquivos da pista atual (Game.track_id; Interlagos: res://assets/track/ e res://data/track/)
+static func glb_path() -> String:
+	return Game.track_asset_path("cenario.glb")
+
+
+static func trees_path() -> String:
+	return Game.track_data_path("arvores_pos.json")
+
+
+## lê um JSON de lista da pista; arquivo ausente ou inválido = [] (pista sem árvores, sem torres...)
+static func read_json_array(path: String) -> Array:
+	if not FileAccess.file_exists(path):
+		return []
+	var v = JSON.parse_string(FileAccess.get_file_as_string(path))
+	return v if v is Array else []
+
 const CHUNK := 250.0
 const CULL_SECONDARY_MIN := 300.0
 const CULL_SECONDARY_LEVE := 500.0
@@ -47,7 +61,7 @@ func _ready() -> void:
 
 func build_scene(scene: PackedScene = null) -> void:
 	if scene == null:
-		scene = load(GLB)
+		scene = load(glb_path())
 	var root := scene.instantiate()
 	add_child(root)
 	_fix(root)
@@ -118,7 +132,7 @@ func _fix(n: Node) -> void:
 					gm.resource_name = "grama"
 					mat = gm
 					mat_name = "grama"
-				if mat_name in ["asfalto", "grama", "pinta", "torcida"]:
+				if mat_name in ["asfalto", "grama", "pinta", "torcida", "brita"]:
 					is_primary_surface = true
 				if mat_name == "fachada":
 					is_building_surface = true
@@ -159,6 +173,9 @@ func _material(src: Material, order: int) -> Material:
 		out = _shader("grama", {"grass_tex": _tex("leafy_grass_diff"), "grass_n": _tex("leafy_grass_nor_gl"), "grass_arm": _tex("leafy_grass_arm"), "dry_tex": _tex("sparse_grass_diff")})
 	elif nm == "fachada":
 		out = _shader("fachada", {"plaster": _tex("concrete_wall_008_diff")})
+	elif nm == "brita":
+		# brita/areia das áreas de escape (Laguna Seca); Interlagos não tem esse material
+		out = _shader("brita", {"grain_tex": _tex("sparse_grass_diff")})
 	elif nm.begins_with("ph:") and bm:
 		var ph := nm.substr(3)
 		var o := ORMMaterial3D.new()
@@ -205,6 +222,13 @@ func _shader(file: String, params: Dictionary) -> ShaderMaterial:
 	m.shader = load("res://shaders/%s.gdshader" % file)
 	for k in params:
 		m.set_shader_parameter(k, params[k])
+	# cores por pista (data/tracks.json → "visual": {"asfalto": {...}, "grama": {...}}); listas viram Vector3.
+	# Interlagos não tem "visual": os shaders ficam com os valores padrão de sempre.
+	var vis: Dictionary = Game.get_track_info().get("visual", {})
+	var over: Dictionary = vis.get(file, {})
+	for k in over:
+		var v = over[k]
+		m.set_shader_parameter(k, Vector3(v[0], v[1], v[2]) if v is Array else v)
 	_shader_mats.append(m)
 	return m
 
@@ -216,7 +240,7 @@ func _tex(file: String) -> Texture2D:
 # ------------------------------------------------------------------ árvores (impostores do web)
 
 func build_trees(data: Array = []) -> void:
-	var a: Array = data if not data.is_empty() else JSON.parse_string(FileAccess.get_file_as_string(TREES))
+	var a: Array = data if not data.is_empty() else TrackView.read_json_array(trees_path())
 	trees = a.size() / 7
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -230,6 +254,10 @@ func build_trees(data: Array = []) -> void:
 	mat.set_shader_parameter("color_atlas", load("res://assets/trees/arvores_cor.png"))
 	mat.set_shader_parameter("normal_atlas", load("res://assets/trees/arvores_normal.png"))
 	mat.set_shader_parameter("fast_mode", detail_level <= 1)
+	# tom da folhagem por pista (Laguna: carvalhos verde-escuros); Interlagos não define e fica igual
+	var tint = Game.get_track_info().get("visual", {}).get("impostor", {}).get("foliage_tint", null)
+	if tint is Array:
+		mat.set_shader_parameter("foliage_tint", Vector3(tint[0], tint[1], tint[2]))
 	_shader_mats.append(mat)
 	# blocos de 250 m, cada um com a sua caixa: a câmera só desenha os blocos que vê (o cartão gira no shader,
 	# então a caixa ganha a margem do maior tamanho de árvore)

@@ -7,6 +7,15 @@ render_mode cull_disabled;
 
 uniform bool fast_mode = false;
 uniform vec3 base_color = vec3(0.44, 0.70, 0.26); // verde-oliva natural calibrado ao LMU, em linear
+// secura por pista (data/tracks.json → visual.grama); o padrão é o de Interlagos
+uniform float dry_lo = 0.45;
+uniform float dry_mix = 0.75;
+uniform float lush_amt = 0.5;
+uniform vec3 straw_tint = vec3(1.32, 1.08, 0.55);
+uniform vec3 soil_color = vec3(0.50, 0.30, 0.18);
+uniform float fast_dry_lo = 0.56;
+uniform float fast_dry_mix = 0.45;
+uniform vec3 fast_straw_tint = vec3(1.18, 0.92, 0.38);
 uniform sampler2D grass_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D grass_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D grass_arm : filter_linear_mipmap_anisotropic, repeat_enable;
@@ -32,9 +41,9 @@ void fragment() {
 		float n = vnoise(ground * 0.018) * 0.65 + vnoise(ground * 0.07) * 0.35;
 		float lg = dot(green, vec3(0.3, 0.59, 0.11));
 		vec3 olive = mix(vec3(lg), green, 1.30) * vec3(0.78, 1.08, 0.44);
-		vec3 straw = vec3(lg) * vec3(1.18, 0.92, 0.38);
-		float dry_k = smoothstep(0.56, 0.86, n);
-		ALBEDO = base_color * mix(olive, straw, dry_k * 0.45) * (0.86 + 0.28 * vnoise(ground * 0.035 + 7.0));
+		vec3 straw = vec3(lg) * fast_straw_tint;
+		float dry_k = smoothstep(fast_dry_lo, 0.86, n);
+		ALBEDO = base_color * mix(olive, straw, dry_k * fast_dry_mix) * (0.86 + 0.28 * vnoise(ground * 0.035 + 7.0));
 		ROUGHNESS = 0.92;
 		METALLIC = 0.0;
 	} else {
@@ -45,20 +54,22 @@ void fragment() {
 		float lg = dot(green, vec3(0.3, 0.59, 0.11));
 		green = mix(vec3(lg), green, 1.25) * vec3(1.02, 1.0, 0.62);
 		float ld = dot(dry_c, vec3(0.3, 0.59, 0.11));
-		vec3 straw = vec3(ld) * vec3(1.32, 1.08, 0.55) * (0.85 + 0.3 * texture(grass_tex, uv * 0.5).g);
-		float dry_k = smoothstep(0.45, 0.8, n);
+		vec3 straw = vec3(ld) * straw_tint * (0.85 + 0.3 * texture(grass_tex, uv * 0.5).g);
+		float dry_k = smoothstep(dry_lo, 0.8, n);
 		float tone = 0.82 + 0.34 * vnoise(gp * 0.03 + 7.0);
-		float lush = smoothstep(0.55, 0.8, vnoise(gp * 0.09 + 13.0)) * 0.5;
-		vec3 grass_c = mix(mix(green, straw, dry_k * 0.75), green * vec3(0.85, 1.0, 0.9), lush * (1.0 - dry_k));
+		float lush = smoothstep(0.55, 0.8, vnoise(gp * 0.09 + 13.0)) * lush_amt;
+		vec3 grass_c = mix(mix(green, straw, dry_k * dry_mix), green * vec3(0.85, 1.0, 0.9), lush * (1.0 - dry_k));
 		vec3 c = base_color * grass_c * tone;
 		// terra vermelha só em trilhas finas e pequenas falhas
 		float tr = abs(vnoise(gp * 0.018 + 31.0) - 0.5);
 		float trail = (1.0 - smoothstep(0.004, 0.012, tr)) * smoothstep(0.4, 0.7, vnoise(gp * 0.01 + 3.0));
 		float bald = smoothstep(0.78, 0.86, vnoise(gp * 0.12 + 5.0) * 0.7 + vnoise(gp * 0.9) * 0.3);
 		float dirt = max(trail, bald * 0.7);
-		vec3 soil = vec3(0.50, 0.30, 0.18) * (0.75 + 0.5 * texture(dry_tex, uv * 1.7).r);
+		vec3 soil = soil_color * (0.75 + 0.5 * texture(dry_tex, uv * 1.7).r);
 		ALBEDO = mix(c, soil, dirt * 0.85);
-		NORMAL_MAP = texture(grass_n, uv).rgb;
+		vec3 gn1 = texture(grass_n, uv).rgb * 2.0 - 1.0;
+		vec3 gn2 = texture(grass_n, uv * 2.8).rgb * 2.0 - 1.0;
+		NORMAL_MAP = normalize(vec3(gn1.xy + gn2.xy * 0.4, gn1.z)) * 0.5 + 0.5;
 		vec3 arm = texture(grass_arm, uv).rgb;
 		AO = arm.r;
 		AO_LIGHT_AFFECT = 0.3;

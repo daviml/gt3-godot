@@ -22,7 +22,7 @@ signal hide_touch_changed(hidden: bool)
 signal hud_gauge_changed(style: String)
 signal recenter_tilt
 
-const VIEWS := ["home", "cars", "settings", "records", "help"]
+const VIEWS := ["home", "cars", "tracks", "settings", "records", "help"]
 const SETTINGS_TABS := ["controls", "graphics", "assists", "audio", "driver"]
 const SETTINGS_TAB_LABELS := {
 	"controls": "CONTROLES",
@@ -61,6 +61,131 @@ const LAYOUT_LABELS := {
 	"central": "MOTOR CENTRAL",
 	"traseiro": "MOTOR TRASEIRO",
 }
+
+
+## Desenho do traçado de uma pista (cartões de pista do menu): contorno com brilho e o ponto da largada.
+class _TrackOutline extends Control:
+	var pts: Array = []
+	var color := Color("#fbbf24")
+
+	func _draw() -> void:
+		if pts.size() < 3:
+			return
+		var side := minf(size.x, size.y) - 10.0
+		var c := size * 0.5
+		var line := PackedVector2Array()
+		for p in pts:
+			line.append(c + Vector2(p) * side)
+		line.append(line[0])
+		draw_polyline(line, Color(color, 0.22), 7.0, true)
+		draw_polyline(line, color, 2.6, true)
+		draw_circle(line[0], 4.5, Color(color, 0.35))
+		draw_circle(line[0], 2.6, Color.WHITE)
+
+
+## Mapa grande da pista (tela "Trocar pista"): traçado nas cores dos 3 setores (terços da volta, como o LapTimer),
+## largada e o nome de cada trecho. Os dados vêm do track.json de cada pista (cache por id).
+class _TrackMap extends Control:
+	const SECTOR_COLORS := [Color("#ff3b30"), Color("#f2c230"), Color("#3d8bff")]
+	static var _cache := {}
+	var track_id := ""
+	var font_size := 12
+
+	## pontos normalizados [-0.5, 0.5], s de cada ponto, comprimento, desnível e trechos com nome
+	static func data_for(id: String) -> Dictionary:
+		if _cache.has(id):
+			return _cache[id]
+		var out := {"pts": [], "s": [], "length": 0.0, "drop": 0.0, "sections": []}
+		var path := String(Game.get_track_info(id).get("data_dir", "")) + "track.json"
+		var d = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+		if d is Dictionary:
+			var n := int(d.n)
+			var st := int(d.stride)
+			var s: Array = d.s
+			var lo := Vector2(INF, INF)
+			var hi := Vector2(-INF, -INF)
+			var ylo := INF
+			var yhi := -INF
+			var raw: Array = []
+			var k := maxi(1, n / 400)
+			for i in range(0, n, k):
+				var v := Vector2(s[i * st], s[i * st + 2])
+				raw.append(v)
+				out.s.append(i * Track.STEP)
+				lo = Vector2(minf(lo.x, v.x), minf(lo.y, v.y))
+				hi = Vector2(maxf(hi.x, v.x), maxf(hi.y, v.y))
+			for i in n:
+				ylo = minf(ylo, float(s[i * st + 1]))
+				yhi = maxf(yhi, float(s[i * st + 1]))
+			var span := maxf(hi.x - lo.x, hi.y - lo.y)
+			var mid := (lo + hi) * 0.5
+			for v in raw:
+				out.pts.append((v - mid) / span)
+			out.length = n * Track.STEP
+			out.drop = yhi - ylo
+			out.sections = d.get("sections", [])
+			# Interlagos: o mesmo traçado oficial dos cartões e do load (já começa na largada, no sentido da
+			# corrida); o s de cada ponto vem do comprimento acumulado
+			if id == "interlagos":
+				var off: Array = LoadingScreen.outline_for(id)
+				var acc := [0.0]
+				for i in range(1, off.size()):
+					acc.append(float(acc[i - 1]) + Vector2(off[i]).distance_to(Vector2(off[i - 1])))
+				var total := float(acc[acc.size() - 1]) + Vector2(off[0]).distance_to(Vector2(off[off.size() - 1]))
+				out.pts = off
+				out.s = acc.map(func(a): return float(a) / total * float(out.length))
+		_cache[id] = out
+		return out
+
+	func _pt_at(dat: Dictionary, s_at: float, c: Vector2, side: float) -> Vector2:
+		var ss: Array = dat.s
+		var j := clampi(int(s_at / maxf(1.0, float(dat.length)) * ss.size()), 0, ss.size() - 1)
+		return c + Vector2(dat.pts[j]) * side
+
+	func _draw() -> void:
+		var dat := data_for(track_id)
+		var pts: Array = dat.pts
+		if pts.size() < 3:
+			return
+		var side := minf(size.x, size.y) - 70.0
+		var c := size * 0.5
+		var L := float(dat.length)
+		var ss: Array = dat.s
+		# brilho por baixo, depois cada setor na sua cor
+		var all := PackedVector2Array()
+		for p in pts:
+			all.append(c + Vector2(p) * side)
+		all.append(all[0])
+		draw_polyline(all, Color(1, 1, 1, 0.08), 14.0, true)
+		for k in 3:
+			var seg := PackedVector2Array()
+			for i in pts.size() + 1:
+				var j := i % pts.size()
+				var s_i := float(ss[j]) if i < pts.size() else L
+				if s_i >= L * k / 3.0 - 0.01 and s_i <= L * (k + 1) / 3.0 + L / pts.size() * 1.5:
+					seg.append(all[i])
+			if seg.size() >= 2:
+				draw_polyline(seg, Color(SECTOR_COLORS[k], 0.25), 9.0, true)
+				draw_polyline(seg, SECTOR_COLORS[k], 3.5, true)
+		# nomes dos trechos, para fora do traçado
+		var font := get_theme_default_font()
+		for sec in dat.sections:
+			var s0 := float(sec.s0)
+			var s1 := float(sec.s1)
+			if s1 < s0:
+				s1 += L
+			var p := _pt_at(dat, fmod((s0 + s1) * 0.5, L), c, side)
+			var dir := (p - c).normalized()
+			var name := String(sec.name).replace("Curva ", "T")
+			var w := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			var at := p + dir * 16.0 - Vector2(w * 0.5, -font_size * 0.35)
+			at.x = clampf(at.x, 2.0, size.x - w - 2.0)
+			draw_circle(p, 2.5, Color(1, 1, 1, 0.8))
+			draw_string(font, at, name, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(1, 1, 1, 0.78))
+		# largada
+		draw_circle(all[0], 7.0, Color(1, 1, 1, 0.3))
+		draw_circle(all[0], 4.0, Color.WHITE)
+		draw_string(font, all[0] + Vector2(10, -8), "LARGADA", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color.WHITE)
 
 
 class _Backdrop extends Control:
@@ -323,6 +448,8 @@ func switch_view(view: String) -> void:
 	active_view = view
 	if view == "records":
 		records_mode = current_mode
+	if view == "tracks":
+		_track_pick = Game.track_id
 	_rebuild_all()
 
 
@@ -565,12 +692,14 @@ func _rebuild_header() -> void:
 		_header_hbox.add_child(_header_center)
 
 		if active_view == "cars":
-			var b1 := LmuTheme.make_label("CIRCUITO: INTERLAGOS", roundi(13 * fs), LmuTheme.TEXT_MUTED, 700)
+			var b1 := LmuTheme.make_label("CIRCUITO: " + Game.track_name().to_upper(), roundi(13 * fs), LmuTheme.TEXT_MUTED, 700)
 			var sep := LmuTheme.make_label(" / ", roundi(13 * fs), LmuTheme.TEXT_DIM, 600)
 			var b2 := LmuTheme.make_label("GARAGEM 3D · CARROS", roundi(13 * fs), Color.WHITE, 800)
 			_header_center.add_child(b1)
 			_header_center.add_child(sep)
 			_header_center.add_child(b2)
+		elif active_view == "tracks":
+			_header_center.add_child(LmuTheme.make_label("SELEÇÃO DE PISTA", roundi(13 * fs), Color.WHITE, 800))
 		elif active_view == "settings":
 			var sbox := HBoxContainer.new()
 			sbox.add_theme_constant_override("separation", 6)
@@ -586,7 +715,7 @@ func _rebuild_header() -> void:
 			sbox.add_child(_header_search_edit)
 		else:
 			var dot := LmuTheme.make_label("● ", roundi(11 * fs), LmuTheme.ACCENT_GREEN, 700)
-			var circ := LmuTheme.make_label("AUTÓDROMO DE INTERLAGOS · SÃO PAULO", roundi(12 * fs), LmuTheme.TEXT_SLATE, 700)
+			var circ := LmuTheme.make_label(_track_header_text(), roundi(12 * fs), LmuTheme.TEXT_SLATE, 700)
 			_header_center.add_child(dot)
 			_header_center.add_child(circ)
 	else:
@@ -702,6 +831,8 @@ func _rebuild_view() -> void:
 			_build_home_view()
 		"cars":
 			_build_cars_view()
+		"tracks":
+			_build_tracks_view()
 		"settings":
 			_build_settings_view()
 		"records":
@@ -786,6 +917,317 @@ func _make_home_nav_item(title: String, text_col: Color, bar_col: Color, active_
 
 # ------------------------------------------------------------------ HOME VIEW
 
+# ------------------------------------------------------------------ pista (data/tracks.json)
+
+## textos da pista atual; Interlagos mantém exatamente os de antes do multi-pista
+func _track_header_text() -> String:
+	if Game.track_id == Game.DEFAULT_TRACK:
+		return "AUTÓDROMO DE INTERLAGOS · SÃO PAULO"
+	var t := Game.get_track_info()
+	return "%s · %s" % [String(t.get("name", "")).to_upper(), String(t.get("country", "")).to_upper()]
+
+
+func _track_hero_text() -> String:
+	if Game.track_id == Game.DEFAULT_TRACK:
+		return "AUTÓDROMO DE INTERLAGOS · 4.309 M"
+	var t := Game.get_track_info()
+	return "%s · %s M" % [String(t.get("name", "")).to_upper(), _thousands(int(t.get("length_m", 0)))]
+
+
+func _track_help_text() -> String:
+	var limits := "Limites de pista: sair com as 4 rodas fora da pista/zebra invalida a volta atual.
+
+"
+	if Game.track_id == Game.DEFAULT_TRACK:
+		return ("Circuito: Autódromo José Carlos Pace (Interlagos) · 4.309 m · 15 curvas · 3 setores cronometrados.
+
+" +
+			limits + "Licença DR/SR: seus melhores tempos válidos em Interlagos evoluem sua licença de Rookie até Pro (S).")
+	var t := Game.get_track_info()
+	return ("Circuito: %s · %s m · %d curvas · 3 setores cronometrados.
+
+" % [t.get("name", ""),
+		_thousands(int(t.get("length_m", 0))), int(t.get("corners", 0))] + limits +
+		"Cada pista tem recordes e ranking próprios.")
+
+
+static func _thousands(v: int) -> String:
+	var txt := str(v)
+	return txt if txt.length() <= 3 else txt.left(txt.length() - 3) + "." + txt.right(3)
+
+
+# ------------------------------------------------------------------ cartões da home e troca de pista
+
+## Painel clicável (cartões da home e lista de pistas): realça a borda ao passar o mouse; no toque, o Godot
+## emula o mouse, então basta o clique.
+func _make_click_card(on_click: Callable, accent: Color, enabled := true, selected := false) -> PanelContainer:
+	var card := PanelContainer.new()
+	var base := LmuTheme.panel_style(Color(accent, 0.12) if selected else Color(LmuTheme.BG_PANEL, 0.82),
+		accent if selected else LmuTheme.BORDER_SUBTLE, 8, 0, 0)
+	base.set_border_width_all(2 if selected else 1)
+	var hover := base.duplicate() as StyleBoxFlat
+	hover.border_color = accent
+	hover.bg_color = Color(accent, 0.16) if selected else Color(LmuTheme.BG_CHIP_HOVER, 0.92)
+	card.add_theme_stylebox_override("panel", base)
+	if enabled:
+		card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		card.mouse_entered.connect(func(): card.add_theme_stylebox_override("panel", hover))
+		card.mouse_exited.connect(func(): card.add_theme_stylebox_override("panel", base))
+		card.gui_input.connect(func(ev: InputEvent):
+			if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed:
+				on_click.call()
+		)
+	return card
+
+
+func _card_margin(card: Control, is_compact: bool) -> VBoxContainer:
+	var mc := MarginContainer.new()
+	mc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for side in ["left", "right"]:
+		mc.add_theme_constant_override("margin_" + side, 12 if is_compact else 18)
+	for side in ["top", "bottom"]:
+		mc.add_theme_constant_override("margin_" + side, 8 if is_compact else 14)
+	mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card.add_child(mc)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 4 if is_compact else 8)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mc.add_child(v)
+	return v
+
+
+func _card_header(parent: Control, title: String, action: String, is_compact: bool, fs: float) -> void:
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(row)
+	var t := LmuTheme.make_label(title, roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_MUTED, 700)
+	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(t)
+	if action != "":
+		row.add_child(LmuTheme.make_label(action, roundi((9 if is_compact else 11) * fs), LmuTheme.ACCENT_RED_BRIGHT, 800))
+
+
+## melhor volta do piloto numa pista (qualquer carro, ou só car_id) e modo. Os recordes ficam por pista e o
+## Records lê os da pista atual: troca Game.track_id só durante a leitura, sem gravar nada.
+func _track_best(track_id: String, mode: String, car_id := "") -> Dictionary:
+	var prev := Game.track_id
+	Game.track_id = track_id
+	var recs := Records.load_all(mode)
+	Game.track_id = prev
+	var nick := current_nick.strip_edges().to_lower()
+	var best := {}
+	for r in recs:
+		if not (r is Dictionary):
+			continue
+		if car_id != "" and String(r.get("carId", "")) != car_id:
+			continue
+		if nick != "" and String(r.get("nick", "")).strip_edges().to_lower() != nick:
+			continue
+		if best.is_empty() or float(r.get("time", INF)) < float(best.get("time", INF)):
+			best = r
+	return best
+
+
+## linha "SIMULADOR 1:21.400 · ARCADE 1:04.333" (com o carro embaixo, se pedir)
+func _times_row(parent: Control, sim: Dictionary, arc: Dictionary, show_car: bool, is_compact: bool, fs: float) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12 if is_compact else 20)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(row)
+	for e in [["SIMULADOR", sim, LmuTheme.ACCENT_GREEN], ["ARCADE", arc, LmuTheme.ACCENT_AMBER]]:
+		var rec: Dictionary = e[1]
+		var col := VBoxContainer.new()
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.add_theme_constant_override("separation", 0)
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(col)
+		col.add_child(LmuTheme.make_label(e[0], roundi((8 if is_compact else 10) * fs), Color(e[2], 0.85), 800))
+		var has := not rec.is_empty()
+		col.add_child(LmuTheme.make_label(LapTimer.format_time(float(rec.time)) if has else "--:--.---",
+			roundi((13 if is_compact else 17) * fs), Color.WHITE if has else LmuTheme.TEXT_DIM, 800))
+		if show_car and has:
+			var cn := String(Game.get_car_info(String(rec.get("carId", ""))).get("short", rec.get("carId", "")))
+			col.add_child(LmuTheme.make_label(cn.to_upper(), roundi((8 if is_compact else 10) * fs), LmuTheme.TEXT_MUTED, 700))
+
+
+func _build_car_card(is_compact: bool, fs: float) -> PanelContainer:
+	var c := current_car()
+	var c_col := Color(String(c.get("color", "#e10600")))
+	var card := _make_click_card(func(): switch_view("cars"), c_col)
+	card.clip_contents = true
+	var v := _card_margin(card, is_compact)
+	_card_header(v, "CARRO", "TROCAR ➔", is_compact, fs)
+	var brand := LmuTheme.make_label(String(c.get("brand", "GT3")).to_upper(), roundi((10 if is_compact else 12) * fs), c_col.lightened(0.15), 800)
+	v.add_child(brand)
+	v.add_child(LmuTheme.make_label(String(c.get("name", current_car_id)), roundi((17 if is_compact else 24) * fs), Color.WHITE, 800))
+	var specs := LmuTheme.make_label("%s · %d CV · %d KG" % [String(c.get("engine", "GT3")).to_upper(), int(c.get("power", 565)), int(c.get("weight", 1250))],
+		roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_SLATE, 700)
+	specs.clip_text = true
+	v.add_child(specs)
+	v.add_child(_make_h_divider(0.10))
+	_times_row(v, _track_best(Game.track_id, "sim", current_car_id), _track_best(Game.track_id, "arcade", current_car_id), false, is_compact, fs)
+	return card
+
+
+func _build_track_card(is_compact: bool, fs: float) -> PanelContainer:
+	var t := Game.get_track_info()
+	var gold := Color("#fbbf24")
+	var can := context != Context.PAUSE and Game.get_available_tracks().size() > 1
+	var card := _make_click_card(func(): switch_view("tracks"), gold, can)
+	var v := _card_margin(card, is_compact)
+	_card_header(v, "PISTA", "TROCAR ➔" if can else "", is_compact, fs)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10 if is_compact else 16)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	v.add_child(row)
+	var draw := _TrackOutline.new()
+	draw.pts = LoadingScreen.outline_for(Game.track_id)
+	draw.color = gold
+	draw.custom_minimum_size = Vector2.ONE * (58.0 if is_compact else 92.0) * fs
+	draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(draw)
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.alignment = BoxContainer.ALIGNMENT_CENTER
+	info.add_theme_constant_override("separation", 2)
+	info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(info)
+	info.add_child(LmuTheme.make_label(String(t.get("short", Game.track_id)).to_upper(), roundi((17 if is_compact else 24) * fs), Color.WHITE, 800))
+	var loc := LmuTheme.make_label(String(t.get("location", t.get("country", ""))).to_upper(), roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_SLATE, 700)
+	loc.clip_text = true
+	info.add_child(loc)
+	info.add_child(LmuTheme.make_label("%s M · %d CURVAS" % [_thousands(int(t.get("length_m", 0))), int(t.get("corners", 0))],
+		roundi((9 if is_compact else 11) * fs), gold, 700))
+	v.add_child(_make_h_divider(0.10))
+	_times_row(v, _track_best(Game.track_id, "sim"), _track_best(Game.track_id, "arcade"), true, is_compact, fs)
+	return card
+
+
+## pista escolhida na tela "Trocar pista" e ainda não confirmada
+var _track_pick := ""
+
+
+func _build_tracks_view() -> void:
+	var lp := layout_profile
+	var fs := float(lp.font_scale)
+	var is_portrait: bool = (lp.profile == "portrait")
+	var is_compact: bool = bool(lp.get("is_compact_mobile", false))
+	if _track_pick == "" or not Game.is_track_available(_track_pick):
+		_track_pick = Game.track_id
+	var gold := Color("#fbbf24")
+	var outer := _make_padded_container(float(lp.pad_x), float(lp.pad_y))
+	_body_holder.add_child(outer)
+	_view_root = outer
+	var main: BoxContainer = VBoxContainer.new() if is_portrait else HBoxContainer.new()
+	main.add_theme_constant_override("separation", 10 if is_compact else 20)
+	outer.add_child(main)
+
+	# lista de pistas
+	var list: BoxContainer = HBoxContainer.new() if is_portrait else VBoxContainer.new()
+	list.add_theme_constant_override("separation", 6 if is_compact else 10)
+	list.custom_minimum_size.x = 0.0 if is_portrait else (210.0 if is_compact else 300.0) * fs
+	main.add_child(list)
+	if not is_portrait:
+		list.add_child(LmuTheme.make_label("PISTAS", roundi((10 if is_compact else 12) * fs), LmuTheme.TEXT_MUTED, 800))
+	for t in Game.get_available_tracks():
+		var id := String(t.id)
+		var item := _make_click_card(_select_track_pick.bind(id), gold, true, id == _track_pick)
+		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL if is_portrait else Control.SIZE_FILL
+		list.add_child(item)
+		var mc := MarginContainer.new()
+		for side in ["left", "right", "top", "bottom"]:
+			mc.add_theme_constant_override("margin_" + side, 6 if is_compact else 10)
+		mc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		item.add_child(mc)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8 if is_compact else 12)
+		row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mc.add_child(row)
+		var draw := _TrackOutline.new()
+		draw.pts = LoadingScreen.outline_for(id)
+		draw.color = gold if id == _track_pick else Color("#94a3b8")
+		draw.custom_minimum_size = Vector2.ONE * (40.0 if is_compact else 60.0) * fs
+		draw.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(draw)
+		var col := VBoxContainer.new()
+		col.alignment = BoxContainer.ALIGNMENT_CENTER
+		col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(col)
+		col.add_child(LmuTheme.make_label(String(t.get("short", id)).to_upper(), roundi((12 if is_compact else 16) * fs), Color.WHITE, 800))
+		col.add_child(LmuTheme.make_label(String(t.get("country", "")).to_upper(), roundi((8 if is_compact else 10) * fs), LmuTheme.TEXT_MUTED, 700))
+		if id == Game.track_id:
+			col.add_child(LmuTheme.make_label("ATUAL", roundi((8 if is_compact else 10) * fs), LmuTheme.ACCENT_GREEN, 800))
+
+	# mapa grande da pista destacada
+	var map := _TrackMap.new()
+	map.track_id = _track_pick
+	map.font_size = roundi((9 if is_compact else 12) * fs)
+	map.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	map.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	map.custom_minimum_size = Vector2(0, 240.0 * fs) if is_portrait else Vector2.ZERO
+	map.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	main.add_child(map)
+
+	# ficha + confirmar
+	var t := Game.get_track_info(_track_pick)
+	var dat := _TrackMap.data_for(_track_pick)
+	var info := PanelContainer.new()
+	info.add_theme_stylebox_override("panel", LmuTheme.panel_style(Color(LmuTheme.BG_PANEL, 0.9), LmuTheme.BORDER_SUBTLE, 8, 0, 0))
+	info.custom_minimum_size.x = 0.0 if is_portrait else (250.0 if is_compact else 340.0) * fs
+	main.add_child(info)
+	var v := _card_margin(info, is_compact)
+	var name_lbl := LmuTheme.make_label(String(t.get("name", _track_pick)).to_upper(), roundi((14 if is_compact else 20) * fs), Color.WHITE, 800)
+	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(name_lbl)
+	v.add_child(LmuTheme.make_label(String(t.get("location", t.get("country", ""))).to_upper(), roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_SLATE, 700))
+	v.add_child(_make_h_divider(0.10))
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", 14)
+	v.add_child(grid)
+	for e in [["COMPRIMENTO", "%s M" % _thousands(int(t.get("length_m", 0)))], ["CURVAS", str(int(t.get("corners", 0)))],
+			["DESNÍVEL", "%d M" % roundi(float(dat.drop))]]:
+		var sv := VBoxContainer.new()
+		sv.add_theme_constant_override("separation", 0)
+		sv.add_child(LmuTheme.make_label(e[0], roundi((8 if is_compact else 10) * fs), LmuTheme.TEXT_DIM, 700))
+		sv.add_child(LmuTheme.make_label(e[1], roundi((12 if is_compact else 16) * fs), Color.WHITE, 800))
+		grid.add_child(sv)
+	v.add_child(_make_h_divider(0.10))
+	v.add_child(LmuTheme.make_label("SEUS MELHORES TEMPOS", roundi((8 if is_compact else 10) * fs), LmuTheme.TEXT_MUTED, 800))
+	_times_row(v, _track_best(_track_pick, "sim"), _track_best(_track_pick, "arcade"), true, is_compact, fs)
+	var grow := Control.new()
+	grow.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(grow)
+	var ok_btn := Button.new()
+	ok_btn.text = "CONFIRMAR PISTA" if _track_pick != Game.track_id else "MANTER PISTA ATUAL"
+	ok_btn.custom_minimum_size.y = roundi((34 if is_compact else 46) * fs)
+	ok_btn.add_theme_font_size_override("font_size", roundi((12 if is_compact else 15) * fs))
+	LmuTheme.apply_button_styles(ok_btn, "primary", 4, 12, 6)
+	ok_btn.pressed.connect(_confirm_track_pick)
+	v.add_child(ok_btn)
+	var back_btn := Button.new()
+	back_btn.text = "VOLTAR"
+	back_btn.custom_minimum_size.y = roundi((28 if is_compact else 36) * fs)
+	back_btn.add_theme_font_size_override("font_size", roundi((11 if is_compact else 13) * fs))
+	LmuTheme.apply_button_styles(back_btn, "outline", 4, 12, 4)
+	back_btn.pressed.connect(func():
+		_track_pick = ""
+		switch_view("home")
+	)
+	v.add_child(back_btn)
+
+
+func _select_track_pick(id: String) -> void:
+	_track_pick = id
+	_rebuild_view()
+
+
+## confirma a pista escolhida (só aqui ela muda e é salva) e volta para a home
+func _confirm_track_pick() -> void:
+	if _track_pick != "" and _track_pick != Game.track_id:
+		Game.set_track(_track_pick)
+	_track_pick = ""
+	switch_view("home")
 func _build_home_view() -> void:
 	var lp := layout_profile
 	var fs := float(lp.font_scale)
@@ -825,21 +1267,13 @@ func _build_home_view() -> void:
 	left_col.add_theme_constant_override("separation", 4 if is_compact else 8)
 	host.add_child(left_col)
 
-	var hero_tag_row := HBoxContainer.new()
-	hero_tag_row.add_theme_constant_override("separation", 8)
-	left_col.add_child(hero_tag_row)
-
-	var track_pill := PanelContainer.new()
-	track_pill.add_theme_stylebox_override("panel", LmuTheme.panel_style(Color("#f59e0b", 0.16), Color("#f59e0b"), 3, 7, 2))
-	track_pill.add_child(LmuTheme.make_label("PISTA", roundi((9 if is_compact else 11) * fs), Color("#fbbf24"), 800))
-	hero_tag_row.add_child(track_pill)
-	hero_tag_row.add_child(LmuTheme.make_label("AUTÓDROMO DE INTERLAGOS · 4.309 M", roundi((10 if is_compact else 13) * fs), LmuTheme.TEXT_SLATE, 700))
-
-	var title_lbl := LmuTheme.make_label("GT3 TIME ATTACK", roundi((24 if is_compact else 44) * fs), Color.WHITE, 800, true)
+	# o menu escrito fica maior: carro e pista viraram cartões na coluna da direita
+	var hs := fs * (1.1 if is_compact else 1.25)
+	var title_lbl := LmuTheme.make_label("GT3 TIME ATTACK", roundi((28 if is_compact else 54) * fs), Color.WHITE, 800, true)
 	left_col.add_child(title_lbl)
 
 	var nav_spacer := Control.new()
-	nav_spacer.custom_minimum_size.y = 4 if is_compact else 10
+	nav_spacer.custom_minimum_size.y = 4 if is_compact else 12
 	left_col.add_child(nav_spacer)
 
 	var nav_list := VBoxContainer.new()
@@ -847,7 +1281,7 @@ func _build_home_view() -> void:
 	left_col.add_child(nav_list)
 
 	var primary_title := "CONTINUAR NA PISTA" if context == Context.PAUSE else "RACE WEEKEND"
-	var primary_item := _make_home_nav_item(primary_title, Color.WHITE, LmuTheme.ACCENT_RED, true, fs, is_compact)
+	var primary_item := _make_home_nav_item(primary_title, Color.WHITE, LmuTheme.ACCENT_RED, true, hs, is_compact)
 	primary_item.pressed.connect(func():
 		if context == Context.PAUSE:
 			resumed.emit()
@@ -857,134 +1291,46 @@ func _build_home_view() -> void:
 	nav_list.add_child(primary_item)
 
 	if context == Context.PAUSE:
-		var restart_item := _make_home_nav_item("REINICIAR VOLTA", LmuTheme.ACCENT_AMBER, LmuTheme.ACCENT_AMBER, true, fs, is_compact)
+		var restart_item := _make_home_nav_item("REINICIAR VOLTA", LmuTheme.ACCENT_AMBER, LmuTheme.ACCENT_AMBER, true, hs, is_compact)
 		restart_item.pressed.connect(func(): restart_requested.emit())
 		nav_list.add_child(restart_item)
 
-	var nav_entries := [
-		["GARAGEM & CARROS", "cars"],
-		["CONFIGURAÇÕES", "settings"],
-		["RECORDES", "records"],
-		["COMO JOGAR", "help"],
-	]
+	var nav_entries := [["TROCAR CARRO", "cars"]]
+	# na pista não troca de pista (exigiria recarregar tudo)
+	if context != Context.PAUSE:
+		nav_entries.append(["TROCAR PISTA", "tracks"])
+	nav_entries.append_array([["CONFIGURAÇÕES", "settings"], ["RECORDES", "records"], ["COMO JOGAR", "help"]])
 	for item in nav_entries:
 		var v_id: String = item[1]
-		var nbtn := _make_home_nav_item(item[0], LmuTheme.TEXT_WHITE, LmuTheme.ACCENT_RED, false, fs, is_compact)
+		var nbtn := _make_home_nav_item(item[0], LmuTheme.TEXT_WHITE, LmuTheme.ACCENT_RED, false, hs, is_compact)
 		nbtn.pressed.connect(func(): switch_view(v_id))
 		nav_list.add_child(nbtn)
 
 	if context == Context.PAUSE:
-		var gar_item := _make_home_nav_item("GARAGEM 3D", LmuTheme.TEXT_SLATE, LmuTheme.ACCENT_RED, false, fs, is_compact, true)
+		var gar_item := _make_home_nav_item("GARAGEM 3D", LmuTheme.TEXT_SLATE, LmuTheme.ACCENT_RED, false, hs, is_compact, true)
 		gar_item.pressed.connect(func(): garage_requested.emit())
 		nav_list.add_child(gar_item)
 
-	var quit_item := _make_home_nav_item("SAIR DO JOGO" if context != Context.PAUSE else "SAIR", LmuTheme.TEXT_MUTED, LmuTheme.ACCENT_RED, false, fs, is_compact, true)
+	var quit_item := _make_home_nav_item("SAIR DO JOGO" if context != Context.PAUSE else "SAIR", LmuTheme.TEXT_MUTED, LmuTheme.ACCENT_RED, false, hs, is_compact, true)
 	quit_item.pressed.connect(func(): quit_requested.emit())
 	nav_list.add_child(quit_item)
 
-	# Espaçador central em desktop/tablet/mobile_landscape para empurrar o card do carro para a direita
+	# Espaçador central em desktop/tablet/mobile_landscape para empurrar os cartões para a direita
 	if not is_portrait:
 		var mid_sp := Control.new()
 		mid_sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		mid_sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		host.add_child(mid_sp)
 
-	# Coluna Direita: Card de Destaque do Carro (com faixa lateral na cor do carro) + linha discreta Piloto
+	# Coluna Direita: cartão do carro em cima e da pista embaixo (os dois abrem a troca)
 	var right_col := VBoxContainer.new()
 	right_col.custom_minimum_size.x = float(lp.home_right_width) if not is_portrait else 0.0
 	right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL if is_portrait else Control.SIZE_SHRINK_END
 	right_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	right_col.add_theme_constant_override("separation", 6 if is_compact else 10)
+	right_col.add_theme_constant_override("separation", 8 if is_compact else 14)
 	host.add_child(right_col)
-
-	var c := current_car()
-	var c_col := Color(String(c.get("color", "#e10600")))
-	var spot := PanelContainer.new()
-	spot.clip_contents = true
-	spot.add_theme_stylebox_override("panel", LmuTheme.panel_style(LmuTheme.BG_PANEL, LmuTheme.BORDER_SUBTLE, 6, 0, 0))
-	right_col.add_child(spot)
-
-	var spot_hwrap := HBoxContainer.new()
-	spot_hwrap.add_theme_constant_override("separation", 0)
-	spot.add_child(spot_hwrap)
-
-	var accent_strip := ColorRect.new()
-	accent_strip.custom_minimum_size = Vector2(4, 0)
-	accent_strip.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	accent_strip.color = c_col
-	accent_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	spot_hwrap.add_child(accent_strip)
-
-	var spot_mc := MarginContainer.new()
-	spot_mc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spot_mc.add_theme_constant_override("margin_left", 12 if is_compact else 18)
-	spot_mc.add_theme_constant_override("margin_right", 12 if is_compact else 18)
-	spot_mc.add_theme_constant_override("margin_top", 10 if is_compact else 16)
-	spot_mc.add_theme_constant_override("margin_bottom", 10 if is_compact else 16)
-	spot_hwrap.add_child(spot_mc)
-
-	var spot_v := VBoxContainer.new()
-	spot_v.add_theme_constant_override("separation", 6 if is_compact else 10)
-	spot_mc.add_child(spot_v)
-
-	var spot_h := HBoxContainer.new()
-	spot_v.add_child(spot_h)
-	var sh_l := LmuTheme.make_label("CARRO SELECIONADO", roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_MUTED, 700)
-	sh_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spot_h.add_child(sh_l)
-	spot_h.add_child(LmuTheme.make_label("GT3 CLASS", roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_MUTED, 700))
-
-	var title_box := VBoxContainer.new()
-	title_box.add_theme_constant_override("separation", 2)
-	spot_v.add_child(title_box)
-	title_box.add_child(LmuTheme.make_label(String(c.get("brand", "GT3")), roundi((10 if is_compact else 12) * fs), LmuTheme.ACCENT_RED_BRIGHT, 800))
-	title_box.add_child(LmuTheme.make_label(String(c.get("name", current_car_id)), roundi((17 if is_compact else 23) * fs), Color.WHITE, 800))
-
-	spot_v.add_child(_make_h_divider(0.10))
-
-	var spec_grid := GridContainer.new()
-	spec_grid.columns = 2
-	spec_grid.add_theme_constant_override("h_separation", 14)
-	spec_grid.add_theme_constant_override("v_separation", 6 if is_compact else 10)
-	spot_v.add_child(spec_grid)
-
-	var specs := [
-		["MOTOR", String(c.get("engine", LAYOUT_LABELS.get(c.get("layout", "central"), "GT3")))],
-		["POTÊNCIA", "%d CV" % int(c.get("power", 565))],
-		["PESO", "%d KG" % int(c.get("weight", 1250))],
-		["CÂMBIO", "%d MARCHAS" % int(c.get("gears", 6))],
-	]
-	for sp in specs:
-		var sv := VBoxContainer.new()
-		sv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		sv.add_theme_constant_override("separation", 1)
-		sv.add_child(LmuTheme.make_label(sp[0], roundi((8 if is_compact else 10) * fs), LmuTheme.TEXT_DIM, 700))
-		var val_lbl := LmuTheme.make_label(sp[1], roundi((11 if is_compact else 13) * fs), LmuTheme.TEXT_WHITE, 700)
-		val_lbl.clip_text = true
-		sv.add_child(val_lbl)
-		spec_grid.add_child(sv)
-
-	spot_v.add_child(_make_h_divider(0.10))
-
-	var swap_btn := Button.new()
-	swap_btn.text = "TROCAR DE CARRO ➔"
-	swap_btn.custom_minimum_size.y = roundi((32 if is_compact else 40) * fs)
-	swap_btn.add_theme_font_size_override("font_size", roundi((11 if is_compact else 13) * fs))
-	LmuTheme.apply_button_styles(swap_btn, "outline", 4, 12, 4)
-	swap_btn.pressed.connect(func(): switch_view("cars"))
-	spot_v.add_child(swap_btn)
-
-	# Resumo discreto do Piloto e Melhor Volta abaixo do card
-	var rating := compute_driver_rating(current_mode)
-	var drv_row := HBoxContainer.new()
-	drv_row.add_theme_constant_override("separation", 8)
-	right_col.add_child(drv_row)
-	var dn := LmuTheme.make_label("%s · DR %s" % [current_nick.to_upper(), rating.dr], roundi((9 if is_compact else 11) * fs), LmuTheme.TEXT_MUTED, 700)
-	dn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	drv_row.add_child(dn)
-	var best_txt := LapTimer.format_time(float(rating.best)) if float(rating.best) > 0.0 else "--:--.---"
-	var bt_lbl := LmuTheme.make_label("MELHOR (%s): %s" % [Game.MODE_NAMES.get(current_mode, "Simulador"), best_txt], roundi((9 if is_compact else 11) * fs), LmuTheme.ACCENT_GREEN if float(rating.best) > 0.0 else LmuTheme.TEXT_DIM, 700)
-	drv_row.add_child(bt_lbl)
+	right_col.add_child(_build_car_card(is_compact, fs))
+	right_col.add_child(_build_track_card(is_compact, fs))
 
 
 # ------------------------------------------------------------------ CARS VIEW (GARAGE 3D LAYOUT)
@@ -1903,7 +2249,7 @@ func _build_records_view() -> void:
 	var hv := VBoxContainer.new()
 	hv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(hv)
-	hv.add_child(LmuTheme.make_label("QUADRO OFICIAL DE TEMPOS · INTERLAGOS", roundi((18 if is_compact else 26) * cfs), Color.WHITE, 800))
+	hv.add_child(LmuTheme.make_label("QUADRO OFICIAL DE TEMPOS · " + Game.track_name().to_upper(), roundi((18 if is_compact else 26) * cfs), Color.WHITE, 800))
 	hv.add_child(LmuTheme.make_label("Top 15 voltas válidas no modo %s" % Game.MODE_NAMES.get(records_mode, records_mode).to_upper(), roundi((11 if is_compact else 13.5) * cfs), LmuTheme.TEXT_MUTED, 500))
 
 	var m_switch := HBoxContainer.new()
@@ -2079,9 +2425,7 @@ func _build_help_view() -> void:
 		],
 		[
 			"🏁 PISTA & REGRAS",
-			"Circuito: Autódromo José Carlos Pace (Interlagos) · 4.309 m · 15 curvas · 3 setores cronometrados.\n\n" +
-			"Limites de pista: sair com as 4 rodas fora da pista/zebra invalida a volta atual.\n\n" +
-			"Licença DR/SR: seus melhores tempos válidos em Interlagos evoluem sua licença de Rookie até Pro (S)."
+			_track_help_text()
 		],
 	]
 

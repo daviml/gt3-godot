@@ -119,6 +119,39 @@ func run_tests() -> void:
 	await _frames(2)
 	check(gar_menu.active_view == "help", "Guia de Controles & Pilotagem abre corretamente")
 
+	# Home: cartões de carro e pista na direita; tela "Trocar pista" (confirma salva, voltar não muda)
+	var orig_track := Game.track_id
+	gar_menu.switch_view("home")
+	await _frames(2)
+	var texts := []
+	var stack: Array = [gar_menu]
+	while not stack.is_empty():
+		var n: Node = stack.pop_back()
+		if n is Label:
+			texts.append(String(n.text))
+		stack.append_array(n.get_children())
+	check("TROCAR CARRO" in texts and "GARAGEM & CARROS" not in texts, "Home: item 'TROCAR CARRO' (antes 'GARAGEM & CARROS')")
+	check("CARRO" in texts and "PISTA" in texts and "CARRO SELECIONADO" not in texts, "Home: cartões CARRO e PISTA no lugar do painel 'Carro selecionado'")
+	var avail: Array = Game.get_available_tracks().map(func(t): return String(t.id))
+	check(("TROCAR PISTA" in texts) == (avail.size() > 1), "Home: 'TROCAR PISTA' aparece com mais de uma pista disponível")
+	if avail.size() > 1:
+		var other: String = avail[(avail.find(Game.track_id) + 1) % avail.size()]
+		gar_menu.switch_view("tracks")
+		await _frames(2)
+		check(gar_menu.active_view == "tracks" and gar_menu._track_pick == Game.track_id, "Trocar pista abre com a pista atual destacada")
+		gar_menu._select_track_pick(other)
+		await _frames(1)
+		check(gar_menu._track_pick == other and Game.track_id == orig_track, "Escolher na lista só destaca (a pista não muda antes de confirmar)")
+		gar_menu.switch_view("home")
+		check(Game.track_id == orig_track, "Voltar sem confirmar mantém a pista")
+		gar_menu.switch_view("tracks")
+		gar_menu._select_track_pick(other)
+		gar_menu._confirm_track_pick()
+		await _frames(1)
+		check(Game.track_id == other and gar_menu.active_view == "home", "Confirmar troca a pista e volta para a home")
+		Game.set_track(orig_track)
+		gar_menu.switch_view("home")
+
 	# Teste de responsividade em 844x390 e 390x844
 	for vp_size in [Vector2(844, 390), Vector2(390, 844)]:
 		gar_menu.size = vp_size

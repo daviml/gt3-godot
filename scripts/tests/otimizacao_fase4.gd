@@ -16,6 +16,8 @@ func _frames(n: int) -> void:
 
 
 func _initialize() -> void:
+	# teste de Interlagos: não depende da última pista escolhida no jogo (user://jogo.cfg)
+	Game.track_id = Game.DEFAULT_TRACK
 	run_tests.call_deferred()
 
 

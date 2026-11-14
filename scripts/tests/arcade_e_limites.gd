@@ -9,6 +9,8 @@ var track: Track
 
 
 func _init() -> void:
+	# teste de Interlagos: não depende da última pista escolhida no jogo (user://jogo.cfg)
+	Game.track_id = Game.DEFAULT_TRACK
 	Records.use_test_storage()  # nunca mexer nos recordes de verdade
 	track = Track.new("res://data/track/track.json")
 	print("limites avançados")
@@ -145,23 +147,28 @@ func _test_records_separation_and_api() -> void:
 	var merged := Records.merge_records([{"nick": "Remoto", "carId": "bmw-m4-gt3", "time": 76.0}], [{"nick": "Local", "carId": "bmw-m4-gt3", "time": 75.0}])
 	check(merged.size() == 2 and merged[0].nick == "Local", "merge_records combina remoto e local mantendo menor tempo primeiro")
 
-	check(Records.ranking_url("sim").ends_with("/api/ranking?modo=godot-sim"), "URL ranking sim aponta para godot-sim")
-	check(Records.ranking_url("arcade").ends_with("/api/ranking?modo=godot-arcade"), "URL ranking arcade aponta para godot-arcade")
-	var payload = JSON.parse_string(Records.build_volta_payload("Davi", "corvette-c6r-gt3", lap_arc, "arcade"))
-	check(payload is Dictionary and payload.get("modo") == "godot-arcade" and payload.get("valid") == true, "payload POST inclui modo godot-arcade")
-
-	# Segurança contra API desatualizada: resposta sem 'modo' igual ao esperado é rejeitada
-	var legacy_body := JSON.stringify({"voltas": [{"nick": "Web", "carId": "corvette-c6r-gt3", "time": 90.0}]}).to_utf8_buffer()
-	var parsed_legacy := Records.parse_ranking_response(200, legacy_body, "godot-sim")
-	check(not bool(parsed_legacy.get("ok", false)), "rejeita resposta sem campo modo (evita misturar ranking web)")
-
-	var ok_body := JSON.stringify({"modo": "godot-arcade", "voltas": [{"nick": "Godot", "carId": "bmw-m4-gt3", "time": 74.5}]}).to_utf8_buffer()
-	var parsed_ok := Records.parse_ranking_response(200, ok_body, "godot-arcade")
-	check(bool(parsed_ok.get("ok", false)) and parsed_ok.voltas.size() == 1, "aceita resposta com modo godot-arcade")
-
-	var post_ok_body := JSON.stringify({"modo": "godot-arcade", "recorde": true, "voltas": [{"nick": "Godot", "carId": "bmw-m4-gt3", "time": 74.5}]}).to_utf8_buffer()
-	var parsed_post := Records.parse_volta_response(200, post_ok_body, "godot-arcade")
-	check(bool(parsed_post.get("ok", false)) and bool(parsed_post.get("recorde", false)), "aceita retorno POST do modo godot-arcade")
+	# ranking direto no GitHub (gt3-tempos), mesmos arquivos e regras da antiga função da Vercel
+	check(Records.contents_url("sim").ends_with("/contents/interlagos-godot.json?ref=main"), "sim lê interlagos-godot.json")
+	check(Records.contents_url("arcade", false).ends_with("/contents/interlagos-godot-arcade.json"), "arcade grava interlagos-godot-arcade.json")
+	check(Records.unscramble(Records.scramble("github_pat_abc123")) == "github_pat_abc123", "token embaralhado volta ao original")
+	var rec := Records.validate_remote(" Da<vi> ", "bmw-m4-gt3", lap_arc.time, Array(lap_arc.sectors), true, "arcade")
+	check(not rec.is_empty() and rec.nick == "Davi" and absf(float(rec.time) - 74.5) < 1e-9, "volta válida vira registro com nick limpo")
+	check(Records.validate_remote("Davi", "bmw-m4-gt3", lap_arc.time, Array(lap_arc.sectors), false, "arcade").is_empty(), "volta inválida não sobe")
+	check(Records.validate_remote("Davi", "bmw-m4-gt3", lap_arc.time, Array(lap_arc.sectors), true, "sim").is_empty(), "1:14 no Simulador é rejeitado (mínimo 85 s)")
+	check(Records.validate_remote("Davi", "carro-x", lap_arc.time, Array(lap_arc.sectors), true, "arcade").is_empty(), "carro desconhecido rejeitado")
+	check(Records.validate_remote("Davi", "bmw-m4-gt3", 80.0, [20.0, 20.0, 20.0], true, "arcade").is_empty(), "setores que não somam a volta rejeitados")
+	var base := [{"nick": "Davi", "carId": "bmw-m4-gt3", "time": 75.0}, {"nick": "Gui", "carId": "bmw-m4-gt3", "time": 74.8}]
+	var m1 := Records.merge_remote(base, rec)
+	check(m1.recorde and m1.voltas.size() == 2 and m1.voltas[0].nick == "Davi", "volta melhor substitui e reordena")
+	var slow := rec.duplicate()
+	slow.time = 76.0
+	check(not Records.merge_remote(base, slow).recorde, "volta pior não grava")
+	var body := JSON.stringify({"sha": "abc", "content": Marshalls.utf8_to_base64(Records.encode_file(m1.voltas)).insert(8, "\n")}).to_utf8_buffer()
+	var parsed := Records.parse_contents(200, body)
+	check(parsed.ok and parsed.sha == "abc" and parsed.voltas.size() == 2 and parsed.voltas[0].nick == "Davi", "lê o arquivo do GitHub (base64 com quebras)")
+	check(Records.encode_file(m1.voltas).find('"nick": "Davi"') >= 0, "grava no formato {voltas: [...]}")
+	check(Records.parse_contents(404, PackedByteArray()).ok and Records.parse_contents(404, PackedByteArray()).voltas.is_empty(), "arquivo inexistente = ranking vazio")
+	check(not Records.parse_contents(401, PackedByteArray()).ok, "token inválido = falha (usa a cópia)")
 
 	# cópia do ranking compartilhado: aparece ao abrir o jogo mesmo sem resposta do servidor
 	check(sim_path.begins_with("user://testes/"), "testes gravam em user://testes/, longe dos recordes reais")

@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://byv83dwai3xsw"
-path.s3tc="res://.godot/imported/sparse_grass_diff.png-93064b1f226187189eb87ed3196b6ef0.s3tc.ctex"
-path.etc2="res://.godot/imported/sparse_grass_diff.png-93064b1f226187189eb87ed3196b6ef0.etc2.ctex"
+path.bptc="res://.godot/imported/sparse_grass_diff.png-93064b1f226187189eb87ed3196b6ef0.bptc.ctex"
+path.astc="res://.godot/imported/sparse_grass_diff.png-93064b1f226187189eb87ed3196b6ef0.astc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -13,12 +13,12 @@ metadata={
 [deps]
 
 source_file="res://assets/textures/sparse_grass_diff.png"
-dest_files=["res://.godot/imported/sparse_grass_diff.png-93064b1f226187189eb87ed3196b6ef0.s3tc.ctex", "res://.godot/imported/sparse_grass_diff.png-93064b1f226187189eb87ed3196b6ef0.etc2.ctex"]
+dest_files=["res://.godot/imported/sparse_grass_diff.png-93064b1f226187189eb87ed3196b6ef0.bptc.ctex", "res://.godot/imported/sparse_grass_diff.png-93064b1f226187189eb87ed3196b6ef0.astc.ctex"]
 
 [params]
 
 compress/mode=2
-compress/high_quality=false
+compress/high_quality=true
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
