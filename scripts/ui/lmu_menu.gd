@@ -1623,26 +1623,75 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 				show_touch
 			)
 
+			# controle e teclado configuráveis (scripts/ui/controls_panel.gd + scripts/input/bindings.gd)
+			var cp := ControlsPanel.new(fs)
+			parent.add_child(cp)
+			var show_kb := not OS.has_feature("mobile")
 			_add_setting_row(
 				parent,
-				"Comandos de Teclado",
-				"W/S ou ↑/↓ = Acelerar/Frear · A/D ou ←/→ = Esterçar · E/Q = Marchas · C = Câmera · R = Grid · Esc = Menu",
-				"teclado comandos atalhos wasd",
-				_make_badge("ATIVO", LmuTheme.ACCENT_GREEN, LmuTheme.ACCENT_GREEN, fs),
+				"Controle / Gamepad",
+				"Qual aparelho o jogo lê. No automático vale o último controle que você mexer (útil quando o Windows lista controles virtuais do Steam/DS4Windows, volantes ou headsets).",
+				"controle gamepad joystick xbox playstation bluetooth aparelho dispositivo",
+				cp.make_device_picker(),
 				is_compact,
 				fs
 			)
+			_add_setting_row(
+				parent,
+				"Teste do Controle",
+				"Mexa o analógico e os gatilhos: as barras mostram o que o jogo está recebendo.",
+				"teste controle gamepad analogico gatilho diagnostico",
+				cp.make_live_view(),
+				is_compact,
+				fs
+			)
+			if show_kb:
+				var kb_row := _add_setting_row(
+					parent,
+					"Comandos de Teclado",
+					cp.keyboard_summary(),
+					"teclado comandos atalhos wasd",
+					_make_badge("ATIVO", LmuTheme.ACCENT_GREEN, LmuTheme.ACCENT_GREEN, fs),
+					is_compact,
+					fs
+				)
+				var labels := kb_row.find_children("*", "Label", true, false)
+				if labels.size() >= 2:
+					cp.set_keyboard_label(labels[1])
 
-			var has_pad := Game.has_gamepad_connected()
-			_add_setting_row(
-				parent,
-				"Controle / Gamepad (Xbox / PlayStation)",
-				"RT/LT = Acelerar/Frear · Analógico = Volante · RB/LB = Marchas · Vibração Háptica (Rumble)",
-				"controle gamepad joystick bluetooth rumble vibracao",
-				_make_badge("CONECTADO" if has_pad else "PLUG & PLAY", LmuTheme.ACCENT_GREEN if has_pad else LmuTheme.TEXT_WHITE, LmuTheme.BORDER_SUBTLE, fs),
-				is_compact,
-				fs
-			)
+			parent.add_child(LmuTheme.make_label("COMANDOS (CLIQUE PARA TROCAR · ESC CANCELA)", roundi(11 * fs), LmuTheme.TEXT_DIM, 800))
+			for action in Bindings.ACTIONS:
+				_add_setting_row(
+					parent,
+					Bindings.NAMES[action],
+					"Eixo ou botão" if action in Bindings.ANALOG else "Botão",
+					"comando mapear remapear botao tecla " + String(Bindings.NAMES[action]),
+					cp.make_binding_buttons(action, show_kb),
+					is_compact,
+					fs
+				)
+
+			parent.add_child(LmuTheme.make_label("AJUSTES DO CONTROLE", roundi(11 * fs), LmuTheme.TEXT_DIM, 800))
+			_add_setting_row(parent, "Zona Morta do Volante",
+				"Quanto do centro do analógico é ignorado. Aumente se o carro esterça sozinho com o controle solto.",
+				"zona morta deadzone analogico volante drift",
+				cp.make_slider("zona_morta", 0.0, 0.3, 0.01, Bindings.deadzone, "%.2f"), is_compact, fs)
+			_add_setting_row(parent, "Curva do Volante",
+				"1,0 = linear (mais direto). Valores maiores deixam o centro mais suave para correções finas.",
+				"sensibilidade curva linearidade volante analogico",
+				cp.make_slider("linearidade", 1.0, 2.5, 0.05, Bindings.linearity, "%.2f"), is_compact, fs)
+			_add_setting_row(parent, "Zona Morta dos Gatilhos",
+				"Começo do curso do acelerador e do freio que é ignorado (gatilho gasto que não volta a zero).",
+				"zona morta gatilho pedal acelerador freio",
+				cp.make_slider("zona_morta_pedal", 0.0, 0.3, 0.01, Bindings.pedal_deadzone, "%.2f"), is_compact, fs)
+			_add_setting_row(parent, "Vibração",
+				"Força da vibração (zebra, grama, batida, ABS e pneu escorregando). 0 desliga.",
+				"vibracao rumble force feedback",
+				cp.make_slider("vibracao", 0.0, 1.0, 0.05, Bindings.rumble, "%.2f"), is_compact, fs)
+			_add_setting_row(parent, "Restaurar Controles",
+				"Volta todos os comandos e ajustes para o padrão e o aparelho para automático.",
+				"restaurar padrao resetar controles",
+				cp.make_reset_button(), is_compact, fs)
 
 		"graphics":
 			parent.add_child(LmuTheme.make_label("QUALIDADE VISUAL & DESEMPENHO", roundi(11 * fs), LmuTheme.TEXT_DIM, 800))

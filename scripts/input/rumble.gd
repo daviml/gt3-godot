@@ -16,11 +16,13 @@ var _clock := 0.0
 
 func update(car: Car, dt: float) -> void:
 	var m := compute(car, dt)
-	var joy := Input.get_connected_joypads()
-	if joy.is_empty() or not enabled or m == Vector2.ZERO:
+	var d := PadManager.active
+	var k := Bindings.rumble
+	if d < 0 or not enabled or k <= 0.0 or m == Vector2.ZERO:
 		return
 	# web: Gamepad weakMagnitude = 70% do motor fraco; Godot: start_joy_vibration(aparelho, fraco, forte, s)
-	Input.start_joy_vibration(joy[0], minf(1.0, m.y * 0.7), minf(1.0, m.x), 0.07)
+	# vibra o controle que está sendo lido (o PadManager já foi atualizado pelo InputReader neste quadro)
+	Input.start_joy_vibration(d, minf(1.0, m.y * 0.7 * k), minf(1.0, m.x * k), 0.07)
 
 
 ## intensidade (forte, fraco) do próximo efeito, ou zero quando não é hora de renovar ou não há o que vibrar

@@ -323,6 +323,8 @@ func _build_hud() -> void:
 		touch.recenter_requested.connect(func(): _toast("Volante calibrado"))
 		layer.add_child(touch)
 		car.assists.brake_reverse = true
+	PadManager.device()
+	PadManager.log_devices()
 	if not Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
 		Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	_sync_touch_visibility()
@@ -570,16 +572,21 @@ func _unhandled_input(e: InputEvent) -> void:
 			_set_paused(false)
 			get_viewport().set_input_as_handled()
 		return
+	# câmera e voltar ao grid seguem o mapa de comandos (Bindings); o reset do controle é lido no _input_axes
+	if Bindings.event_is(e, "camera"):
+		chase.next()
+		_toast("Câmera: " + chase.mode_name())
+		get_viewport().set_input_as_handled()
+		return
+	if key and Bindings.event_is(e, "reset"):
+		_spawn()
+		chase.snap()
+		get_viewport().set_input_as_handled()
+		return
 	if key:
 		match e.keycode:
 			KEY_N:
 				_set_paused(true, true)
-			KEY_R:
-				_spawn()
-				chase.snap()
-			KEY_C:
-				chase.next()
-				_toast("Câmera: " + chase.mode_name())
 			KEY_P:
 				autopilot = not autopilot
 				if autopilot:
@@ -604,11 +611,8 @@ func _unhandled_input(e: InputEvent) -> void:
 			KEY_ESCAPE:
 				_set_paused(true)
 	if pad:
-		# câmera também no controle (Y, como no web); Start abre o menu
-		if e.button_index == JOY_BUTTON_Y:
-			chase.next()
-			_toast("Câmera: " + chase.mode_name())
-		elif e.button_index == JOY_BUTTON_START:
+		# Start abre o menu (fixo, para nunca ficar sem saída)
+		if e.button_index == JOY_BUTTON_START:
 			_set_paused(true)
 
 
@@ -624,7 +628,10 @@ func _toggle_pause() -> void:
 	_set_paused(not paused)
 
 
-func _on_joy_connection_changed(_device: int, _connected: bool) -> void:
+func _on_joy_connection_changed(device: int, connected: bool) -> void:
+	print("[controles] #%d %s" % [device, "conectado" if connected else "desconectado"])
+	PadManager.device()
+	PadManager.log_devices()
 	_sync_touch_visibility()
 
 

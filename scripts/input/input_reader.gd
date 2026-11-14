@@ -1,4 +1,5 @@
 # Entrada (src/input/input.ts do web): controle + teclado com suavização, e os botões de toque do celular.
+# Teclas e botões vêm do mapa configurável (bindings.gd); o controle lido é o ativo do PadManager.
 # Controle e teclado passam pelo limite de esterço por velocidade (o teclado ainda ganha rampa progressiva);
 # no celular o toque mantém a direção antiga (commits 1177412 e 2fd40d5 do web).
 # update() lê os aparelhos; filter() só faz a conta, para os testes alimentarem entradas sintéticas.
@@ -22,6 +23,10 @@ var touch_keys := {}
 var touch_axes := {"steer": 0.0, "gas": 0.0, "brake": 0.0}
 ## escala de aderência do modo de jogo (Arcade > 1.0): pneu aguenta mais volante, então o limite sobe junto
 var grip_scale := 1.0
+## ajustes do controle (menu Controles): zona morta e curva do analógico, zona morta dos gatilhos
+var deadzone := DEADZONE
+var linearity := STEER_LINEARITY
+var pedal_deadzone := 0.0
 
 # saída (o câmbio é "segurado"; o carro só troca uma marcha por aperto)
 var steer := 0.0
@@ -53,32 +58,27 @@ static func steer_limit(speed_ms: float) -> float:
 	return minf(1.0, maxf(0.18, 14.0 / maxf(speed_ms, 1.0)))
 
 
-static func _key(a: Key, b: Key) -> bool:
-	return Input.is_physical_key_pressed(a) or Input.is_physical_key_pressed(b)
-
-
-## estado cru dos aparelhos (teclado + toque + primeiro controle conectado)
+## estado cru dos aparelhos (teclado + toque + controle ativo), lidos pelo mapa de comandos (Bindings)
 func read_devices() -> Dictionary:
-	var joy := Input.get_connected_joypads()
-	var use_touch := touch and not touch_hidden and joy.is_empty()
+	var d := PadManager.device()
+	var use_touch := touch and not touch_hidden and d < 0
 	var raw := {
-		"left": _key(KEY_LEFT, KEY_A) or (use_touch and touch_keys.has("left")),
-		"right": _key(KEY_RIGHT, KEY_D) or (use_touch and touch_keys.has("right")),
-		"gas": _key(KEY_UP, KEY_W) or (use_touch and touch_keys.has("gas")),
-		"brake": _key(KEY_DOWN, KEY_S) or Input.is_physical_key_pressed(KEY_SPACE) or (use_touch and touch_keys.has("brake")),
-		"up": _key(KEY_E, KEY_SHIFT),
-		"down": _key(KEY_Q, KEY_CTRL),
+		"left": Bindings.key_held("steer_left") or (use_touch and touch_keys.has("left")),
+		"right": Bindings.key_held("steer_right") or (use_touch and touch_keys.has("right")),
+		"gas": Bindings.key_held("gas") or (use_touch and touch_keys.has("gas")),
+		"brake": Bindings.key_held("brake") or (use_touch and touch_keys.has("brake")),
+		"up": Bindings.key_held("shift_up"),
+		"down": Bindings.key_held("shift_down"),
 		"pad": null,
 	}
-	if joy.size() > 0:
-		var d: int = joy[0]
+	if d >= 0:
 		raw.pad = {
-			"x": Input.get_joy_axis(d, JOY_AXIS_LEFT_X),
-			"rt": Input.get_joy_axis(d, JOY_AXIS_TRIGGER_RIGHT),
-			"lt": Input.get_joy_axis(d, JOY_AXIS_TRIGGER_LEFT),
-			"up": Input.is_joy_button_pressed(d, JOY_BUTTON_RIGHT_SHOULDER) or Input.is_joy_button_pressed(d, JOY_BUTTON_A),
-			"down": Input.is_joy_button_pressed(d, JOY_BUTTON_LEFT_SHOULDER) or Input.is_joy_button_pressed(d, JOY_BUTTON_X),
-			"reset": Input.is_joy_button_pressed(d, JOY_BUTTON_BACK),
+			"x": Bindings.pad_value(d, "steer_right") - Bindings.pad_value(d, "steer_left"),
+			"rt": Bindings.pad_value(d, "gas"),
+			"lt": Bindings.pad_value(d, "brake"),
+			"up": Bindings.pad_value(d, "shift_up") > 0.5,
+			"down": Bindings.pad_value(d, "shift_down") > 0.5,
+			"reset": Bindings.pad_value(d, "reset") > 0.5,
 		}
 	return raw
 
@@ -103,7 +103,16 @@ static func _step_steer_ramp(cur: float, target: float, dt: float, speed_ms: flo
 	return cur + clampf(target - cur, -rate * dt, rate * dt)
 
 
+## ajustes finos do menu (Bindings); os testes chamam filter() direto e ficam com os padrões
+func apply_settings() -> void:
+	Bindings.ensure_loaded()
+	deadzone = Bindings.deadzone
+	linearity = Bindings.linearity
+	pedal_deadzone = Bindings.pedal_deadzone
+
+
 func update(dt: float, speed_ms: float) -> void:
+	apply_settings()
 	filter(dt, speed_ms, read_devices())
 
 
@@ -170,13 +179,17 @@ func filter(dt: float, speed_ms: float, raw: Dictionary) -> void:
 	var pad = raw.pad
 	if pad != null:
 		var ax: float = pad.x
-		var mag := maxf(0.0, (absf(ax) - DEADZONE) / (1.0 - DEADZONE))
-		var linearity := lerpf(STEER_LINEARITY, STEER_LINEARITY_ARCADE, arcade_blend)
-		var stick := signf(ax) * pow(mag, linearity)
+		ax = clampf(ax, -1.0, 1.0)
+		var dz := minf(deadzone, 0.9)
+		var mag := maxf(0.0, (absf(ax) - dz) / (1.0 - dz))
+		# Arcade: a curva fica mais suave na mesma proporção do padrão (1,6 -> 1,9)
+		var lin := lerpf(linearity, linearity * STEER_LINEARITY_ARCADE / STEER_LINEARITY, arcade_blend)
+		var stick := signf(ax) * pow(mag, lin)
 		_pad_steer = _step_steer_ramp(_pad_steer, stick, dt, speed_ms, arcade_blend)
 		var pad_steer := _pad_steer * limit
-		var pad_thr: float = pad.rt
-		var pad_brk: float = pad.lt
+		var pdz := minf(pedal_deadzone, 0.9)
+		var pad_thr: float = maxf(0.0, (float(pad.rt) - pdz) / (1.0 - pdz))
+		var pad_brk: float = maxf(0.0, (float(pad.lt) - pdz) / (1.0 - pdz))
 		# usa o controle sempre que ele estiver sendo mexido ou o teclado estiver parado
 		var pad_active := absf(pad_steer) > 0.01 or pad_thr > 0.02 or pad_brk > 0.02
 		var kb_active := target != 0.0 or _kb_throttle > 0.0 or _kb_brake > 0.0

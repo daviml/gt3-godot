@@ -344,8 +344,11 @@ func step(dt: float, steer_in: float, throttle_in: float, brake_in: float, shift
 		var max_sub := max_sub_steps
 		var n_steps := clampi(int(roundf(dt / SUB_DT)), 1, max_sub)
 		var sub_dt := dt / float(n_steps)
+		# o câmbio recebe o botão "segurado" em todos os sub-passos: a borda (_last_up/_last_down) é detectada
+		# dentro de _shift. Passar false nos sub-passos seguintes "soltava" o botão a cada frame, e segurar
+		# a borboleta por mais que o tempo de troca engatava outra marcha (1ª -> 3ª).
 		for s in n_steps:
-			_single_step(sub_dt, steer_in, throttle_in, brake_in, shift_up if s == 0 else false, shift_down if s == 0 else false)
+			_single_step(sub_dt, steer_in, throttle_in, brake_in, shift_up, shift_down)
 	else:
 		_single_step(dt, steer_in, throttle_in, brake_in, shift_up, shift_down)
 

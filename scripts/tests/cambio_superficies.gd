@@ -48,6 +48,13 @@ func _init() -> void:
 	run(car, 0.1, 0, 0, 0, false, true)
 	check(car.gear >= 2, "proteção: não reduz para 1ª a %.0f km/h (estava em %dª, ficou em %dª)" % [car.speed() * 3.6, g, car.gear])
 	check(car.shift_count >= 3, "contador de trocas (%d)" % car.shift_count)
+	# no jogo o passo é de 60 Hz com sub-passos internos: segurar a borboleta não pode pular marcha (1ª -> 3ª)
+	var frame := new_car(flat)
+	frame.assists.auto = false
+	run(frame, 6.0, 0, 1, 0)
+	for i in 45:
+		frame.step(1.0 / 60.0, 0, 1, 0, true, false)
+	check(frame.gear == 2, "a 60 Hz, segurar a borboleta 0,75 s sobe só uma marcha (%dª)" % frame.gear)
 	var rev := new_car(flat)
 	rev.assists.auto = false
 	run(rev, 0.1, 0, 0, 0, false, true)
