@@ -480,7 +480,7 @@ func update_fps(fps: int) -> void:
 
 func set_drive_busy(busy: bool) -> void:
 	if _drive_btn != null and is_instance_valid(_drive_btn):
-		_drive_btn.text = "CARREGANDO..." if busy else "PILOTAR ➔"
+		_drive_btn.text = "CARREGANDO..." if busy else ("CONTINUAR ➔" if context == Context.PAUSE else "CONFIRMAR CARRO ➔")
 		_drive_btn.disabled = busy
 
 
@@ -1590,7 +1590,9 @@ func _build_cars_view() -> void:
 		arow.add_child(gar_btn)
 
 	_drive_btn = Button.new()
-	_drive_btn.text = "CONTINUAR ➔" if context == Context.PAUSE else "PILOTAR ➔"
+	# na garagem, escolher o carro só confirma e volta para o menu (igual à pista); quem entra na pista é o
+	# RACE WEEKEND da home
+	_drive_btn.text = "CONTINUAR ➔" if context == Context.PAUSE else "CONFIRMAR CARRO ➔"
 	_drive_btn.custom_minimum_size.y = 42 if is_compact else 48
 	_drive_btn.add_theme_font_size_override("font_size", roundi((13 if is_compact else 16) * fs))
 	LmuTheme.apply_button_styles(_drive_btn, "primary", 4, 18 if is_compact else 24, 6 if is_compact else 8)
@@ -1598,7 +1600,7 @@ func _build_cars_view() -> void:
 		if context == Context.PAUSE:
 			resumed.emit()
 		else:
-			drive_requested.emit()
+			switch_view("home")
 	)
 	arow.add_child(_drive_btn)
 

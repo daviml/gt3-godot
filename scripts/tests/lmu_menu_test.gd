@@ -98,6 +98,12 @@ func run_tests() -> void:
 	gar_menu.set_selected_car("ferrari-488-gt3", true)
 	check(picked_car[0] == "ferrari-488-gt3" and Game.car_id == "ferrari-488-gt3", "Seleção de carro emite sinal e salva em Game")
 
+	# confirmar o carro volta para a home sem entrar na pista (quem entra é o RACE WEEKEND)
+	var drove := [false]
+	gar_menu.drive_requested.connect(func(): drove[0] = true)
+	gar_menu._drive_btn.pressed.emit()
+	await _frames(1)
+	check(gar_menu.active_view == "home" and not drove[0], "Confirmar carro volta para o menu sem abrir a pista")
 	gar_menu.switch_view("settings")
 	gar_menu.search_query = "abs"
 	gar_menu._rebuild_view()
