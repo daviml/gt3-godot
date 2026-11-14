@@ -394,11 +394,8 @@ func _spawn() -> void:
 
 
 func _refresh_records() -> void:
-	var local_all := Records.load_all(mode)
-	if has_shared_records and not shared_records.is_empty():
-		top_records = Records.merge_records(shared_records, local_all).slice(0, 8)
-	else:
-		top_records = Records.top(8, mode)
+	# sem resposta do servidor ainda, usa a última cópia do ranking guardada neste PC
+	top_records = Records.ranking(8, mode, shared_records if has_shared_records else [])
 	if hud:
 		hud.records = top_records
 

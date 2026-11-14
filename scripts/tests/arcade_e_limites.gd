@@ -9,6 +9,7 @@ var track: Track
 
 
 func _init() -> void:
+	Records.use_test_storage()  # nunca mexer nos recordes de verdade
 	track = Track.new("res://data/track/track.json")
 	print("limites avançados")
 	_test_offtime_reset_at_finish()
@@ -123,10 +124,8 @@ func _test_arcade_grip_and_no_rollover() -> void:
 
 
 func _test_records_separation_and_api() -> void:
-	var sim_path := Records.PATH_SIM
-	var arc_path := Records.PATH_ARCADE
-	var b_sim := FileAccess.get_file_as_string(sim_path) if FileAccess.file_exists(sim_path) else ""
-	var b_arc := FileAccess.get_file_as_string(arc_path) if FileAccess.file_exists(arc_path) else ""
+	var sim_path := Records.path_for("sim")
+	var arc_path := Records.path_for("arcade")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(sim_path))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(arc_path))
 
@@ -164,10 +163,13 @@ func _test_records_separation_and_api() -> void:
 	var parsed_post := Records.parse_volta_response(200, post_ok_body, "godot-arcade")
 	check(bool(parsed_post.get("ok", false)) and bool(parsed_post.get("recorde", false)), "aceita retorno POST do modo godot-arcade")
 
-	# Restaura arquivos do usuário
-	for p_b in [[sim_path, b_sim], [arc_path, b_arc]]:
-		if p_b[1] != "":
-			var f := FileAccess.open(p_b[0], FileAccess.WRITE)
-			f.store_string(p_b[1])
-		else:
-			DirAccess.remove_absolute(ProjectSettings.globalize_path(p_b[0]))
+	# cópia do ranking compartilhado: aparece ao abrir o jogo mesmo sem resposta do servidor
+	check(sim_path.begins_with("user://testes/"), "testes gravam em user://testes/, longe dos recordes reais")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Records.cache_path("arcade")))
+	Records.save_cache("arcade", [{"nick": "Amigo", "carId": "bmw-m6-gt3", "time": 73.0}])
+	var shown := Records.ranking(15, "arcade")
+	check(shown.size() == 2 and shown[0].nick == "Amigo", "ranking usa a cópia guardada + local sem servidor")
+	var fresh := Records.ranking(15, "arcade", [{"nick": "Novo", "carId": "bmw-m6-gt3", "time": 72.0}])
+	check(fresh.size() == 2 and fresh[0].nick == "Novo", "ranking prefere a resposta do servidor à cópia")
+	for p in [sim_path, arc_path, Records.cache_path("arcade")]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(p))

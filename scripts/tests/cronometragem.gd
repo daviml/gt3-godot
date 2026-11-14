@@ -18,6 +18,7 @@ func check(cond: bool, msg: String) -> void:
 
 
 func _init() -> void:
+	Records.use_test_storage()  # nunca mexer nos recordes de verdade
 	track = Track.new("res://data/track/track.json")
 	print("volta lançada (RefBot R8)")
 	bot_laps()
@@ -122,7 +123,6 @@ func limits() -> void:
 
 func records() -> void:
 	var path := Records.path_for()
-	var backup := FileAccess.get_file_as_string(path) if FileAccess.file_exists(path) else ""
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 	var lap := LapTimer.Lap.new()
 	lap.time = 97.5
@@ -139,9 +139,4 @@ func records() -> void:
 	check(Records.save_lap("teste", "audi-r8-lms-gt3", lap), "outro carro = outro recorde")
 	var all := Records.load_all()
 	check(all.size() == 2 and absf(float(Records.top(1)[0].time) - 96.9) < 1e-6, "2 recordes, melhor 1:36,900")
-	# devolve os recordes de verdade do Davi
-	if backup != "":
-		var f := FileAccess.open(path, FileAccess.WRITE)
-		f.store_string(backup)
-	else:
-		DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

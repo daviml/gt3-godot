@@ -1941,11 +1941,10 @@ func _build_records_view() -> void:
 		pbh.add_child(LmuTheme.make_label("--:--.---", roundi((12.5 if is_compact else 14.5) * cfs), LmuTheme.TEXT_DIM, 700))
 
 	# Lista Top 15
-	var recs: Array = Records.top(15, records_mode)
-	if shared_records_by_mode.has(records_mode) and shared_records_by_mode[records_mode] is Array:
-		var remote: Array = shared_records_by_mode[records_mode]
-		if not remote.is_empty():
-			recs = Records.merge_records(remote, Records.load_all(records_mode)).slice(0, 15)
+	var remote: Array = []
+	if shared_records_by_mode.get(records_mode) is Array:
+		remote = shared_records_by_mode[records_mode]
+	var recs: Array = Records.ranking(15, records_mode, remote)
 
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
