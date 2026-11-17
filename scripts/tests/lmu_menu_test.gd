@@ -189,11 +189,32 @@ func run_tests() -> void:
 	check(pmenu.lmu_menu._backdrop.visible, "PAUSE exibe backdrop sólido completo")
 	check(pmenu.lmu_menu._backdrop.size == vp_exp and pmenu.lmu_menu._root_vbox.size.x == vp_exp.x, "PauseMenu preenche toda a viewport mesmo após nascer oculto (%s vs %s)" % [str(pmenu.lmu_menu._backdrop.size), str(vp_exp)])
 
-	var sig_hits := {"resumed": false, "restart": false, "garage": false, "hide_touch": false}
+	var sig_hits := {"resumed": false, "restart": false, "garage": false, "hide_touch": false, "track": ""}
 	pmenu.resumed.connect(func(): sig_hits.resumed = true)
 	pmenu.restart_requested.connect(func(): sig_hits.restart = true)
 	pmenu.garage.connect(func(): sig_hits.garage = true)
 	pmenu.hide_touch_changed.connect(func(h: bool): sig_hits.hide_touch = h)
+	pmenu.track_selected.connect(func(tid: String): sig_hits.track = tid)
+
+	var p_texts := []
+	var p_stack: Array = [pmenu.lmu_menu]
+	while not p_stack.is_empty():
+		var pn: Node = p_stack.pop_back()
+		if pn is Label:
+			p_texts.append(String(pn.text))
+		p_stack.append_array(pn.get_children())
+	check(("TROCAR PISTA" in p_texts) == (avail.size() > 1), "PauseMenu Home: 'TROCAR PISTA' aparece com mais de uma pista disponível")
+	if avail.size() > 1:
+		var p_other: String = avail[(avail.find(Game.track_id) + 1) % avail.size()]
+		pmenu.lmu_menu.switch_view("tracks")
+		await _frames(2)
+		pmenu.lmu_menu._select_track_pick(p_other)
+		pmenu.lmu_menu._confirm_track_pick()
+		await _frames(1)
+		check(sig_hits.track == p_other and Game.track_id == p_other, "PauseMenu: confirmar outra pista emite track_selected")
+		Game.set_track(orig_track)
+		pmenu.lmu_menu.switch_view("home")
+		await _frames(1)
 
 	pmenu.lmu_menu.resumed.emit()
 	pmenu.lmu_menu.restart_requested.emit()

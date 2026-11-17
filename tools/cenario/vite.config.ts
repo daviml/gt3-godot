@@ -12,10 +12,10 @@ import { resolve } from 'node:path';
 
 const web = fileURLToPath(new URL('../../../gt3-time-attack/', import.meta.url));
 const godot = fileURLToPath(new URL('../../', import.meta.url));
-const track = process.env.TRACK && process.env.TRACK !== 'interlagos' ? process.env.TRACK : '';
+const track = process.env.TRACK || 'interlagos';
 
 /** pasta das cópias adaptadas dos módulos do web (tools/cenario/<pasta>/) */
-const MODULES: Record<string, string> = { 'laguna-seca': 'laguna' };
+const MODULES: Record<string, string> = { 'laguna-seca': 'laguna', interlagos: 'interlagos' };
 
 /** dados de Interlagos → dados da pista (a referência alimenta a borracha e as placas de freada) */
 const DATA: Record<string, Record<string, string>> = {
@@ -32,7 +32,7 @@ const norm = (p: string) => resolve(p).replace(/\\/g, '/').toLowerCase();
 function trackRedirect(id: string): Plugin {
   const map = new Map<string, string>();
   for (const [from, to] of Object.entries(DATA[id] ?? {})) map.set(norm(web + from), resolve(godot + to));
-  for (const m of ['trackView', 'trackDetails', 'trackside', 'scenery', 'surroundings']) {
+  for (const m of ['trackView', 'trackDetails', 'trackside', 'scenery', 'surroundings', 'osmScenery']) {
     const own = fileURLToPath(new URL(`./${MODULES[id] ?? id}/${m}.ts`, import.meta.url));
     if (existsSync(own)) map.set(norm(web + `src/render/${m}.ts`), own);
   }

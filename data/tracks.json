@@ -22,6 +22,25 @@
       "sim": 85.0,
       "arcade": 60.0
     },
+    "visual": {
+      "asfalto": {
+        "color_mul": [0.96, 0.89, 0.76],
+        "color_add": [0.016, 0.014, 0.011],
+        "fast_mul": [0.92, 0.85, 0.73],
+        "fast_add": [0.014, 0.012, 0.010]
+      },
+      "grama": {
+        "base_color": [0.16, 0.30, 0.06],
+        "dry_lo": 0.52,
+        "dry_mix": 0.45,
+        "lush_amt": 0.65,
+        "straw_tint": [0.75, 0.48, 0.12],
+        "soil_color": [0.32, 0.18, 0.10],
+        "fast_dry_lo": 0.52,
+        "fast_dry_mix": 0.40,
+        "fast_straw_tint": [0.75, 0.48, 0.12]
+      }
+    },
     "location": "São Paulo, Brasil"
   },
   {

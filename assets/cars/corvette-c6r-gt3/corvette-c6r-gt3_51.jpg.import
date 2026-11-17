@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bnbhsxtx0d618"
-path.bptc="res://.godot/imported/corvette-c6r-gt3_51.jpg-a31735a32c94727263baf75e606db336.bptc.ctex"
-path.astc="res://.godot/imported/corvette-c6r-gt3_51.jpg-a31735a32c94727263baf75e606db336.astc.ctex"
+path.s3tc="res://.godot/imported/corvette-c6r-gt3_51.jpg-a31735a32c94727263baf75e606db336.s3tc.ctex"
+path.etc2="res://.godot/imported/corvette-c6r-gt3_51.jpg-a31735a32c94727263baf75e606db336.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -16,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/cars/corvette-c6r-gt3/corvette-c6r-gt3_51.jpg"
-dest_files=["res://.godot/imported/corvette-c6r-gt3_51.jpg-a31735a32c94727263baf75e606db336.bptc.ctex", "res://.godot/imported/corvette-c6r-gt3_51.jpg-a31735a32c94727263baf75e606db336.astc.ctex"]
+dest_files=["res://.godot/imported/corvette-c6r-gt3_51.jpg-a31735a32c94727263baf75e606db336.s3tc.ctex", "res://.godot/imported/corvette-c6r-gt3_51.jpg-a31735a32c94727263baf75e606db336.etc2.ctex"]
 
 [params]
 

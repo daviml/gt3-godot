@@ -12,6 +12,7 @@ signal quit_requested
 signal drive_requested
 signal restart_requested
 signal car_selected(car_id: String)
+signal track_selected(track_id: String)
 signal nick_changed(nick: String)
 signal mode_changed(mode: String)
 signal quality_changed(name: String)
@@ -1072,7 +1073,7 @@ func _build_car_card(is_compact: bool, fs: float) -> PanelContainer:
 func _build_track_card(is_compact: bool, fs: float) -> PanelContainer:
 	var t := Game.get_track_info()
 	var gold := Color("#fbbf24")
-	var can := context != Context.PAUSE and Game.get_available_tracks().size() > 1
+	var can := Game.get_available_tracks().size() > 1
 	var card := _make_click_card(func(): switch_view("tracks"), gold, can)
 	var v := _card_margin(card, is_compact)
 	_card_header(v, "PISTA", "TROCAR ➔" if can else "", is_compact, fs)
@@ -1222,11 +1223,16 @@ func _select_track_pick(id: String) -> void:
 	_rebuild_view()
 
 
-## confirma a pista escolhida (só aqui ela muda e é salva) e volta para a home
+## confirma a pista escolhida (só aqui ela muda e é salva) e volta para a home (ou recarrega na pausa)
 func _confirm_track_pick() -> void:
-	if _track_pick != "" and _track_pick != Game.track_id:
+	var changed := _track_pick != "" and _track_pick != Game.track_id
+	if changed:
 		Game.set_track(_track_pick)
+	var picked := Game.track_id
 	_track_pick = ""
+	if changed and context == Context.PAUSE:
+		track_selected.emit(picked)
+		return
 	switch_view("home")
 func _build_home_view() -> void:
 	var lp := layout_profile
@@ -1296,8 +1302,7 @@ func _build_home_view() -> void:
 		nav_list.add_child(restart_item)
 
 	var nav_entries := [["TROCAR CARRO", "cars"]]
-	# na pista não troca de pista (exigiria recarregar tudo)
-	if context != Context.PAUSE:
+	if Game.get_available_tracks().size() > 1:
 		nav_entries.append(["TROCAR PISTA", "tracks"])
 	nav_entries.append_array([["CONFIGURAÇÕES", "settings"], ["RECORDES", "records"], ["COMO JOGAR", "help"]])
 	for item in nav_entries:

@@ -9,21 +9,36 @@
 extends SceneTree
 
 const CHECKPOINTS := [
-	["01_senna_entrada", 230.0],
-	["02_senna_apex2", 380.0],
-	["03_curva_do_sol", 640.0],
-	["04_reta_oposta_1", 900.0],
-	["05_reta_oposta_2", 1260.0],
-	["06_descida_do_lago", 1430.0],
-	["07_ferradura_entrada", 1860.0],
-	["08_ferradura", 2030.0],
-	["09_laranjinha", 2160.0],
-	["10_pinheirinho", 2470.0],
-	["11_bico_de_pato", 2660.0],
-	["12_mergulho", 2960.0],
-	["13_juncao", 3180.0],
-	["14_subida_boxes", 3650.0],
-	["15_arquibancadas", 3980.0],
+	["01_reta_freada_senna", 135.0, 4.2, 0.0],
+	["02_senna_entrada", 258.0, 4.0, 10.0],
+	["03_senna_apex1", 335.0, -4.2, -10.0],
+	["04_senna_apex2", 415.0, 4.5, -8.0],
+	["05_curva_do_sol_entrada", 545.0, -4.5, 5.0],
+	["06_curva_do_sol_saida", 685.0, -5.5, 6.0],
+	["07_reta_oposta_inicio", 920.0, 4.8, 0.0],
+	["08_reta_oposta_meio", 1165.0, 4.6, 0.0],
+	["09_reta_oposta_freada", 1340.0, 5.0, 4.0],
+	["10_descida_lago_apex", 1485.0, -3.5, 8.0],
+	["11_descida_lago_saida", 1560.0, -3.8, 4.0],
+	["12_subida_ferradura_1", 1700.0, 3.5, 0.0],
+	["13_subida_ferradura_2", 1850.0, -4.2, 0.0],
+	["14_ferradura_entrada", 1985.0, 4.0, -5.0],
+	["15_ferradura_meio", 2075.0, 4.8, -12.0],
+	["16_laranjinha_entrada", 2165.0, -3.5, -10.0],
+	["17_laranjinha_saida", 2280.0, 3.0, 8.0],
+	["18_esse_pinheirinho", 2390.0, -3.5, 10.0],
+	["19_pinheirinho_saida", 2535.0, -3.0, -5.0],
+	["20_bico_de_pato_apex", 2762.0, 3.8, -12.0],
+	["21_bico_de_pato_saida", 2835.0, 0.0, -4.0],
+	["22_mergulho_entrada", 2935.0, -3.2, -8.0],
+	["23_juncao_freada", 3120.0, 4.5, 4.0],
+	["24_juncao_apex", 3260.0, -3.5, -8.0],
+	["25_juncao_saida", 3390.0, 1.5, -4.0],
+	["26_subida_atenuador", 3490.0, -2.5, 2.0],
+	["27_subida_cafe", 3610.0, -3.8, 4.0],
+	["28_subida_telao", 3780.0, -2.0, 2.0],
+	["29_entrada_boxes_ilha", 3940.0, -3.0, 2.0],
+	["30_reta_grid", 4160.0, 0.5, 0.0],
 ]
 
 ## Laguna Seca: [nome, s, quadro do LMU em build/compare/lmu_laguna/scan/ (perseguição, onboard)]
@@ -119,7 +134,14 @@ func _run() -> void:
 		else:
 			# parado na pista, inclinado com ela (pitch e roll pela normal), e 0,4 s de física freado para a
 			# suspensão assentar (antes o carro ficava nivelado e enterrava nas rampas, como a do Corkscrew)
-			car.reset_at(track.index_at(s))
+			var idx := track.index_at(s)
+			car.reset_at(idx)
+			var lat: float = float(cp[2]) if cp.size() > 2 and typeof(cp[2]) in [TYPE_FLOAT, TYPE_INT] else 0.0
+			var yaw_deg: float = float(cp[3]) if cp.size() > 3 and typeof(cp[3]) in [TYPE_FLOAT, TYPE_INT] else 0.0
+			if absf(lat) > 0.01:
+				car.pos += track.R[idx] * lat
+			if absf(yaw_deg) > 0.01:
+				car.rot = Quaternion(Vector3.UP, deg_to_rad(yaw_deg)) * car.rot
 			for _k in int(0.4 * Car.HZ):
 				car.step(1.0 / Car.HZ, 0.0, 0.0, 1.0)
 			car.prev_pos = car.pos

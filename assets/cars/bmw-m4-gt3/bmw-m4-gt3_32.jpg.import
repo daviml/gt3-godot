@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bq72fygu64jl1"
-path.bptc="res://.godot/imported/bmw-m4-gt3_32.jpg-5c6734aadda2428257c98b9614ff5714.bptc.ctex"
-path.astc="res://.godot/imported/bmw-m4-gt3_32.jpg-5c6734aadda2428257c98b9614ff5714.astc.ctex"
+path.s3tc="res://.godot/imported/bmw-m4-gt3_32.jpg-5c6734aadda2428257c98b9614ff5714.s3tc.ctex"
+path.etc2="res://.godot/imported/bmw-m4-gt3_32.jpg-5c6734aadda2428257c98b9614ff5714.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -16,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/cars/bmw-m4-gt3/bmw-m4-gt3_32.jpg"
-dest_files=["res://.godot/imported/bmw-m4-gt3_32.jpg-5c6734aadda2428257c98b9614ff5714.bptc.ctex", "res://.godot/imported/bmw-m4-gt3_32.jpg-5c6734aadda2428257c98b9614ff5714.astc.ctex"]
+dest_files=["res://.godot/imported/bmw-m4-gt3_32.jpg-5c6734aadda2428257c98b9614ff5714.s3tc.ctex", "res://.godot/imported/bmw-m4-gt3_32.jpg-5c6734aadda2428257c98b9614ff5714.etc2.ctex"]
 
 [params]
 

@@ -342,6 +342,7 @@ func _build_hud() -> void:
 			chase.snap()
 	)
 	menu.car_selected.connect(_switch_car)
+	menu.track_selected.connect(_switch_track)
 	menu.nick_changed.connect(_on_nick)
 	menu.mode_changed.connect(func(m: String):
 		_apply_mode(m, not autopilot)
@@ -715,6 +716,17 @@ func _to_garage() -> void:
 	if car_audio:
 		car_audio.set_paused(true)
 	Game.transition_target = "garage"
+	get_tree().change_scene_to_file("res://scenes/loading.tscn")
+
+
+func _switch_track(new_track_id: String) -> void:
+	Game.set_track(new_track_id)
+	paused = false
+	if car_audio:
+		car_audio.set_paused(true)
+	if menu and menu.is_open:
+		menu.close()
+	Game.transition_target = "track"
 	get_tree().change_scene_to_file("res://scenes/loading.tscn")
 
 

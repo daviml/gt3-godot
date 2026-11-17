@@ -9,6 +9,7 @@ signal garage
 signal quit
 signal restart_requested
 signal car_selected(car_id: String)
+signal track_selected(track_id: String)
 signal nick_changed(nick: String)
 signal mode_changed(mode: String)
 signal quality_changed(name: String)
@@ -68,6 +69,7 @@ func _ready() -> void:
 	lmu_menu.quit_requested.connect(func(): quit.emit())
 	lmu_menu.restart_requested.connect(func(): restart_requested.emit())
 	lmu_menu.car_selected.connect(func(car_id: String): car_selected.emit(car_id))
+	lmu_menu.track_selected.connect(func(track_id: String): track_selected.emit(track_id))
 	lmu_menu.nick_changed.connect(func(nick: String): nick_changed.emit(nick))
 	lmu_menu.mode_changed.connect(func(mode: String): mode_changed.emit(mode))
 	lmu_menu.quality_changed.connect(func(qname: String): quality_changed.emit(qname))

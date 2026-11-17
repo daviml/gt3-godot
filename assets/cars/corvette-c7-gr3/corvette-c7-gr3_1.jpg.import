@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dgy4v62wkl3lb"
-path.bptc="res://.godot/imported/corvette-c7-gr3_1.jpg-1e3ae504b37368bdb97d977acbb17551.bptc.ctex"
-path.astc="res://.godot/imported/corvette-c7-gr3_1.jpg-1e3ae504b37368bdb97d977acbb17551.astc.ctex"
+path.s3tc="res://.godot/imported/corvette-c7-gr3_1.jpg-1e3ae504b37368bdb97d977acbb17551.s3tc.ctex"
+path.etc2="res://.godot/imported/corvette-c7-gr3_1.jpg-1e3ae504b37368bdb97d977acbb17551.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -16,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/cars/corvette-c7-gr3/corvette-c7-gr3_1.jpg"
-dest_files=["res://.godot/imported/corvette-c7-gr3_1.jpg-1e3ae504b37368bdb97d977acbb17551.bptc.ctex", "res://.godot/imported/corvette-c7-gr3_1.jpg-1e3ae504b37368bdb97d977acbb17551.astc.ctex"]
+dest_files=["res://.godot/imported/corvette-c7-gr3_1.jpg-1e3ae504b37368bdb97d977acbb17551.s3tc.ctex", "res://.godot/imported/corvette-c7-gr3_1.jpg-1e3ae504b37368bdb97d977acbb17551.etc2.ctex"]
 
 [params]
 

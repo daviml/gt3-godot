@@ -1,25 +1,25 @@
 {
-  "hash": "f3bee2d7",
-  "configHash": "60450c94",
+  "hash": "472d8210",
+  "configHash": "bbfe11c8",
   "lockfileHash": "e3b0c442",
-  "browserHash": "62b1cacb",
+  "browserHash": "73da0561",
   "optimized": {
     "three": {
       "src": "../../../../../gt3-time-attack/node_modules/three/build/three.module.js",
       "file": "three.js",
-      "fileHash": "982b7c5b",
+      "fileHash": "c72e6b96",
       "needsInterop": false
     },
     "three/examples/jsm/exporters/GLTFExporter.js": {
       "src": "../../../../../gt3-time-attack/node_modules/three/examples/jsm/exporters/GLTFExporter.js",
       "file": "three_examples_jsm_exporters_GLTFExporter__js.js",
-      "fileHash": "a5d67aa3",
+      "fileHash": "1c4aa2d2",
       "needsInterop": false
     },
     "three/examples/jsm/utils/BufferGeometryUtils.js": {
       "src": "../../../../../gt3-time-attack/node_modules/three/examples/jsm/utils/BufferGeometryUtils.js",
       "file": "three_examples_jsm_utils_BufferGeometryUtils__js.js",
-      "fileHash": "124d1d4b",
+      "fileHash": "e2c2fa72",
       "needsInterop": false
     }
   },

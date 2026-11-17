@@ -43,11 +43,14 @@ void fragment() {
 		c = mix(c, texture(albedo_tex, uv * 0.23 + 0.41).rgb, 0.4);
 		c = c * color_mul + color_add;
 		float big = a_noise(ground / 45.0) * 0.65 + a_noise(ground / 18.0 + 13.0) * 0.35;
-		float newer = smoothstep(0.6, 0.68, big);
-		float older = smoothstep(0.36, 0.28, big);
-		c *= mix(vec3(1.0), vec3(0.70, 0.71, 0.74), newer);
-		c *= mix(vec3(1.0), vec3(1.14, 1.13, 1.10), older);
-		c *= 0.92 + 0.16 * a_noise(ground / 7.0 + 3.0);
+		float newer = smoothstep(0.56, 0.66, big);
+		float older = smoothstep(0.40, 0.28, big);
+		c *= mix(vec3(1.0), vec3(0.58, 0.59, 0.62), newer);
+		c *= mix(vec3(1.0), vec3(1.18, 1.16, 1.12), older);
+		// faixas longitudinais sutis de desgaste / recapeamento
+		float streak = a_noise(vec2(ground.x * 0.04, ground.y * 0.22) + 5.0);
+		c *= 0.86 + 0.24 * streak;
+		c *= 0.90 + 0.20 * a_noise(ground / 6.0 + 3.0);
 		ALBEDO = c;
 		vec3 n1 = texture(normal_tex, uv).rgb * 2.0 - 1.0;
 		vec3 n2 = texture(normal_tex, uv * 3.2).rgb * 2.0 - 1.0;
