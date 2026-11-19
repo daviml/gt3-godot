@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
 import { AdScheme, adCanvas, tex } from '@web/render/trackDetails';
+import { addProp } from '../propsRegistry';
 
 /** Ponto p cai sobre (ou perto de) outro trecho da pista, longe da amostra i? */
 function overOther(track: Track, p: THREE.Vector3, i: number, margin: number): boolean {
@@ -662,23 +663,8 @@ export function buildMarshalPosts(track: Track, group: THREE.Group) {
     const wall = side < 0 ? s.wallL : s.wallR;
     const base = s.p.clone().addScaledVector(s.r, side * (wall + 3));
     if (overOther(track, tmp.copy(base), i, 3)) continue;
-    const g = new THREE.Group();
-    const hut = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.4, 2.2), white);
-    hut.position.y = 1.2;
-    const win = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.8, 2.24), glass);
-    win.position.y = 1.6;
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.2, 2.8), roofMat);
-    roof.position.y = 2.5;
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 6), poleMat);
-    pole.position.set(1.3, 3.5, 0);
-    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.6), flagMat);
-    flag.position.set(1.75, 4.25, 0);
-    g.add(hut, win, roof, pole, flag);
-    g.traverse(o => (o.castShadow = true));
-    g.position.copy(base).setY(s.p.y - 0.2);
-    // virado para a pista
-    g.lookAt(s.p.x, g.position.y, s.p.z);
-    group.add(g);
+    const rotY = Math.atan2(s.p.x - base.x, s.p.z - base.z);
+    addProp('marshal_post', new THREE.Vector3(base.x, s.p.y - 0.2, base.z), rotY, 1, false);
     // portão dos fiscais no muro, ao lado da casinha: folha de grade com moldura laranja, um pouco acima do muro
     const gate = new THREE.Group();
     for (const [w, h, x, y] of [[3, 0.12, 0, 2.04], [3, 0.12, 0, 0.06], [0.12, 2.1, -1.44, 1.05], [0.12, 2.1, 1.44, 1.05], [0.08, 2.0, 0, 1.05]]) {
@@ -694,6 +680,21 @@ export function buildMarshalPosts(track: Track, group: THREE.Group) {
     gate.position.copy(at.p).addScaledVector(at.r, side * (gw + 0.25)).setY(at.p.y - 0.1);
     gate.lookAt(at.p.x, gate.position.y, at.p.z);
     group.add(gate);
+  }
+  // ambulâncias e guindastes de resgate em pontos estratégicos fora do muro
+  for (const [sM, side, id] of [
+    [220, -1, 'ambulance'],
+    [1920, -1, 'crane'],
+    [3090, 1, 'ambulance'],
+    [1340, 1, 'crane'],
+  ] as [number, -1 | 1, string][]) {
+    const idx = Math.round(((sM * L) / 4300) / STEP) % N;
+    const s = S[idx];
+    const wall = side < 0 ? s.wallL : s.wallR;
+    const p = s.p.clone().addScaledVector(s.r, side * (wall + 5.5));
+    if (overOther(track, tmp.copy(p), idx, 4)) continue;
+    const rotY = Math.atan2(s.p.x - p.x, s.p.z - p.z) + (id === 'ambulance' ? Math.PI * 0.45 : 0.3);
+    addProp(id, new THREE.Vector3(p.x, s.p.y - 0.15, p.z), rotY, 1, false);
   }
 }
 

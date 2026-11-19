@@ -11,7 +11,7 @@
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Track } from '../../gt3-time-attack/src/track/track';
-import { applyBank, clampRunoff } from './tracks/bank';
+import { applyBank, applyKerbs, applyWalls, clampRunoff } from './tracks/bank';
 
 const id = process.argv.slice(2).filter(a => a !== '--')[0];
 if (!id || id === 'interlagos') throw new Error('uso: npx vite-node pista.ts -- <id>  (Interlagos é pelo prep.ts)');
@@ -32,7 +32,9 @@ const dir = `data/tracks/${id}/`;
 const data = JSON.parse(readFileSync(src(`${id}.json`), 'utf8'));
 const track = new Track(data);
 const S = track.samples;
-// escape asfaltado limitado (opcional, `maxRunoff` na fonte): igual no cenário (tools/cenario/cenario.ts)
+// zebras e muros reais medidos (opcionais, presentes em Imola) e escape asfaltado limitado (`maxRunoff`)
+applyKerbs(track, data.kerbLeft, data.kerbRight);
+applyWalls(track, data.wallLeft, data.wallRight);
 clampRunoff(track, data.maxRunoff);
 
 // trechos com nome: s da fonte (linha de 1 m) → s desta pista (Catmull-Rom a cada 2 m), na proporção do comprimento

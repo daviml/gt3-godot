@@ -223,50 +223,66 @@ static func panel_style(bg := BG_PANEL, border := BORDER_SUBTLE, radius := 6, pa
 
 
 static func apply_button_styles(b: Button, kind := "outline", radius := 4, pad_h := 14, pad_v := 8) -> void:
-	b.focus_mode = Control.FOCUS_NONE
+	b.focus_mode = Control.FOCUS_ALL
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	b.add_theme_font_override("font", font(700))
-	for st in ["normal", "hover", "pressed", "disabled"]:
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var sb := StyleBoxFlat.new()
 		sb.set_corner_radius_all(radius)
 		sb.content_margin_left = pad_h
 		sb.content_margin_right = pad_h
 		sb.content_margin_top = pad_v
 		sb.content_margin_bottom = pad_v
-		sb.set_border_width_all(1)
+		sb.set_border_width_all(2 if st == "focus" else 1)
 		match kind:
 			"primary":
-				sb.bg_color = ACCENT_RED if st == "normal" else (ACCENT_RED_BRIGHT if st == "hover" else (ACCENT_RED_DARK if st == "pressed" else Color(0.35, 0.1, 0.1, 0.6)))
-				sb.border_color = Color(1, 1, 1, 0.25 if st == "hover" else 0.05)
+				sb.bg_color = ACCENT_RED if st == "normal" else (ACCENT_RED_BRIGHT if (st == "hover" or st == "focus") else (ACCENT_RED_DARK if st == "pressed" else Color(0.35, 0.1, 0.1, 0.6)))
+				sb.border_color = Color.WHITE if st == "focus" else Color(1, 1, 1, 0.25 if st == "hover" else 0.05)
 			"active":
 				sb.bg_color = Color(ACCENT_RED.r, ACCENT_RED.g, ACCENT_RED.b, 0.26 if st == "normal" else 0.38)
-				sb.border_color = ACCENT_RED
+				sb.border_color = Color.WHITE if st == "focus" else ACCENT_RED
 			"arcade":
 				sb.bg_color = Color(ACCENT_AMBER.r, ACCENT_AMBER.g, ACCENT_AMBER.b, 0.16 if st == "normal" else 0.28)
-				sb.border_color = ACCENT_AMBER
+				sb.border_color = Color.WHITE if st == "focus" else ACCENT_AMBER
 			"ghost":
-				sb.bg_color = Color(1, 1, 1, 0.0 if st == "normal" else (0.08 if st == "hover" else 0.14))
-				sb.border_color = Color.TRANSPARENT
-				sb.set_border_width_all(0)
+				sb.bg_color = Color(1, 1, 1, 0.0 if st == "normal" else (0.12 if st == "focus" else (0.08 if st == "hover" else 0.14)))
+				sb.border_color = Color(1, 1, 1, 0.85) if st == "focus" else Color.TRANSPARENT
+				if st != "focus":
+					sb.set_border_width_all(0)
 			"tab_active":
-				sb.bg_color = Color(1, 1, 1, 0.05 if st == "normal" else 0.09)
+				sb.bg_color = Color(1, 1, 1, 0.05 if st == "normal" else (0.14 if st == "focus" else 0.09))
 				sb.set_border_width_all(0)
-				sb.border_width_bottom = 2
-				sb.border_color = Color.WHITE
+				sb.border_width_bottom = 3 if st == "focus" else 2
+				sb.border_color = ACCENT_RED_BRIGHT if st == "focus" else Color.WHITE
 				sb.set_corner_radius_all(0)
 			"tab_idle":
-				sb.bg_color = Color(1, 1, 1, 0.0 if st == "normal" else 0.05)
+				sb.bg_color = Color(1, 1, 1, 0.0 if st == "normal" else (0.10 if st == "focus" else 0.05))
 				sb.set_border_width_all(0)
 				sb.border_width_bottom = 2
-				sb.border_color = Color(1, 1, 1, 0.25 if st == "hover" else 0.0)
+				sb.border_color = Color.WHITE if st == "focus" else Color(1, 1, 1, 0.25 if st == "hover" else 0.0)
 				sb.set_corner_radius_all(0)
 			_:
-				sb.bg_color = Color(1, 1, 1, 0.07 if st == "normal" else (0.16 if st == "hover" else (0.24 if st == "pressed" else 0.03)))
-				sb.border_color = Color(1, 1, 1, 0.20 if st == "normal" else 0.45)
+				sb.bg_color = Color(1, 1, 1, 0.07 if st == "normal" else (0.18 if st == "focus" else (0.16 if st == "hover" else (0.24 if st == "pressed" else 0.03))))
+				sb.border_color = Color(1, 1, 1, 0.92) if st == "focus" else Color(1, 1, 1, 0.20 if st == "normal" else 0.45)
 		b.add_theme_stylebox_override(st, sb)
 	b.add_theme_color_override("font_color", ACCENT_AMBER if kind == "arcade" else TEXT_WHITE)
 	b.add_theme_color_override("font_hover_color", Color.WHITE)
+	b.add_theme_color_override("font_focus_color", Color.WHITE)
 	b.add_theme_color_override("font_pressed_color", Color.WHITE)
+
+
+static func apply_focus_outline(ctrl: Control, radius := 4, pad_h := 6, pad_v := 4) -> void:
+	ctrl.focus_mode = Control.FOCUS_ALL
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(1, 1, 1, 0.10)
+	sb.border_color = Color(1, 1, 1, 0.92)
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(radius)
+	sb.content_margin_left = pad_h
+	sb.content_margin_right = pad_h
+	sb.content_margin_top = pad_v
+	sb.content_margin_bottom = pad_v
+	ctrl.add_theme_stylebox_override("focus", sb)
 
 
 static func input_style(focused := false) -> StyleBoxFlat:

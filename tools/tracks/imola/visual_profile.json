@@ -1,0 +1,100 @@
+{
+  "lapLength": 4890,
+  "pitSide": 1,
+  "kerbColors": ["#008c45", "#f4f5f0", "#cd212a", "#f4f5f0"],
+  "sausages": [
+    { "s0": 620, "s1": 655, "side": -1, "color": "yellow", "offset": 0.65 },
+    { "s0": 720, "s1": 755, "side": 1, "color": "yellow", "offset": 0.65 },
+    { "s0": 1335, "s1": 1365, "side": -1, "color": "yellow", "offset": 0.65 },
+    { "s0": 1410, "s1": 1445, "side": 1, "color": "yellow", "offset": 0.65 },
+    { "s0": 3330, "s1": 3368, "side": 1, "color": "yellow", "offset": 0.65 },
+    { "s0": 3380, "s1": 3418, "side": -1, "color": "yellow", "offset": 0.65 }
+  ],
+  "wideRunoffs": [
+    { "s0": 595, "s1": 775, "side": -1, "width": 3.4 },
+    { "s0": 1310, "s1": 1475, "side": -1, "width": 2.8 },
+    { "s0": 1680, "s1": 1790, "side": -1, "width": 3.2 },
+    { "s0": 2760, "s1": 2925, "side": 1, "width": 3.4 },
+    { "s0": 3315, "s1": 3435, "side": 1, "width": 3.5 },
+    { "s0": 3370, "s1": 3455, "side": -1, "width": 2.8 },
+    { "s0": 4120, "s1": 4285, "side": -1, "width": 2.8 },
+    { "s0": 4380, "s1": 4510, "side": 1, "width": 4.2 }
+  ],
+  "pitOpenRange": { "s0": 4420, "s1": 525 },
+  "pit": {
+    "s0": 4560,
+    "s1": 5060,
+    "side": 1,
+    "lane": 12.0,
+    "garageFrom": 16.5,
+    "garageDepth": 16.0,
+    "garageH": 8.0
+  },
+  "barrierDefault": {
+    "kind": "wall",
+    "ads": null,
+    "fence": true
+  },
+  "barrierZones": [
+    { "s0": 4650, "s1": 4890, "side": -1, "kind": "wall", "ads": "vermelho", "fence": true, "billboard": false },
+    { "s0": 0, "s1": 220, "side": -1, "kind": "wall", "ads": "vermelho", "fence": true, "billboard": false },
+    { "s0": 4520, "s1": 4890, "side": 1, "kind": "wall", "ads": "vermelho", "fence": true, "billboard": false },
+    { "s0": 0, "s1": 180, "side": 1, "kind": "wall", "ads": "vermelho", "fence": true, "billboard": false },
+    { "s0": 540, "s1": 900, "side": 1, "kind": "wall", "ads": "azul", "fence": true, "billboard": true },
+    { "s0": 540, "s1": 880, "side": -1, "kind": "wall", "ads": "azul", "fence": true, "billboard": false },
+    { "s0": 920, "s1": 1220, "side": -1, "kind": "wall", "ads": "branco", "fence": true, "billboard": false },
+    { "s0": 1250, "s1": 1500, "side": 1, "kind": "wall", "ads": "azul", "fence": true, "billboard": true },
+    { "s0": 1600, "s1": 1860, "side": 1, "kind": "wall", "ads": "branco", "fence": true, "billboard": true },
+    { "s0": 1600, "s1": 1860, "side": -1, "kind": "wall", "ads": "azul", "fence": true, "billboard": false },
+    { "s0": 1880, "s1": 2480, "side": 1, "kind": "wall", "ads": "vermelho", "fence": true, "billboard": true },
+    { "s0": 2650, "s1": 2980, "side": -1, "kind": "wall", "ads": "vermelho", "fence": true, "billboard": false },
+    { "s0": 2680, "s1": 2980, "side": 1, "kind": "wall", "ads": "amarelo", "fence": true, "billboard": true },
+    { "s0": 3020, "s1": 3330, "side": -1, "kind": "rail_green", "ads": null, "fence": true, "billboard": false },
+    { "s0": 3280, "s1": 3520, "side": 1, "kind": "wall", "ads": "amarelo", "fence": true, "billboard": true },
+    { "s0": 3320, "s1": 3520, "side": -1, "kind": "wall", "ads": "azul", "fence": true, "billboard": false },
+    { "s0": 3600, "s1": 3960, "side": -1, "kind": "wall", "ads": "azul", "fence": false, "billboard": false },
+    { "s0": 4040, "s1": 4380, "side": 1, "kind": "wall", "ads": "amarelo", "fence": true, "billboard": true },
+    { "s0": 4040, "s1": 4440, "side": -1, "kind": "wall", "ads": "vermelho", "fence": true, "billboard": false }
+  ],
+  "stands": [
+    { "s0": 4650, "s1": 4875, "side": -1, "depth": 18, "roof": true, "seatColor": "#1f4f9c" },
+    { "s0": 1620, "s1": 1785, "side": 1, "depth": 14, "roof": false, "seatColor": "#1f4f9c" },
+    { "s0": 2740, "s1": 2910, "side": -1, "depth": 14, "roof": false, "seatColor": "#b8242a" },
+    { "s0": 3180, "s1": 3310, "side": -1, "depth": 13, "roof": false, "seatColor": "#c41e24" },
+    { "s0": 4120, "s1": 4340, "side": -1, "depth": 16, "roof": false, "seatColor": "#2d783e", "naturalSlope": true }
+  ],
+  "bridges": [
+    { "s": 4882, "kind": "gantry_green", "t1": "IMOLA", "t2": "EMILIA ROMAGNA" },
+    { "s": 2040, "kind": "truss_blue", "t1": "IMOLA GP", "t2": "SANTERNO" },
+    { "s": 3150, "kind": "truss_yellow", "t1": "AUTODROMO", "t2": "IMOLA" },
+    { "s": 3940, "kind": "overpass_yellow", "t1": "IMOLA", "t2": "GT3 SERIES" },
+    { "s": 4345, "kind": "truss_red", "t1": "TRAGUARDO", "t2": "IMOLA" },
+    { "s": 4560, "kind": "truss_white", "t1": "IMOLA", "t2": "PADDOCK" }
+  ],
+  "brakingWindows": [
+    { "s0": 420, "s1": 640, "labels": [200, 150, 100, 50] },
+    { "s0": 1120, "s1": 1350, "labels": [150, 100, 50] },
+    { "s0": 1510, "s1": 1730, "labels": [150, 100, 50] },
+    { "s0": 2110, "s1": 2330, "labels": [150, 100, 50] },
+    { "s0": 2610, "s1": 2840, "labels": [150, 100, 50] },
+    { "s0": 3130, "s1": 3345, "labels": [150, 100, 50] },
+    { "s0": 3920, "s1": 4150, "labels": [150, 100, 50] }
+  ],
+  "tyreBarriers": [
+    { "s0": 580, "s1": 740, "side": 1 },
+    { "s0": 1320, "s1": 1460, "side": 1 },
+    { "s0": 1680, "s1": 1790, "side": 1 },
+    { "s0": 2260, "s1": 2390, "side": 1 },
+    { "s0": 2770, "s1": 2920, "side": -1 },
+    { "s0": 4090, "s1": 4260, "side": 1 }
+  ],
+  "heroProps": [
+    { "id": "torre_imola", "s": 4720, "d_outside": 18.0, "side": 1, "yaw_deg": 0, "scale": 1.0, "min_quality": 1 },
+    { "id": "portico_imola", "s": 4860, "d_outside": 0.0, "side": 0, "yaw_deg": 0, "scale": 1.0, "min_quality": 1 },
+    { "id": "marshal_post", "s": 760, "d_outside": 3.0, "side": -1, "yaw_deg": 0, "scale": 1.0, "min_quality": 1 },
+    { "id": "marshal_post", "s": 1760, "d_outside": 3.0, "side": 1, "yaw_deg": 0, "scale": 1.0, "min_quality": 1 },
+    { "id": "marshal_post", "s": 2850, "d_outside": 3.0, "side": -1, "yaw_deg": 0, "scale": 1.0, "min_quality": 1 },
+    { "id": "marshal_post", "s": 3420, "d_outside": 3.0, "side": 1, "yaw_deg": 0, "scale": 1.0, "min_quality": 1 },
+    { "id": "marshal_post", "s": 4220, "d_outside": 3.0, "side": 1, "yaw_deg": 0, "scale": 1.0, "min_quality": 1 }
+  ]
+}

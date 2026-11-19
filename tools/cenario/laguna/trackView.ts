@@ -18,6 +18,9 @@ import type { Quality } from '@web/render/quality';
 import { plantTrees, TreeSpot } from '@web/render/trees';
 import { pbr, phTexture, setHiRes } from '@web/render/textures';
 import { buildHorizon, buildTowers, HAZE } from './surroundings';
+import m4Ref from '../../../data/reference/laguna-seca-m4.json';
+import { applyLiveAsphaltUV2 } from '../liveAsphalt';
+import { addProp } from '../propsRegistry';
 
 /**
  * Terreno: grama verde-amarelada (leafy_grass) e palha seca alaranjada (sparse_grass) misturadas por um ruído em
@@ -290,7 +293,7 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
         diffuseColor.rgb *= 0.92 + 0.16 * aNoise(gp / 7.0 + 3.0);`
       );
   };
-  mesh(ribbon(track, i => -S[i].wl, i => S[i].wr, 0, 4, 4), asphalt);
+  mesh(applyLiveAsphaltUV2(ribbon(track, i => -S[i].wl, i => S[i].wr, 0, 4, 4), track, m4Ref), asphalt);
   /** tinta sobre o asfalto: a textura de cor pintada + o relevo e a rugosidade do asfalto por baixo */
   const paintOn = (map: THREE.Texture, offset: number, roughness = 1) =>
     new THREE.MeshStandardMaterial({
@@ -731,8 +734,7 @@ function buildPaddock(track: Track, group: THREE.Group, heightAt: (x: number, z:
     im.castShadow = true;
     group.add(im);
   }
-  // dois guindastes amarelos (vistos no LMU atrás da T3)
-  const yellow = new THREE.MeshStandardMaterial({ color: 0xf2c200, roughness: 0.6, metalness: 0.3 });
+  // dois guindastes amarelos (vistos no LMU atrás da T3) via hero prop modular
   let cranes = 0;
   for (const poly of polys) {
     if (cranes >= 2) break;
@@ -740,17 +742,7 @@ function buildPaddock(track: Track, group: THREE.Group, heightAt: (x: number, z:
     const cz = poly.reduce((a, v) => a + v[1], 0) / poly.length;
     if (!free(cx, cz)) continue;
     const y = heightAt(cx, cz);
-    const g = new THREE.Group();
-    const base = new THREE.Mesh(new THREE.BoxGeometry(3, 2.5, 8), yellow);
-    base.position.y = 1.25;
-    const boom = new THREE.Mesh(new THREE.BoxGeometry(0.8, 26, 0.8), yellow);
-    boom.position.set(0, 13, -3);
-    boom.rotation.x = -0.45;
-    g.add(base, boom);
-    g.position.set(cx, y, cz);
-    g.rotation.y = rand() * Math.PI * 2;
-    g.traverse(o => (o.castShadow = true));
-    group.add(g);
+    addProp('crane', new THREE.Vector3(cx, y, cz), rand() * Math.PI * 2, 1, false);
     cranes++;
   }
   console.info('paddock: ' + nt + ' tendas, ' + nk + ' carretas, ' + cranes + ' guindastes em ' + polys.length + ' áreas');

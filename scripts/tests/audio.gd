@@ -42,7 +42,7 @@ func _initialize() -> void:
 			check(AudioServer.get_bus_send(idx) == &"Master", "bus %s envia para Master" % b)
 
 	var eng_idx := AudioServer.get_bus_index("Engine")
-	check(eng_idx != -1 and AudioServer.get_bus_effect_count(eng_idx) > 0, "bus Engine tem efeito cadastrado")
+	check(eng_idx != -1 and AudioServer.get_bus_effect_count(eng_idx) >= 3, "bus Engine tem LowPass + EQ6 + Compressor")
 	var lpf := audio.engine_filter
 	check(lpf != null and lpf is AudioEffectLowPassFilter, "efeito é AudioEffectLowPassFilter nativo")
 
@@ -152,7 +152,7 @@ func _initialize() -> void:
 	check(audio.wind_gain > 0.15, "vento em alta velocidade (250 km/h) audível (ganho %.2f)" % audio.wind_gain)
 	check(audio.wind_pitch > 1.0, "pitch do vento aumentado com a velocidade (%.2f)" % audio.wind_pitch)
 
-	# Batida na zebra
+	# Batida na zebra + zebra contínua (kerb_loop)
 	for w in porsche_car.wheels:
 		w.surface = Ground.KERB
 	audio.kerb_dist = 1.45
@@ -163,6 +163,87 @@ func _initialize() -> void:
 			fired_kerb = true
 			break
 	check(fired_kerb, "batida na zebra (bump_front1) acionada na zebra")
+	for step in 8:
+		audio.update(0.02)
+	check(audio.kerb_player != null and not audio.kerb_player.stream_paused and audio.kerb_gain > 0.10,
+		"zebra contínua (kerb_loop) ativa sobre a zebra (ganho %.2f)" % audio.kerb_gain)
+
+	# Volta ao asfalto -> kerb_loop deve pausar
+	for w in porsche_car.wheels:
+		w.surface = Ground.ASPHALT
+	porsche_car.vel = Vector3.ZERO
+	for step in 30:
+		audio.update(0.04)
+	check(audio.kerb_player != null and audio.kerb_player.stream_paused and audio.kerb_gain == 0.0,
+		"zebra contínua (kerb_loop) pausa ao sair da zebra")
+
+	print("\n--- Testando Efeitos Fase 3 (Raspagem, Backfire, UI; Freio/Câmbio sintéticos desativados) ---")
+	log_lines.append("\n--- Testando Efeitos Fase 3 (Raspagem, Backfire, UI; Freio/Câmbio sintéticos desativados) ---")
+
+	# Freio de carbono sintético desativado (evita som agudo/sirene nas freadas)
+	porsche_car.vel = Vector3(0, 0, -33.33) # ~120 km/h
+	porsche_car.brake_out = 0.85
+	for step in 10:
+		audio.update(0.03)
+	check(audio.brake_squeal_player == null and audio.brake_squeal_gain == 0.0,
+		"freio de carbono sintético desativado na freada (ganho %.3f)" % audio.brake_squeal_gain)
+	porsche_car.brake_out = 0.0
+
+	# Fundo raspando no asfalto (batente da suspensão)
+	audio.scrape_cooldown = 0.0
+	porsche_car.vel = Vector3(0, 0, -40.0)
+	porsche_car.wheels[0].contact = true
+	porsche_car.wheels[0].comp = float(porsche_car.wheels[0].susp.travel) + 0.015
+	porsche_car.wheels[0].comp_vel = 0.5
+	audio.update(0.016)
+	var fired_scrape := false
+	for p in audio.oneshot_pool:
+		if p.stream == audio.fx_streams.get("bottom_scrape") and p.playing:
+			fired_scrape = true
+			break
+	check(fired_scrape, "fundo raspando (bottom_scrape) acionado no batente da suspensão")
+	porsche_car.wheels[0].comp = 0.02
+	porsche_car.wheels[0].comp_vel = 0.0
+
+	# Pipocos de escape (redução em RPM alto e lift-off > 7000 RPM)
+	audio.backfire_cooldown = 0.0
+	audio.last_gear = 4
+	porsche_car.gear = 3
+	porsche_car.rpm = 6500.0
+	porsche_car.throttle_out = 0.0
+	audio.update(0.016)
+	var fired_downshift_bf := false
+	for p in audio.oneshot_pool:
+		if p.playing and p.stream in [audio.fx_streams.get("backfire_1"), audio.fx_streams.get("backfire_2"), audio.fx_streams.get("backfire_3")]:
+			fired_downshift_bf = true
+			break
+	check(fired_downshift_bf, "pipoco de escape (backfire) acionado na redução em RPM alto")
+
+	audio.backfire_cooldown = 0.0
+	audio.last_throttle = 0.90
+	porsche_car.throttle_out = 0.05
+	porsche_car.rpm = 7600.0
+	audio.update(0.016)
+	var fired_liftoff_bf := false
+	for p in audio.oneshot_pool:
+		if p.playing and p.stream in [audio.fx_streams.get("backfire_1"), audio.fx_streams.get("backfire_2"), audio.fx_streams.get("backfire_3")]:
+			fired_liftoff_bf = true
+			break
+	check(fired_liftoff_bf, "pipoco de escape (backfire) acionado ao soltar acelerador > 7000 RPM")
+
+	# Zumbido de câmbio sintético desativado
+	porsche_car.gear = 4
+	porsche_car.vel = Vector3(0, 0, -50.0) # 180 km/h
+	porsche_car.throttle_out = 1.0
+	for step in 12:
+		audio.update(0.03)
+	check(audio.gearbox_player == null and audio.gearbox_gain == 0.0,
+		"zumbido de câmbio sintético desativado em velocidade (ganho %.3f)" % audio.gearbox_gain)
+	porsche_car.vel = Vector3.ZERO
+
+	# Streams de UI e volta carregados
+	for ui_key in ["ui_click", "ui_tab", "ui_start", "lap_valid", "lap_pb"]:
+		check(audio.fx_streams.has(ui_key), "stream de UI/volta '%s' carregado em fx_streams" % ui_key)
 
 	print("\n--- Testando Todos os 13 Carros GT3 com seus Bancos Sonoros ---")
 	log_lines.append("\n--- Testando Todos os 13 Carros GT3 com seus Bancos Sonoros ---")

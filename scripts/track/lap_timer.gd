@@ -28,6 +28,9 @@ var valid := true
 var last: Lap = null
 var best: Lap = null
 var laps: Array[Lap] = []
+## referência externa opcional (ghost salvo ou telemetria Garage 61) usada para delta antes da 1ª volta fechada
+var ref_trace := PackedFloat32Array()
+var ref_time := NAN
 ## chamado a cada volta fechada (com setores completos)
 var on_lap: Callable
 ## diferença para a melhor volta no mesmo ponto da pista (s); NAN sem referência
@@ -68,6 +71,17 @@ func _ref_time(ref: PackedFloat32Array, at: float) -> float:
 	if is_nan(b):
 		return a
 	return a + (b - a) * (at / TRACE_STEP - k)
+
+
+func set_reference(trace: PackedFloat32Array, lap_time: float) -> void:
+	ref_trace = trace
+	ref_time = lap_time
+
+
+func get_active_ref_time() -> float:
+	if best != null:
+		return best.time
+	return ref_time
 
 
 func reset() -> void:
@@ -118,6 +132,9 @@ func update(dt: float, car: Car) -> void:
 			_trace[k10] = current
 		if best:
 			var ref := _ref_time(best.trace, s)
+			delta = NAN if is_nan(ref) else current - ref
+		elif ref_trace.size() > 0:
+			var ref := _ref_time(ref_trace, s)
 			delta = NAN if is_nan(ref) else current - ref
 		for k in 2:
 			var split := _splits[k]

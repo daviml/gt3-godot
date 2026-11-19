@@ -38,18 +38,29 @@ try {
   const page = await browser.newPage();
   page.on('console', m => console.log('  [página]', m.text()));
   page.on('pageerror', e => console.log('  [erro]', e.message));
+  const isPreview = process.argv.includes('--preview');
   await page.goto('http://localhost:5199/', { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => 'exportar' in window, null, { timeout: 120000 });
-  const r = await page.evaluate(() => window.exportar());
-  const rawGlb = Buffer.from(r.glb, 'base64');
-  const io = new NodeIO();
-  const doc = await io.readBinary(new Uint8Array(rawGlb));
-  await doc.transform(weld(), dedup(), prune());
-  const glb = Buffer.from(await io.writeBinary(doc));
-  writeFileSync(out(assetDir + 'cenario.glb'), glb);
-  writeFileSync(out(dataDir + 'arvores_pos.json'), JSON.stringify(r.trees));
-  console.log(`cenario.glb ${(glb.length / 1e6).toFixed(1)} MB (antes ${(rawGlb.length / 1e6).toFixed(1)} MB),`, JSON.stringify(r.stats));
-  console.log('trechos:', r.sections.join(', '));
+  if (isPreview) {
+    await page.waitForFunction(() => 'preview' in window, null, { timeout: 120000 });
+    const shots = await page.evaluate(() => window.preview());
+    const prevDir = out(`build/compare/${trackArg}/preview`);
+    mkdirSync(prevDir, { recursive: true });
+    for (const s of shots) writeFileSync(`${prevDir}/${s.name}.png`, Buffer.from(s.b64, 'base64'));
+    console.log(`preview ${trackArg}: ${shots.length} PNGs em ${prevDir}`);
+  } else {
+    await page.waitForFunction(() => 'exportar' in window, null, { timeout: 120000 });
+    const r = await page.evaluate(() => window.exportar());
+    const rawGlb = Buffer.from(r.glb, 'base64');
+    const io = new NodeIO();
+    const doc = await io.readBinary(new Uint8Array(rawGlb));
+    await doc.transform(weld(), dedup(), prune());
+    const glb = Buffer.from(await io.writeBinary(doc));
+    writeFileSync(out(assetDir + 'cenario.glb'), glb);
+    writeFileSync(out(dataDir + 'arvores_pos.json'), JSON.stringify(r.trees));
+    writeFileSync(out(dataDir + 'props.json'), JSON.stringify(r.props ?? []));
+    console.log(`cenario.glb ${(glb.length / 1e6).toFixed(1)} MB (antes ${(rawGlb.length / 1e6).toFixed(1)} MB), props: ${(r.props ?? []).length},`, JSON.stringify(r.stats));
+    console.log('trechos:', r.sections.join(', '));
+  }
 } finally {
   await browser.close();
   await server.close();

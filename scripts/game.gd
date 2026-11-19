@@ -6,9 +6,23 @@ const CFG := "user://jogo.cfg"
 const CAR_CACHE_MAX_DESKTOP := 3
 const CAR_CACHE_MAX_MOBILE := 2
 const QUALITY_LEVELS := {"Mínimo": 0, "Leve": 1, "Médio": 2, "Extremo": 3}
+const TIME_PRESETS := ["auto", "manha", "tarde", "por_do_sol", "noite"]
+const TIME_NAMES := {
+	"auto": "Automático (Relógio)",
+	"manha": "Manhã",
+	"tarde": "Tarde",
+	"por_do_sol": "Pôr do sol",
+	"noite": "Noite",
+}
 const MODES := ["sim", "arcade"]
 const MODE_NAMES := {"sim": "Simulador", "arcade": "Arcade"}
 const MODE_GRIP := {"sim": 1.0, "arcade": 2.0}
+const AUDIO_CHANNELS := {
+	"master": {"key": "volume", "default": 0.6, "buses": ["Master"]},
+	"engine": {"key": "vol_motor", "default": 1.0, "buses": ["Engine"]},
+	"tires": {"key": "vol_pneus", "default": 1.0, "buses": ["Tires", "Surface", "Wind"]},
+	"fx": {"key": "vol_fx", "default": 1.0, "buses": ["FX"]},
+}
 
 ## carro escolhido na garagem (o main.gd usa; --car=<id> na linha de comando tem prioridade)
 static var car_id := _load_car()
@@ -61,6 +75,41 @@ static func get_quality_name() -> String:
 static func get_quality_level(name := "") -> int:
 	var q_name := name if name != "" else get_quality_name()
 	return int(QUALITY_LEVELS.get(q_name, 1 if is_mobile_platform() else 3))
+
+
+static func get_time_of_day_setting() -> String:
+	var saved := String(get_setting("video", "horario", "auto"))
+	return saved if saved in TIME_PRESETS else "auto"
+
+
+static func set_time_of_day(preset: String) -> void:
+	var p := preset if preset in TIME_PRESETS else "auto"
+	set_setting("video", "horario", p)
+
+
+static func get_time_of_day_label(preset: String) -> String:
+	return String(TIME_NAMES.get(preset, "Automático (Relógio)"))
+
+
+static func resolve_time_of_day(hour_override := -1) -> String:
+	var want := ""
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--time="):
+			want = a.substr(7)
+	if want in ["manha", "tarde", "por_do_sol", "noite"]:
+		return want
+	if want == "":
+		var saved := get_time_of_day_setting()
+		if saved != "auto":
+			return saved
+	var h: int = hour_override if hour_override >= 0 else int(Time.get_time_dict_from_system().get("hour", 14))
+	if h >= 6 and h <= 11:
+		return "manha"
+	if h >= 12 and h <= 16:
+		return "tarde"
+	if h >= 17 and h <= 18:
+		return "por_do_sol"
+	return "noite"
 
 
 static func get_cars_list() -> Array:
@@ -187,6 +236,35 @@ static func erase_setting(section: String, key: String) -> void:
 	c.save(CFG)
 
 
+static func get_audio_volume(channel: String) -> float:
+	var spec: Dictionary = AUDIO_CHANNELS.get(channel, {})
+	if spec.is_empty():
+		return 1.0
+	return clampf(float(get_setting("audio", String(spec.key), float(spec.default))), 0.0, 1.0)
+
+
+static func set_audio_volume(channel: String, value: float) -> void:
+	var spec: Dictionary = AUDIO_CHANNELS.get(channel, {})
+	if spec.is_empty():
+		return
+	var v := clampf(value, 0.0, 1.0)
+	set_setting("audio", String(spec.key), v)
+	apply_audio_volumes()
+
+
+static func apply_audio_volumes() -> void:
+	for channel in AUDIO_CHANNELS:
+		var spec: Dictionary = AUDIO_CHANNELS[channel]
+		var v := get_audio_volume(channel)
+		var db := linear_to_db(maxf(v, 0.0001))
+		var muted := v <= 0.0001
+		for bus_name in spec.buses:
+			var idx := AudioServer.get_bus_index(String(bus_name))
+			if idx != -1:
+				AudioServer.set_bus_volume_db(idx, db)
+				AudioServer.set_bus_mute(idx, muted)
+
+
 static func _load_mode() -> String:
 	var args := OS.get_cmdline_user_args()
 	if "--arcade" in args:
@@ -218,6 +296,24 @@ static func is_hide_touch_controls() -> bool:
 
 static func set_hide_touch_controls(hide: bool) -> void:
 	set_setting("controles", "ocultar_toque", hide)
+
+
+static func is_ghost_enabled() -> bool:
+	return bool(get_setting("jogo", "ghost", true))
+
+
+static func set_ghost_enabled(on: bool) -> void:
+	set_setting("jogo", "ghost", on)
+
+
+static func get_brake_bias_offset(id := "") -> float:
+	var cid := id if id != "" else car_id
+	return clampf(float(get_setting("setup", "bb_" + cid, 0.0)), -0.08, 0.08)
+
+
+static func set_brake_bias_offset(offset: float, id := "") -> void:
+	var cid := id if id != "" else car_id
+	set_setting("setup", "bb_" + cid, clampf(offset, -0.08, 0.08))
 
 
 static func has_gamepad_connected() -> bool:

@@ -16,8 +16,11 @@ signal track_selected(track_id: String)
 signal nick_changed(nick: String)
 signal mode_changed(mode: String)
 signal quality_changed(name: String)
+signal time_of_day_changed(preset: String)
 signal volume_changed(v: float)
 signal assist_changed(key: String, on: bool)
+signal ghost_changed(on: bool)
+signal brake_bias_changed(offset: float)
 signal touch_mode_changed(mode: String)
 signal hide_touch_changed(hidden: bool)
 signal hud_gauge_changed(style: String)
@@ -250,6 +253,7 @@ var current_car_id := "corvette-c6r-gt3"
 var current_nick := "Piloto"
 var current_mode := "sim"
 var current_quality := "Extremo"
+var current_time_of_day := "auto"
 var current_volume := 0.6
 var current_assists := {"abs": true, "tc": true, "auto": false}
 var current_touch_mode := "padrao"
@@ -294,6 +298,13 @@ var _fps_explain_lbl: Label
 var _fps_hist: Array[int] = []
 var _driver_tab_rating_lbl: Label
 var _recenter_row: Control
+var _controls_panel: ControlsPanel
+var _hdr_focus := {}
+var _view_focus := {}
+var _default_focus_ctrl: Control
+var _pending_focus_key := ""
+var _force_focus_once := false
+static var _ui_actions_registered := false
 
 
 func _init(ctx := Context.GARAGE) -> void:
@@ -304,6 +315,7 @@ func _init(ctx := Context.GARAGE) -> void:
 	records_mode = current_mode
 	current_nick = Records.load_nick()
 	current_quality = Game.get_quality_name()
+	current_time_of_day = Game.get_time_of_day_setting()
 	current_volume = float(Game.get_setting("audio", "volume", 0.6))
 	current_assists = {
 		"abs": bool(Game.get_setting("assistencias", "abs", true)),
@@ -321,12 +333,149 @@ func _init(ctx := Context.GARAGE) -> void:
 
 
 func _ready() -> void:
+	ensure_ui_gamepad_actions()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_ui_audio = UiAudio.new()
+	add_child(_ui_audio)
+	Game.apply_audio_volumes()
 	_build_shell()
 	get_viewport().size_changed.connect(relayout)
+	if not Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
+		Input.joy_connection_changed.connect(_on_joy_connection_changed)
 	relayout()
+
+
+func _exit_tree() -> void:
+	if Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
+		Input.joy_connection_changed.disconnect(_on_joy_connection_changed)
+
+
+static func ensure_ui_gamepad_actions() -> void:
+	if _ui_actions_registered:
+		return
+	_ui_actions_registered = true
+	_add_joy_btn_to_action("ui_accept", JOY_BUTTON_A)
+	_add_joy_btn_to_action("ui_cancel", JOY_BUTTON_B)
+
+
+static func _add_joy_btn_to_action(action: String, btn: JoyButton) -> void:
+	if not InputMap.has_action(action):
+		return
+	for ev in InputMap.action_get_events(action):
+		if ev is InputEventJoypadButton and (ev as InputEventJoypadButton).button_index == btn:
+			return
+	var je := InputEventJoypadButton.new()
+	je.button_index = btn
+	je.device = -1
+	InputMap.action_add_event(action, je)
+
+
+func _on_joy_connection_changed(_device: int, connected: bool) -> void:
+	if connected:
+		_ensure_menu_focus.call_deferred(true)
+
+
+func _has_gamepad() -> bool:
+	return not Input.get_connected_joypads().is_empty()
+
+
+func _register_focus(key: String, ctrl: Control, is_header := false) -> void:
+	if ctrl == null:
+		return
+	if is_header:
+		_hdr_focus[key] = ctrl
+	else:
+		_view_focus[key] = ctrl
+
+
+func _ensure_menu_focus(force := false) -> void:
+	if not is_inside_tree() or not visible or not is_visible_in_tree():
+		return
+	var should_focus := force or _force_focus_once or _pending_focus_key != "" or _has_gamepad()
+	_force_focus_once = false
+	if not should_focus:
+		return
+	var key := _pending_focus_key
+	_pending_focus_key = ""
+	if key != "":
+		var target: Control = _view_focus.get(key, _hdr_focus.get(key, null))
+		if target != null and is_instance_valid(target) and target.is_inside_tree() and target.visible and target.focus_mode != Control.FOCUS_NONE:
+			target.grab_focus()
+			return
+	var cur := get_viewport().gui_get_focus_owner()
+	if cur != null and is_instance_valid(cur) and is_ancestor_of(cur) and cur.visible and cur.focus_mode != Control.FOCUS_NONE:
+		return
+	if _default_focus_ctrl != null and is_instance_valid(_default_focus_ctrl) and _default_focus_ctrl.is_inside_tree() and _default_focus_ctrl.visible and _default_focus_ctrl.focus_mode != Control.FOCUS_NONE:
+		_default_focus_ctrl.grab_focus()
+
+
+func _input(e: InputEvent) -> void:
+	if not visible or not is_visible_in_tree():
+		return
+	if _controls_panel != null and is_instance_valid(_controls_panel) and _controls_panel.is_capturing():
+		return
+	var is_joy_nav: bool = (e is InputEventJoypadButton and e.pressed) or (e is InputEventJoypadMotion and absf(e.axis_value) > 0.55)
+	if is_joy_nav:
+		var cur := get_viewport().gui_get_focus_owner()
+		if cur == null or not is_instance_valid(cur) or not is_ancestor_of(cur):
+			_ensure_menu_focus(true)
+			get_viewport().set_input_as_handled()
+
+
+func _unhandled_input(e: InputEvent) -> void:
+	if not visible or not is_visible_in_tree():
+		return
+	if _controls_panel != null and is_instance_valid(_controls_panel) and _controls_panel.is_capturing():
+		return
+	if not (e is InputEventJoypadButton and e.pressed):
+		return
+	match e.button_index:
+		JOY_BUTTON_B:
+			var focus_owner := get_viewport().gui_get_focus_owner()
+			if focus_owner is LineEdit:
+				focus_owner.release_focus()
+				_ensure_menu_focus(true)
+				get_viewport().set_input_as_handled()
+				return
+			if active_view != "home":
+				if active_view == "tracks":
+					_track_pick = ""
+				switch_view("home")
+				get_viewport().set_input_as_handled()
+				return
+			elif context == Context.PAUSE:
+				resumed.emit()
+				get_viewport().set_input_as_handled()
+				return
+		JOY_BUTTON_LEFT_SHOULDER, JOY_BUTTON_RIGHT_SHOULDER:
+			var delta := -1 if e.button_index == JOY_BUTTON_LEFT_SHOULDER else 1
+			if active_view == "settings":
+				var ti := SETTINGS_TABS.find(active_settings_tab)
+				var next_tab: String = SETTINGS_TABS[posmod(ti + delta, SETTINGS_TABS.size())]
+				_pending_focus_key = "settings_tab:" + next_tab
+				switch_settings_tab(next_tab)
+				get_viewport().set_input_as_handled()
+			elif active_view == "cars":
+				_step_car(delta)
+				if _cars_grid_nodes.has(current_car_id):
+					(_cars_grid_nodes[current_car_id] as Control).grab_focus()
+				get_viewport().set_input_as_handled()
+			elif active_view == "records":
+				var next_rm := "arcade" if records_mode == "sim" else "sim"
+				records_mode = next_rm
+				_pending_focus_key = "records_mode:" + next_rm
+				_rebuild_view()
+				get_viewport().set_input_as_handled()
+
+
+var _ui_audio: UiAudio
+
+
+func _play_ui(fx_name: String, vol := 0.38) -> void:
+	if _ui_audio:
+		_ui_audio.play(fx_name, vol)
 
 
 func _notification(what: int) -> void:
@@ -334,6 +483,7 @@ func _notification(what: int) -> void:
 		var vp := get_viewport().get_visible_rect().size
 		if vp.x > 0.0 and vp.y > 0.0 and (not is_equal_approx(size.x, vp.x) or not is_equal_approx(size.y, vp.y)):
 			relayout()
+		_ensure_menu_focus.call_deferred()
 
 
 ## Calcula Driver Rating (DR) e Safety Rating (SR) com base nas voltas salvas.
@@ -402,6 +552,8 @@ func configure(state: Dictionary) -> void:
 		records_mode = current_mode
 	if state.has("quality"):
 		current_quality = String(state.quality)
+	if state.has("time_of_day"):
+		current_time_of_day = String(state.time_of_day)
 	if state.has("volume"):
 		current_volume = float(state.volume)
 	if state.has("assists") and state.assists is Dictionary:
@@ -446,6 +598,8 @@ func set_selected_car(car_id: String, emit_sig := false) -> void:
 func switch_view(view: String) -> void:
 	if not (view in VIEWS):
 		view = "home"
+	if view != active_view:
+		_play_ui("ui_tab", 0.35)
 	active_view = view
 	if view == "records":
 		records_mode = current_mode
@@ -457,6 +611,8 @@ func switch_view(view: String) -> void:
 func switch_settings_tab(tab: String) -> void:
 	if not (tab in SETTINGS_TABS):
 		tab = "controls"
+	if tab != active_settings_tab or active_view != "settings":
+		_play_ui("ui_tab", 0.32)
 	active_settings_tab = tab
 	if active_view != "settings":
 		active_view = "settings"
@@ -625,6 +781,7 @@ func _rebuild_all() -> void:
 func _rebuild_header() -> void:
 	for c in _header_panel.get_children():
 		c.queue_free()
+	_hdr_focus.clear()
 
 	var lp := layout_profile
 	var hh := int(lp.header_height)
@@ -733,10 +890,17 @@ func _rebuild_header() -> void:
 	var rating := compute_driver_rating(current_mode)
 	var drv_panel := PanelContainer.new()
 	drv_panel.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	drv_panel.add_theme_stylebox_override("panel", LmuTheme.panel_style(Color(1, 1, 1, 0.06), LmuTheme.BORDER_SUBTLE, 4, 8 if compact else 10, 4))
+	var drv_base := LmuTheme.panel_style(Color(1, 1, 1, 0.06), LmuTheme.BORDER_SUBTLE, 4, 8 if compact else 10, 4)
+	var drv_focus := LmuTheme.panel_style(Color(1, 1, 1, 0.14), Color.WHITE, 4, 8 if compact else 10, 4)
+	drv_focus.set_border_width_all(2)
+	drv_panel.add_theme_stylebox_override("panel", drv_base)
+	drv_panel.focus_mode = Control.FOCUS_ALL
 	drv_panel.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	drv_panel.focus_entered.connect(func(): drv_panel.add_theme_stylebox_override("panel", drv_focus))
+	drv_panel.focus_exited.connect(func(): drv_panel.add_theme_stylebox_override("panel", drv_base))
 	drv_panel.gui_input.connect(func(e: InputEvent):
-		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+		if (e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT) or e.is_action_pressed("ui_accept"):
+			drv_panel.accept_event()
 			switch_settings_tab("driver")
 	)
 	right.add_child(drv_panel)
@@ -784,8 +948,10 @@ func _rebuild_header() -> void:
 	_mode_pill_btn.add_theme_font_size_override("font_size", roundi((10 if compact else 12) * fs))
 	LmuTheme.apply_button_styles(_mode_pill_btn, "arcade" if current_mode == "arcade" else "outline", 4, 8 if compact else 10, 4)
 	_mode_pill_btn.pressed.connect(func():
+		_pending_focus_key = "mode_pill"
 		_set_mode("arcade" if current_mode == "sim" else "sim")
 	)
+	_register_focus("mode_pill", _mode_pill_btn, true)
 	right.add_child(_mode_pill_btn)
 
 	var gear_btn := Button.new()
@@ -812,6 +978,9 @@ func _rebuild_view() -> void:
 	for c in _body_holder.get_children():
 		c.queue_free()
 	_view_root = null
+	_view_focus.clear()
+	_default_focus_ctrl = null
+	_controls_panel = null
 	_cars_grid_nodes.clear()
 	_settings_rows.clear()
 	_car_hero_brand = null
@@ -842,6 +1011,7 @@ func _rebuild_view() -> void:
 			_build_help_view()
 		_:
 			_build_home_view()
+	_ensure_menu_focus()
 
 
 func _make_padded_container(pad_x: float, pad_y: float, mouse_pass := false) -> MarginContainer:
@@ -868,18 +1038,20 @@ func _make_h_divider(alpha := 0.08) -> ColorRect:
 
 func _make_home_nav_item(title: String, text_col: Color, bar_col: Color, active_bar: bool, fs: float, is_compact: bool, sub_mode := false) -> Button:
 	var btn := Button.new()
-	btn.focus_mode = Control.FOCUS_NONE
+	btn.focus_mode = Control.FOCUS_ALL
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn.custom_minimum_size = Vector2(0, roundi(((28 if sub_mode else 34) if is_compact else (34 if sub_mode else 44)) * fs))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	for st in ["normal", "hover", "pressed", "disabled"]:
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
 		var sb := StyleBoxFlat.new()
-		sb.set_border_width_all(0)
+		sb.set_border_width_all(1 if st == "focus" else 0)
+		if st == "focus":
+			sb.border_color = Color(1, 1, 1, 0.55)
 		sb.set_corner_radius_all(3)
 		if st == "normal":
 			sb.bg_color = Color(1, 1, 1, 0.04 if active_bar else 0.0)
-		elif st == "hover":
-			sb.bg_color = Color(bar_col.r, bar_col.g, bar_col.b, 0.14) if active_bar else Color(1, 1, 1, 0.07)
+		elif st == "hover" or st == "focus":
+			sb.bg_color = Color(bar_col.r, bar_col.g, bar_col.b, 0.20 if st == "focus" else 0.14) if active_bar else Color(1, 1, 1, 0.12 if st == "focus" else 0.07)
 		else:
 			sb.bg_color = Color(1, 1, 1, 0.12)
 		btn.add_theme_stylebox_override(st, sb)
@@ -904,15 +1076,17 @@ func _make_home_nav_item(title: String, text_col: Color, bar_col: Color, active_
 	lbl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(lbl)
 
-	btn.mouse_entered.connect(func():
-		bar.color = bar_col
-		if not sub_mode:
+	var sync_nav_visual := func():
+		var hi := btn.has_focus() or btn.is_hovered()
+		bar.color = bar_col if (active_bar or hi) else Color(bar_col.r, bar_col.g, bar_col.b, 0.0)
+		if hi and not sub_mode:
 			lbl.add_theme_color_override("font_color", Color.WHITE)
-	)
-	btn.mouse_exited.connect(func():
-		bar.color = bar_col if active_bar else Color(bar_col.r, bar_col.g, bar_col.b, 0.0)
-		lbl.add_theme_color_override("font_color", text_col)
-	)
+		else:
+			lbl.add_theme_color_override("font_color", text_col)
+	btn.mouse_entered.connect(sync_nav_visual)
+	btn.mouse_exited.connect(sync_nav_visual)
+	btn.focus_entered.connect(sync_nav_visual)
+	btn.focus_exited.connect(sync_nav_visual)
 	return btn
 
 
@@ -969,13 +1143,31 @@ func _make_click_card(on_click: Callable, accent: Color, enabled := true, select
 	var hover := base.duplicate() as StyleBoxFlat
 	hover.border_color = accent
 	hover.bg_color = Color(accent, 0.16) if selected else Color(LmuTheme.BG_CHIP_HOVER, 0.92)
+	var focus_sb := base.duplicate() as StyleBoxFlat
+	focus_sb.set_border_width_all(2)
+	focus_sb.border_color = Color.WHITE if not selected else accent.lightened(0.35)
+	focus_sb.bg_color = Color(accent, 0.22) if selected else Color(LmuTheme.BG_CHIP_HOVER, 0.96)
 	card.add_theme_stylebox_override("panel", base)
 	if enabled:
+		card.focus_mode = Control.FOCUS_ALL
 		card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		card.mouse_entered.connect(func(): card.add_theme_stylebox_override("panel", hover))
-		card.mouse_exited.connect(func(): card.add_theme_stylebox_override("panel", base))
+		var sync_card := func():
+			if card.has_focus():
+				card.add_theme_stylebox_override("panel", focus_sb)
+			elif card.get_rect().has_point(card.get_local_mouse_position() + card.position) and false:
+				card.add_theme_stylebox_override("panel", hover)
+			else:
+				card.add_theme_stylebox_override("panel", base)
+		card.mouse_entered.connect(func():
+			if not card.has_focus():
+				card.add_theme_stylebox_override("panel", hover)
+		)
+		card.mouse_exited.connect(sync_card)
+		card.focus_entered.connect(func(): card.add_theme_stylebox_override("panel", focus_sb))
+		card.focus_exited.connect(sync_card)
 		card.gui_input.connect(func(ev: InputEvent):
-			if ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed:
+			if (ev is InputEventMouseButton and ev.button_index == MOUSE_BUTTON_LEFT and not ev.pressed) or ev.is_action_pressed("ui_accept"):
+				card.accept_event()
 				on_click.call()
 		)
 	return card
@@ -1134,6 +1326,9 @@ func _build_tracks_view() -> void:
 		var id := String(t.id)
 		var item := _make_click_card(_select_track_pick.bind(id), gold, true, id == _track_pick)
 		item.size_flags_horizontal = Control.SIZE_EXPAND_FILL if is_portrait else Control.SIZE_FILL
+		_register_focus("track_item:" + id, item)
+		if id == _track_pick or _default_focus_ctrl == null:
+			_default_focus_ctrl = item
 		list.add_child(item)
 		var mc := MarginContainer.new()
 		for side in ["left", "right", "top", "bottom"]:
@@ -1220,6 +1415,7 @@ func _build_tracks_view() -> void:
 
 func _select_track_pick(id: String) -> void:
 	_track_pick = id
+	_pending_focus_key = "track_item:" + id
 	_rebuild_view()
 
 
@@ -1248,6 +1444,7 @@ func _build_home_view() -> void:
 	var host: Control
 	if is_portrait:
 		var scroll := ScrollContainer.new()
+		scroll.follow_focus = true
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1288,7 +1485,9 @@ func _build_home_view() -> void:
 
 	var primary_title := "CONTINUAR NA PISTA" if context == Context.PAUSE else "RACE WEEKEND"
 	var primary_item := _make_home_nav_item(primary_title, Color.WHITE, LmuTheme.ACCENT_RED, true, hs, is_compact)
+	_default_focus_ctrl = primary_item
 	primary_item.pressed.connect(func():
+		_play_ui("ui_start", 0.45)
 		if context == Context.PAUSE:
 			resumed.emit()
 		else:
@@ -1298,7 +1497,10 @@ func _build_home_view() -> void:
 
 	if context == Context.PAUSE:
 		var restart_item := _make_home_nav_item("REINICIAR VOLTA", LmuTheme.ACCENT_AMBER, LmuTheme.ACCENT_AMBER, true, hs, is_compact)
-		restart_item.pressed.connect(func(): restart_requested.emit())
+		restart_item.pressed.connect(func():
+			_play_ui("ui_click", 0.38)
+			restart_requested.emit()
+		)
 		nav_list.add_child(restart_item)
 
 	var nav_entries := [["TROCAR CARRO", "cars"]]
@@ -1313,11 +1515,17 @@ func _build_home_view() -> void:
 
 	if context == Context.PAUSE:
 		var gar_item := _make_home_nav_item("GARAGEM 3D", LmuTheme.TEXT_SLATE, LmuTheme.ACCENT_RED, false, hs, is_compact, true)
-		gar_item.pressed.connect(func(): garage_requested.emit())
+		gar_item.pressed.connect(func():
+			_play_ui("ui_click", 0.38)
+			garage_requested.emit()
+		)
 		nav_list.add_child(gar_item)
 
 	var quit_item := _make_home_nav_item("SAIR DO JOGO" if context != Context.PAUSE else "SAIR", LmuTheme.TEXT_MUTED, LmuTheme.ACCENT_RED, false, hs, is_compact, true)
-	quit_item.pressed.connect(func(): quit_requested.emit())
+	quit_item.pressed.connect(func():
+		_play_ui("ui_click", 0.38)
+		quit_requested.emit()
+	)
 	nav_list.add_child(quit_item)
 
 	# Espaçador central em desktop/tablet/mobile_landscape para empurrar os cartões para a direita
@@ -1362,6 +1570,7 @@ func _build_cars_view() -> void:
 	var stage_parent: Control = root_col
 	if is_portrait:
 		var scroll := ScrollContainer.new()
+		scroll.follow_focus = true
 		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 		scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1429,7 +1638,8 @@ func _build_cars_view() -> void:
 	showcase.add_child(center_gap)
 
 	if context == Context.GARAGE and not is_compact and not is_portrait:
-		var hint := LmuTheme.make_label("◀ ▶ trocar  ·  Arraste no carro para girar  ·  Roda do mouse aproxima  ·  Enter pilotar", roundi(12 * fs), LmuTheme.TEXT_DIM, 500)
+		var hint_txt := "D-pad/Analógico navegar  ·  A selecionar  ·  B voltar  ·  LB/RB trocar carro" if _has_gamepad() else "◀ ▶ trocar  ·  Arraste no carro para girar  ·  Roda do mouse aproxima  ·  Enter pilotar"
+		var hint := LmuTheme.make_label(hint_txt, roundi(12 * fs), LmuTheme.TEXT_DIM, 500)
 		showcase.add_child(hint)
 
 	# Painel Lateral Direito: Modo + Ficha Técnica + Personal Best
@@ -1459,7 +1669,11 @@ func _build_cars_view() -> void:
 		mb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		mb.custom_minimum_size.y = roundi((34 if is_compact else 48) * float(lp.get("ui_scale", 1.0)))
 		LmuTheme.apply_button_styles(mb, "active" if current_mode == m_id else "outline", 4, 6, 4)
-		mb.pressed.connect(func(): _set_mode(m_id))
+		mb.pressed.connect(func():
+			_pending_focus_key = "cars_mode:" + m_id
+			_set_mode(m_id)
+		)
+		_register_focus("cars_mode:" + m_id, mb)
 		var mbv := VBoxContainer.new()
 		mbv.set_anchors_preset(Control.PRESET_FULL_RECT)
 		mbv.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -1563,9 +1777,11 @@ func _build_cars_view() -> void:
 		fb.add_theme_font_size_override("font_size", roundi((11 if is_compact else 12.5) * cfs))
 		LmuTheme.apply_button_styles(fb, "primary" if category_filter == f_id else "outline", 3, 8 if is_compact else 12, 3 if is_compact else 6)
 		fb.pressed.connect(func():
+			_pending_focus_key = "car_filter:" + f_id
 			category_filter = f_id
 			_rebuild_view()
 		)
+		_register_focus("car_filter:" + f_id, fb)
 		frow.add_child(fb)
 
 	var arow := HBoxContainer.new()
@@ -1627,6 +1843,10 @@ func _build_cars_view() -> void:
 		var chip := _create_car_chip(c, ccol, chip_h, is_compact, cfs)
 		grid.add_child(chip)
 		_cars_grid_nodes[cid] = chip
+		if cid == current_car_id:
+			_default_focus_ctrl = chip
+	if _default_focus_ctrl == null:
+		_default_focus_ctrl = _drive_btn
 
 	_refresh_cars_view_data()
 
@@ -1638,7 +1858,7 @@ func _create_car_chip(c: Dictionary, ccol: Color, chip_h: int, is_compact: bool,
 	btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	btn.custom_minimum_size = Vector2(0, chip_h)
 	btn.clip_contents = true
-	btn.focus_mode = Control.FOCUS_NONE
+	btn.focus_mode = Control.FOCUS_ALL
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	_apply_chip_style(btn, ccol, is_sel)
 	btn.pressed.connect(func(): set_selected_car(cid, true))
@@ -1667,9 +1887,14 @@ func _create_car_chip(c: Dictionary, ccol: Color, chip_h: int, is_compact: bool,
 
 
 func _apply_chip_style(btn: Button, ccol: Color, selected: bool) -> void:
-	for st in ["normal", "hover", "pressed"]:
+	for st in ["normal", "hover", "pressed", "focus"]:
 		var sb := StyleBoxFlat.new()
-		if selected:
+		if st == "focus":
+			sb.bg_color = Color(0.20, 0.23, 0.30, 0.98) if selected else LmuTheme.BG_CHIP_HOVER
+			sb.border_color = LmuTheme.ACCENT_AMBER if selected else Color.WHITE
+			sb.set_border_width_all(2)
+			sb.border_width_left = 5
+		elif selected:
 			sb.bg_color = Color(0.14, 0.16, 0.22, 0.96) if st == "normal" else Color(0.18, 0.21, 0.28, 0.98)
 			sb.border_color = Color.WHITE
 			sb.set_border_width_all(2)
@@ -1790,9 +2015,13 @@ func _build_settings_view() -> void:
 		tb.add_theme_font_size_override("font_size", roundi((13 if is_compact else 15) * cfs))
 		LmuTheme.apply_button_styles(tb, "tab_active" if active_settings_tab == tab_id else "tab_idle", 0, 14 if is_compact else 18, 8 if is_compact else 10)
 		tb.pressed.connect(func():
+			_pending_focus_key = "settings_tab:" + tab_id
 			active_settings_tab = tab_id
 			_rebuild_all()
 		)
+		_register_focus("settings_tab:" + tab_id, tb)
+		if active_settings_tab == tab_id:
+			_default_focus_ctrl = tb
 		tab_bar.add_child(tb)
 	tab_bar_wrap.add_child(_make_h_divider(0.10))
 
@@ -1809,6 +2038,7 @@ func _build_settings_view() -> void:
 		col.add_child(_settings_search_edit)
 
 	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -1869,7 +2099,9 @@ func _add_setting_row(parent: Control, title: String, desc: String, keywords: St
 	var row_panel := PanelContainer.new()
 	var is_mobile_ui := float(layout_profile.get("ui_scale", 1.0)) > 1.05
 	var pad_v := 8 if is_compact else (14 if is_mobile_ui else 10)
-	row_panel.add_theme_stylebox_override("panel", LmuTheme.panel_style(Color(1, 1, 1, 0.03), LmuTheme.BORDER_SOFT, 6, 16 if is_mobile_ui else 12, pad_v))
+	var row_base := LmuTheme.panel_style(Color(1, 1, 1, 0.03), LmuTheme.BORDER_SOFT, 6, 16 if is_mobile_ui else 12, pad_v)
+	var row_focus := LmuTheme.panel_style(Color(1, 1, 1, 0.08), Color(1, 1, 1, 0.72), 6, 16 if is_mobile_ui else 12, pad_v, LmuTheme.ACCENT_RED)
+	row_panel.add_theme_stylebox_override("panel", row_base)
 	if is_mobile_ui and not is_compact:
 		row_panel.custom_minimum_size.y = roundi(62 * fs)
 	parent.add_child(row_panel)
@@ -1890,6 +2122,14 @@ func _add_setting_row(parent: Control, title: String, desc: String, keywords: St
 
 	control.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	h.add_child(control)
+
+	var watch_nodes: Array[Node] = [control]
+	watch_nodes.append_array(control.find_children("*", "Control", true, false))
+	for wn in watch_nodes:
+		var wc := wn as Control
+		if wc != null and wc.focus_mode != Control.FOCUS_NONE:
+			wc.focus_entered.connect(func(): row_panel.add_theme_stylebox_override("panel", row_focus))
+			wc.focus_exited.connect(func(): row_panel.add_theme_stylebox_override("panel", row_base))
 
 	_settings_rows.append({
 		"node": row_panel,
@@ -1916,7 +2156,7 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 			touch_opt.custom_minimum_size = Vector2(roundi(165 * fs), roundi(36 * fs))
 			touch_opt.add_theme_font_size_override("font_size", roundi(13 * fs))
 			touch_opt.get_popup().add_theme_font_size_override("font_size", roundi(13 * fs))
-			touch_opt.focus_mode = Control.FOCUS_NONE
+			LmuTheme.apply_focus_outline(touch_opt, 4, 8, 4)
 			for tm in TOUCH_MODES:
 				touch_opt.add_item(TOUCH_MODE_NAMES[tm])
 			touch_opt.selected = maxi(0, TOUCH_MODES.find(current_touch_mode))
@@ -1958,7 +2198,7 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 			)
 
 			var hide_cb := CheckButton.new()
-			hide_cb.focus_mode = Control.FOCUS_NONE
+			LmuTheme.apply_focus_outline(hide_cb, 4, 4, 2)
 			hide_cb.button_pressed = current_hide_touch
 			hide_cb.toggled.connect(func(on: bool):
 				current_hide_touch = on
@@ -1978,6 +2218,7 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 
 			# controle e teclado configuráveis (scripts/ui/controls_panel.gd + scripts/input/bindings.gd)
 			var cp := ControlsPanel.new(fs)
+			_controls_panel = cp
 			parent.add_child(cp)
 			var show_kb := not OS.has_feature("mobile")
 			_add_setting_row(
@@ -2086,9 +2327,48 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 				q_val_lbl.text = current_quality.to_upper()
 				quality_changed.emit(current_quality)
 				_rebuild_view()
-			q_prev.pressed.connect(func(): step_quality.call(-1))
-			q_next.pressed.connect(func(): step_quality.call(1))
+			q_prev.pressed.connect(func():
+				_pending_focus_key = "graphics_q_prev"
+				step_quality.call(-1)
+			)
+			q_next.pressed.connect(func():
+				_pending_focus_key = "graphics_q_next"
+				step_quality.call(1)
+			)
+			_register_focus("graphics_q_prev", q_prev)
+			_register_focus("graphics_q_next", q_next)
 			var _unused_q_row := q_row
+
+			var tod_opt := OptionButton.new()
+			tod_opt.custom_minimum_size = Vector2(roundi(215 * fs), roundi(36 * fs))
+			tod_opt.add_theme_font_size_override("font_size", roundi(13 * fs))
+			tod_opt.get_popup().add_theme_font_size_override("font_size", roundi(13 * fs))
+			LmuTheme.apply_focus_outline(tod_opt, 4, 8, 4)
+			_register_focus("graphics_tod", tod_opt)
+			for tp in Game.TIME_PRESETS:
+				tod_opt.add_item(Game.get_time_of_day_label(tp))
+			tod_opt.selected = maxi(0, Game.TIME_PRESETS.find(current_time_of_day))
+			tod_opt.item_selected.connect(func(i: int):
+				_pending_focus_key = "graphics_tod"
+				current_time_of_day = Game.TIME_PRESETS[i]
+				Game.set_time_of_day(current_time_of_day)
+				time_of_day_changed.emit(current_time_of_day)
+				_rebuild_view()
+			)
+			var tod_desc: String
+			if current_time_of_day == "auto":
+				tod_desc = "Segue o relógio do sistema (agora: %s). Troca ao vivo na pista." % Game.get_time_of_day_label(Game.resolve_time_of_day())
+			else:
+				tod_desc = "Horário fixo: %s. Troca ao vivo na pista." % Game.get_time_of_day_label(current_time_of_day)
+			_add_setting_row(
+				parent,
+				"Horário da Pista",
+				tod_desc,
+				"horario hora dia noite manha tarde por do sol automatico relogio iluminacao farol",
+				tod_opt,
+				is_compact,
+				fs
+			)
 
 			var fps_p := PanelContainer.new()
 			fps_p.add_theme_stylebox_override("panel", LmuTheme.panel_style(Color(1, 1, 1, 0.08), LmuTheme.BORDER_SUBTLE, 4, 10, 4))
@@ -2111,7 +2391,7 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 			gauge_opt.custom_minimum_size = Vector2(roundi(215 * fs), roundi(36 * fs))
 			gauge_opt.add_theme_font_size_override("font_size", roundi(13 * fs))
 			gauge_opt.get_popup().add_theme_font_size_override("font_size", roundi(13 * fs))
-			gauge_opt.focus_mode = Control.FOCUS_NONE
+			LmuTheme.apply_focus_outline(gauge_opt, 4, 8, 4)
 			for gs in GAUGE_STYLES:
 				gauge_opt.add_item(GAUGE_NAMES[gs])
 			gauge_opt.selected = maxi(0, GAUGE_STYLES.find(current_hud_gauge))
@@ -2140,7 +2420,7 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 			for aid in aids_info:
 				var a_key: String = aid[0]
 				var cb := CheckButton.new()
-				cb.focus_mode = Control.FOCUS_NONE
+				LmuTheme.apply_focus_outline(cb, 4, 4, 2)
 				cb.button_pressed = bool(current_assists.get(a_key, false))
 				cb.toggled.connect(func(on: bool):
 					current_assists[a_key] = on
@@ -2149,42 +2429,94 @@ func _populate_settings_tab(parent: Control, is_compact: bool, fs: float) -> voi
 				)
 				_add_setting_row(parent, aid[1], aid[2], aid[3], cb, is_compact, fs)
 
-		"audio":
-			parent.add_child(LmuTheme.make_label("CONFIGURAÇÕES DE ÁUDIO", roundi(11 * fs), LmuTheme.TEXT_DIM, 800))
-			var vrow := HBoxContainer.new()
-			vrow.add_theme_constant_override("separation", 10)
-			var slider := HSlider.new()
-			slider.min_value = 0.0
-			slider.max_value = 1.0
-			slider.step = 0.05
-			slider.custom_minimum_size = Vector2(roundi((140 if is_compact else 200) * fs), roundi(26 * fs))
-			slider.value = current_volume
-			var v_lbl := LmuTheme.make_label("%d%%" % roundi(current_volume * 100.0), roundi(13 * fs), Color.WHITE, 700)
-			v_lbl.custom_minimum_size.x = roundi(44 * fs)
-			v_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			slider.value_changed.connect(func(v: float):
-				current_volume = v
-				v_lbl.text = "%d%%" % roundi(v * 100.0)
-				Game.set_setting("audio", "volume", v)
-				volume_changed.emit(v)
+			var ghost_cb := CheckButton.new()
+			LmuTheme.apply_focus_outline(ghost_cb, 4, 4, 2)
+			ghost_cb.button_pressed = Game.is_ghost_enabled()
+			ghost_cb.toggled.connect(func(on: bool):
+				Game.set_ghost_enabled(on)
+				ghost_changed.emit(on)
 			)
-			vrow.add_child(slider)
-			vrow.add_child(v_lbl)
 			_add_setting_row(
 				parent,
-				"Volume Geral",
-				"Volume dos motores gravados, pneus cantando, zebras e vento.",
-				"volume som audio efeitos",
-				vrow,
+				"Carro Fantasma (Ghost)",
+				"Exibe sua melhor volta salva como carro translúcido na pista (atalho: H).",
+				"fantasma ghost melhor volta pb referencia",
+				ghost_cb,
 				is_compact,
 				fs
 			)
+
+			var c_data := Game.get_car_data(current_car_id)
+			var base_bb := 0.58
+			if c_data.has("params") and c_data.params is Dictionary and c_data.params.has("brakes"):
+				base_bb = float(c_data.params.brakes.get("bias", 0.58))
+			var bb_off := Game.get_brake_bias_offset(current_car_id)
+			var bb_row := HBoxContainer.new()
+			bb_row.add_theme_constant_override("separation", 10)
+			var bb_slider := HSlider.new()
+			bb_slider.min_value = -0.06
+			bb_slider.max_value = 0.06
+			bb_slider.step = 0.01
+			bb_slider.custom_minimum_size = Vector2(roundi((130 if is_compact else 185) * fs), roundi(26 * fs))
+			bb_slider.value = bb_off
+			var bb_lbl := LmuTheme.make_label("%d%% F" % roundi(clampf(base_bb + bb_off, 0.45, 0.72) * 100.0), roundi(13 * fs), Color.WHITE, 700)
+			bb_lbl.custom_minimum_size.x = roundi(52 * fs)
+			bb_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			bb_slider.value_changed.connect(func(v: float):
+				bb_lbl.text = "%d%% F" % roundi(clampf(base_bb + v, 0.45, 0.72) * 100.0)
+				Game.set_brake_bias_offset(v, current_car_id)
+				brake_bias_changed.emit(v)
+			)
+			bb_row.add_child(bb_slider)
+			bb_row.add_child(bb_lbl)
 			_add_setting_row(
 				parent,
-				"Ronco do Motor & Turbo",
-				"Amostras reais sintetizadas com rotação, superfícies e corte de giro GT3.",
-				"motor ronco banco de som turbo",
-				_make_badge("ÁUDIO ESPACIAL ON", LmuTheme.ACCENT_GREEN, LmuTheme.BORDER_SUBTLE, fs),
+				"Balanço de Freio (Brake Bias)",
+				"Desloca força de frenagem para frente (+estabilidade) ou traseira (+rotação). Atalhos: [ e ].",
+				"freio brake bias balanco setup ajuste",
+				bb_row,
+				is_compact,
+				fs
+			)
+
+		"audio":
+			parent.add_child(LmuTheme.make_label("MIXER DE ÁUDIO", roundi(11 * fs), LmuTheme.TEXT_DIM, 800))
+			var mixer_specs := [
+				["master", "Volume Geral (Master)", "Controle mestre de todas as camadas sonoras do jogo.", "volume geral master som audio"],
+				["engine", "Motor", "Ronco do motor GT3 gravado, corte de giro e blip nas reduções.", "motor ronco giro escape engine"],
+				["tires", "Pneus & Superfície", "Pneus cantando em curva/freada, zebras, grama, brita e vento.", "pneus zebra grama brita vento superficie"],
+				["fx", "Efeitos & Interface", "Trocas de marcha, pipocos de escape, raspagem e cliques de menu.", "efeitos fx ui interface marcha pipoco"],
+			]
+			for ms in mixer_specs:
+				var ch_id: String = ms[0]
+				var init_val := current_volume if ch_id == "master" else Game.get_audio_volume(ch_id)
+				var vrow := HBoxContainer.new()
+				vrow.add_theme_constant_override("separation", 10)
+				var slider := HSlider.new()
+				slider.min_value = 0.0
+				slider.max_value = 1.0
+				slider.step = 0.05
+				slider.custom_minimum_size = Vector2(roundi((140 if is_compact else 200) * fs), roundi(26 * fs))
+				slider.value = init_val
+				var v_lbl := LmuTheme.make_label("%d%%" % roundi(init_val * 100.0), roundi(13 * fs), Color.WHITE, 700)
+				v_lbl.custom_minimum_size.x = roundi(44 * fs)
+				v_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+				slider.value_changed.connect(func(v: float):
+					v_lbl.text = "%d%%" % roundi(v * 100.0)
+					Game.set_audio_volume(ch_id, v)
+					if ch_id == "master":
+						current_volume = v
+						volume_changed.emit(v)
+				)
+				vrow.add_child(slider)
+				vrow.add_child(v_lbl)
+				_add_setting_row(parent, ms[1], ms[2], ms[3], vrow, is_compact, fs)
+			_add_setting_row(
+				parent,
+				"Motor GT3 & Superfícies",
+				"Bancos gravados reais com crossfade por RPM, filtro dinâmico de carga e buses separadas.",
+				"motor ronco banco de som",
+				_make_badge("MIXER 4 CANAIS", LmuTheme.ACCENT_GREEN, LmuTheme.BORDER_SUBTLE, fs),
 				is_compact,
 				fs
 			)
@@ -2269,9 +2601,13 @@ func _build_records_view() -> void:
 		b.add_theme_font_size_override("font_size", roundi((11.5 if is_compact else 13.5) * cfs))
 		LmuTheme.apply_button_styles(b, "primary" if records_mode == rm_id else "outline", 4, 14, 7)
 		b.pressed.connect(func():
+			_pending_focus_key = "records_mode:" + rm_id
 			records_mode = rm_id
 			_rebuild_view()
 		)
+		_register_focus("records_mode:" + rm_id, b)
+		if records_mode == rm_id:
+			_default_focus_ctrl = b
 		m_switch.add_child(b)
 
 	# Comparação pessoal do piloto no carro atual
@@ -2300,6 +2636,7 @@ func _build_records_view() -> void:
 	var recs: Array = Records.ranking(15, records_mode, remote)
 
 	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -2405,6 +2742,7 @@ func _build_help_view() -> void:
 	col.add_child(LmuTheme.make_label("GUIA DE CONTROLES & PILOTAGEM", roundi((19 if is_compact else 26) * cfs), Color.WHITE, 800))
 
 	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -2420,7 +2758,7 @@ func _build_help_view() -> void:
 		[
 			"⌨️ CONTROLES",
 			"Teclado: W/S ou ↑/↓ aceleram e freiam · A/D ou ←/→ esterçam · E/Shift sobe marcha · Q/Ctrl reduz.\n\n" +
-			"Atalhos: C = câmera · R = voltar ao grid · P = piloto automático · T = telemetria · F1 = qualidade · Esc = menu.\n\n" +
+			"Atalhos: C = câmera · L = faróis · R = voltar ao grid · P = piloto automático · T = telemetria · F1 = qualidade · Esc = menu.\n\n" +
 			"Gamepad: RT/LT pedais · Analógico volante · RB/A e LB/X marchas · Y câmera · Back grid · Start menu.\n\n" +
 			"Celular: 4 modos (Padrão, Fly-by-wire, Inclinar com acelerômetro e Legacy)."
 		],
@@ -2462,6 +2800,7 @@ func _build_help_view() -> void:
 	back_btn.add_theme_font_size_override("font_size", roundi((12.5 if is_compact else 14) * cfs))
 	LmuTheme.apply_button_styles(back_btn, "outline", 4, 16, 8)
 	back_btn.pressed.connect(func(): switch_view("home"))
+	_default_focus_ctrl = back_btn
 	footer.add_child(back_btn)
 
 

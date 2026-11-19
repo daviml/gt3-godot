@@ -87,13 +87,12 @@ function buildSausage(track: Track, group: THREE.Group) {
   for (let k = 0; k < 2; k++) {
     const s = S[(i0 + k) % N];
     const off = -(s.wl + s.kerbL + 0.7);
-    const geo = new THREE.CylinderGeometry(0.3, 0.3, 1.9, 10, 1, false, 0, Math.PI);
+    const geo = new THREE.CylinderGeometry(0.28, 0.28, 2.2, 10, 1, false, 0, Math.PI);
     const m = new THREE.Mesh(geo, mat);
-    m.position.copy(s.p).addScaledVector(s.r, off).addScaledVector(s.n, -0.02);
-    // deitada ao longo da pista, com a parte curva para cima
-    const ax = new THREE.Matrix4().makeBasis(s.r, s.t, new THREE.Vector3().crossVectors(s.r, s.t).negate());
+    m.position.copy(s.p).addScaledVector(s.r, off).addScaledVector(s.n, -0.04);
+    // deitada ao longo da pista (eixo Y = tangente s.t), com o lado arredondado (+X) para cima (normal s.n)
+    const ax = new THREE.Matrix4().makeBasis(s.n, s.t, new THREE.Vector3().crossVectors(s.n, s.t).normalize());
     m.quaternion.setFromRotationMatrix(ax);
-    m.rotateY(Math.PI / 2);
     m.castShadow = true;
     m.userData.essential = true;
     group.add(m);

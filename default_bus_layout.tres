@@ -5,6 +5,23 @@ resource_name = "LowPassFilter"
 cutoff_hz = 15000.0
 resonance = 0.7
 
+[sub_resource type="AudioEffectEQ6" id="AudioEffectEQ6_1"]
+resource_name = "EngineEQ6"
+band_db/32_hz = 1.5
+band_db/100_hz = 3.0
+band_db/320_hz = 1.5
+band_db/1000_hz = -1.0
+band_db/3200_hz = 2.5
+band_db/10000_hz = 1.0
+
+[sub_resource type="AudioEffectCompressor" id="AudioEffectCompressor_1"]
+resource_name = "EngineCompressor"
+threshold = -14.0
+ratio = 3.2
+gain = 2.0
+attack_us = 2500.0
+release_ms = 90.0
+
 [resource]
 bus/1/name = &"Engine"
 bus/1/solo = false
@@ -14,6 +31,10 @@ bus/1/volume_db = 0.0
 bus/1/send = &"Master"
 bus/1/effect/0/effect = SubResource("AudioEffectLowPassFilter_1")
 bus/1/effect/0/enabled = true
+bus/1/effect/1/effect = SubResource("AudioEffectEQ6_1")
+bus/1/effect/1/enabled = true
+bus/1/effect/2/effect = SubResource("AudioEffectCompressor_1")
+bus/1/effect/2/enabled = true
 bus/2/name = &"Tires"
 bus/2/solo = false
 bus/2/mute = false

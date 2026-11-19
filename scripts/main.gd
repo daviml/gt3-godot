@@ -20,11 +20,16 @@ var track_view: TrackView
 var car: Car
 var car_view: CarView
 var car_audio: CarAudio
+var ghost_car: GhostCar
 var cam: Camera3D
 var chase: ChaseCamera
 var speed_blur: SpeedBlur
 var env: Environment
 var sun: DirectionalLight3D
+var _sky_mat: ShaderMaterial
+var _time_preset := "tarde"
+var _headlights_on := false
+var _headlights_manual := false
 var hud: Hud
 var menu: PauseMenu
 ## preset gráfico atual (PauseMenu.QUALITIES): Leve / Médio / Extremo
@@ -120,9 +125,13 @@ func setup_step_car(preloaded_streams: Dictionary = {}) -> void:
 func setup_step_hud_and_quality() -> void:
 	timer = LapTimer.new(track)
 	timer.on_lap = _on_lap
+	ghost_car = GhostCar.new()
+	add_child(ghost_car)
+	ghost_car.setup(Game.track_id, car_id, mode, timer)
 	remote_records = Records.RemoteClient.new()
 	add_child(remote_records)
 	_build_hud()
+	_apply_time_of_day()
 	# assistências e volume guardados no menu de pausa (user://jogo.cfg)
 	for key in ["abs", "tc", "auto"]:
 		car.assists[key] = bool(Game.get_setting("assistencias", key, car.assists[key]))
@@ -201,6 +210,7 @@ func _build_env(sky_tex: Texture2D = null) -> void:
 	if sky_tex == null:
 		sky_tex = load("res://assets/sky/ceu_2k.hdr")
 	sky_mat.set_shader_parameter("pano", sky_tex)
+	_sky_mat = sky_mat
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	var q_lvl := Game.get_quality_level()
@@ -252,6 +262,94 @@ func _build_env(sky_tex: Texture2D = null) -> void:
 	sun.light_angular_distance = 0.5
 	add_child(sun)
 	sun.look_at_from_position(sun_dir * 100.0, Vector3.ZERO, Vector3.UP)
+	_apply_time_of_day()
+
+
+func _apply_time_of_day(preset := "") -> void:
+	var resolved := Game.resolve_time_of_day() if (preset == "" or preset == "auto") else preset
+	_time_preset = resolved
+	var elev := SUN_ELEV
+	var sun_col := Color(1.0, 0.91, 0.78)
+	var sun_energy := 2.8
+	var amb_energy := 1.0
+	var fog_col := Color(0.72, 0.78, 0.85)
+	var fog_dens := 0.00035
+	var sky_tint := Color.WHITE
+	var sky_exp := 1.0
+	var hor_col := Color(0.04, 0.08, 0.16)
+	var hor_mix := 0.45
+	var sky_night := 0.0
+	var night_amt := 0.0
+	var hor_tint := Color.WHITE
+	var hor_bright := 1.0
+
+	match resolved:
+		"manha":
+			elev = deg_to_rad(28.0)
+			sun_col = Color(1.0, 0.94, 0.86)
+			sun_energy = 2.1
+			amb_energy = 1.05
+			fog_col = Color(0.76, 0.82, 0.90)
+			fog_dens = 0.00055
+			sky_tint = Color(0.96, 0.98, 1.04)
+			sky_exp = 0.95
+			hor_col = Color(0.08, 0.12, 0.20)
+			hor_mix = 0.50
+			hor_tint = Color(0.92, 0.95, 1.02)
+			hor_bright = 0.92
+		"por_do_sol":
+			elev = deg_to_rad(10.0)
+			sun_col = Color(1.0, 0.58, 0.28)
+			sun_energy = 2.2
+			amb_energy = 0.85
+			fog_col = Color(0.78, 0.48, 0.34)
+			fog_dens = 0.00048
+			sky_tint = Color(1.08, 0.72, 0.52)
+			sky_exp = 0.82
+			hor_col = Color(0.45, 0.18, 0.08)
+			hor_mix = 0.75
+			sky_night = 0.35
+			night_amt = 0.4
+			hor_tint = Color(1.0, 0.62, 0.42)
+			hor_bright = 0.55
+		"noite":
+			elev = deg_to_rad(32.0)
+			sun_col = Color(0.62, 0.74, 1.0)
+			sun_energy = 0.25
+			amb_energy = 0.32
+			fog_col = Color(0.05, 0.07, 0.12)
+			fog_dens = 0.00042
+			sky_tint = Color(0.16, 0.22, 0.38)
+			sky_exp = 0.22
+			hor_col = Color(0.02, 0.04, 0.09)
+			hor_mix = 0.65
+			sky_night = 1.0
+			night_amt = 1.0
+			hor_tint = Color(0.28, 0.34, 0.52)
+			hor_bright = 0.18
+
+	if sun:
+		var phi := (SUN_U - 0.5) * TAU
+		var sun_dir := Vector3(cos(phi) * cos(elev), sin(elev), sin(phi) * cos(elev))
+		sun.light_color = sun_col
+		sun.light_energy = sun_energy
+		sun.look_at_from_position(sun_dir * 100.0, Vector3.ZERO, Vector3.UP)
+	if env:
+		env.ambient_light_energy = amb_energy
+		env.fog_light_color = fog_col
+		env.fog_density = fog_dens
+	if _sky_mat:
+		_sky_mat.set_shader_parameter("sky_tint", Vector3(sky_tint.r, sky_tint.g, sky_tint.b))
+		_sky_mat.set_shader_parameter("sky_exposure", sky_exp)
+		_sky_mat.set_shader_parameter("horizon_color", Vector3(hor_col.r, hor_col.g, hor_col.b))
+		_sky_mat.set_shader_parameter("horizon_mix", hor_mix)
+		_sky_mat.set_shader_parameter("night_amount", sky_night)
+	if track_view:
+		track_view.set_night_amount(night_amt, hor_tint, hor_bright)
+	if not _headlights_manual:
+		_headlights_on = resolved in ["por_do_sol", "noite"]
+	if car_view:
+		car_view.headlights_on = _headlights_on
 
 
 # ------------------------------------------------------------------ carro
@@ -263,9 +361,12 @@ func _build_car(preloaded_streams: Dictionary = {}, start_paused := false) -> vo
 	# visual do carro (modelo, materiais, rodas com pinça parada e desfoque): scripts/render/car_view.gd
 	var q_lvl := Game.get_quality_level()
 	car_view = CarView.new(car_id, q_lvl >= 2, q_lvl == 0)
+	car_view.beam_spotlight_enabled = q_lvl >= 2
+	car_view.headlights_on = _headlights_on
 	add_child(car_view)
 	car_data = car_view.data
 	car = Car.new(track, car_data.params)
+	car.set_brake_bias_offset(Game.get_brake_bias_offset(car_id))
 	# som do carro (etapa 11): motor engine-sim, turbo, pneu, superfícies e vento
 	car_audio = CarAudio.new(car, car_id, preloaded_streams)
 	if start_paused:
@@ -273,8 +374,8 @@ func _build_car(preloaded_streams: Dictionary = {}, start_paused := false) -> vo
 	add_child(car_audio)
 
 
-func _update_car_view(frac := 1.0) -> void:
-	car_view.update_from(car, frac)
+func _update_car_view(frac := 1.0, dt := 0.016) -> void:
+	car_view.update_from(car, frac, dt)
 
 
 # ------------------------------------------------------------------ HUD e menu (etapa 10)
@@ -351,8 +452,20 @@ func _build_hud() -> void:
 		_toast("Modo: " + String(Game.MODE_NAMES.get(m, m)))
 	)
 	menu.quality_changed.connect(_apply_quality)
+	menu.time_of_day_changed.connect(func(preset: String):
+		_headlights_manual = false
+		_apply_time_of_day(preset)
+		_toast("Horário: " + Game.get_time_of_day_label(_time_preset))
+	)
 	menu.volume_changed.connect(_set_volume)
 	menu.assist_changed.connect(func(key: String, on: bool): car.assists[key] = on)
+	menu.ghost_changed.connect(func(on: bool):
+		if ghost_car:
+			ghost_car.enabled = on
+	)
+	menu.brake_bias_changed.connect(func(off: float):
+		car.set_brake_bias_offset(off)
+	)
 	menu.hud_gauge_changed.connect(func(style: String): hud.set_gauge_style(style))
 	menu.touch_mode_changed.connect(func(tm: String):
 		input.touch_mode = tm
@@ -394,6 +507,8 @@ func _spawn() -> void:
 	_was_valid = true
 	if car_audio:
 		car_audio.reset()
+	if ghost_car:
+		ghost_car.reset_recording()
 
 
 func _refresh_records() -> void:
@@ -413,6 +528,8 @@ func _apply_mode(m: String, reset_car := true) -> void:
 	best_sectors = []
 	if hud:
 		hud.best_sectors = best_sectors
+	if ghost_car:
+		ghost_car.setup(Game.track_id, car_id, mode, timer)
 	shared_records = []
 	has_shared_records = false
 	_refresh_records()
@@ -457,8 +574,13 @@ func _on_lap(lap: LapTimer.Lap) -> void:
 				best_sectors.append(lap.sectors[i])
 			else:
 				best_sectors[i] = minf(best_sectors[i], lap.sectors[i])
+	if car_audio and lap.valid:
+		var is_session_pb := (timer != null and timer.best == lap)
+		car_audio.play_oneshot("lap_pb" if is_session_pb else "lap_valid", 0.50 if is_session_pb else 0.42)
 	if autopilot:
 		return
+	if ghost_car:
+		ghost_car.on_lap_completed(lap, timer)
 	var clean_nick := nick.strip_edges()
 	if clean_nick == "":
 		clean_nick = Records.load_nick()
@@ -525,11 +647,13 @@ func _physics_process(dt: float) -> void:
 
 func _process(dt: float) -> void:
 	var frac := Engine.get_physics_interpolation_fraction()
-	_update_car_view(frac)
+	_update_car_view(frac, 0.0 if paused else dt)
 	if not paused:
 		rumble.update(car, dt)
 		if car_audio:
 			car_audio.update(dt)
+		if ghost_car:
+			ghost_car.update_frame(car, timer)
 	if shot_dir != "":
 		_shot_tick(dt)
 	chase.update(dt, frac)
@@ -593,6 +717,28 @@ func _unhandled_input(e: InputEvent) -> void:
 					car.assists.auto = true
 			KEY_T:
 				hud.telemetry = not hud.telemetry
+			KEY_L:
+				_headlights_manual = true
+				_headlights_on = not _headlights_on
+				if car_view:
+					car_view.headlights_on = _headlights_on
+				_toast("Faróis " + ("ligados" if _headlights_on else "desligados"))
+			KEY_H:
+				var g_on := not Game.is_ghost_enabled()
+				Game.set_ghost_enabled(g_on)
+				if ghost_car:
+					ghost_car.enabled = g_on
+				_toast("Fantasma " + ("ligado" if g_on else "desligado"))
+			KEY_BRACKETLEFT:
+				var bb_off := clampf(Game.get_brake_bias_offset(car_id) - 0.01, -0.06, 0.06)
+				Game.set_brake_bias_offset(bb_off, car_id)
+				car.set_brake_bias_offset(bb_off)
+				_toast("Freio dianteiro: %d%%" % roundi(float(car.p.brake_bias) * 100.0))
+			KEY_BRACKETRIGHT:
+				var bb_off := clampf(Game.get_brake_bias_offset(car_id) + 0.01, -0.06, 0.06)
+				Game.set_brake_bias_offset(bb_off, car_id)
+				car.set_brake_bias_offset(bb_off)
+				_toast("Freio dianteiro: %d%%" % roundi(float(car.p.brake_bias) * 100.0))
 			KEY_1:
 				car.assists.abs = not car.assists.abs
 				_toast("ABS " + ("ligado" if car.assists.abs else "desligado"))
@@ -659,10 +805,13 @@ func _switch_car(new_id: String) -> void:
 		car_view.queue_free()
 	var q_lvl := Game.get_quality_level()
 	car_view = CarView.new(car_id, q_lvl >= 2, q_lvl == 0)
+	car_view.beam_spotlight_enabled = q_lvl >= 2
+	car_view.headlights_on = _headlights_on
 	add_child(car_view)
 	car_data = car_view.data
 
 	car = Car.new(track, car_data.params)
+	car.set_brake_bias_offset(Game.get_brake_bias_offset(car_id))
 	car.assists = prev_assists
 	car.grip_scale = prev_grip
 
@@ -682,6 +831,8 @@ func _switch_car(new_id: String) -> void:
 		hud.dash = (car_id in Hud.DASH_CARS)
 		hud.dash_on = hud.dash
 	bot = _create_bot()
+	if ghost_car:
+		ghost_car.setup(Game.track_id, car_id, mode, timer)
 	_spawn()
 	_update_car_view(1.0)
 	if chase:
@@ -737,7 +888,8 @@ func _toast(t: String) -> void:
 func _set_volume(v: float) -> void:
 	volume = clampf(v, 0.0, 1.0)
 	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(volume, 0.0001)))
-	AudioServer.set_bus_mute(0, volume <= 0.0)
+	AudioServer.set_bus_mute(0, volume <= 0.0001)
+	Game.apply_audio_volumes()
 
 
 const PRESET_INDEX := {"Mínimo": 0, "Leve": 1, "Médio": 2, "Extremo": 3}
@@ -758,6 +910,8 @@ func _apply_quality(name: String) -> void:
 ## 3 = Extremo (PC com GPU: SSAO, SSIL, SSR, sombras 4 cortes).
 func _set_quality(level: int) -> void:
 	high = level > 1
+	if car_audio:
+		car_audio.set_quality(level)
 	var vp := get_viewport()
 	var is_mobile := Game.is_mobile_platform()
 	var is_compat := Game.is_compatibility_renderer()
@@ -854,6 +1008,7 @@ func _set_quality(level: int) -> void:
 		car_view.blur_enabled = level >= 2
 		car_view.simple_materials = level == 0
 		car_view.blob_shadow_enabled = level == 0
+		car_view.beam_spotlight_enabled = level >= 2
 
 	# 8. Física e HUD por orçamento (Mínimo limita sub-passos a 4 / 240 Hz mesmo no Desktop)
 	if car:

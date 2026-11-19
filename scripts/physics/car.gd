@@ -44,6 +44,7 @@ class Wheel:
 	var abs_active := false
 
 var ground: Ground
+var base_brake_bias := 0.58
 var assists := {"abs": true, "tc": true, "auto": false, "brake_reverse": false}
 var grip_scale: float = 1.0
 ## Máximo de sub-passos por tick de 60 Hz (4 no mobile/Mínimo = 240 Hz; 8 no Desktop = 480 Hz)
@@ -63,6 +64,7 @@ var shift_timer := 0.0
 var clutch_locked := false
 var tc_cut := 0.0
 var throttle_out := 0.0
+var brake_out := 0.0
 var hint := -1
 var kappa_peak := 0.0
 var alpha_peak := 0.0
@@ -129,6 +131,7 @@ func _init(g: Ground, params: Dictionary) -> void:
 	kappa_peak = _peak_slip(p.b_long, p.c_long, p.e_long)
 	alpha_peak = _peak_slip(p.b_lat, p.c_lat, p.e_lat)
 	max_steer = deg_to_rad(p.steer_deg)
+	base_brake_bias = float(p.brake_bias)
 	rpm = p.idle
 	var a: float = p.wheelbase * (1.0 - p.wf)
 	var b: float = p.wheelbase * p.wf
@@ -230,6 +233,10 @@ func visual_basis(frac: float) -> Basis:
 
 func speed() -> float:
 	return vel.length()
+
+
+func set_brake_bias_offset(offset: float) -> void:
+	p.brake_bias = clampf(base_brake_bias + clampf(offset, -0.08, 0.08), 0.45, 0.72)
 
 
 func fwd_speed() -> float:
@@ -402,6 +409,7 @@ func _single_step(dt: float, steer_in: float, throttle_in: float, brake_in: floa
 	tc_cut = minf(0.9, tc_cut + dt * 15.0) if assists.tc and rear_over else maxf(0.0, tc_cut - dt * 3.0)
 	var throttle := throttle_in * (1.0 - tc_cut)
 	throttle_out = throttle
+	brake_out = clampf(brake_in, 0.0, 1.0)
 	var diff_in := _drivetrain(throttle, dt)
 	var Gr := gear_ratio(gear)
 	var reflected: float = p.eng_inertia * Gr * Gr / 2.0 if clutch_locked else 0.0

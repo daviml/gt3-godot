@@ -280,21 +280,8 @@ func _unhandled_input(e: InputEvent) -> void:
 				else:
 					get_tree().quit()
 	elif e is InputEventJoypadButton and e.pressed:
-		match e.button_index:
-			JOY_BUTTON_DPAD_LEFT, JOY_BUTTON_LEFT_SHOULDER:
-				if cur_view == "cars":
-					_nav_dir = -1
-					_show(idx - 1)
-			JOY_BUTTON_DPAD_RIGHT, JOY_BUTTON_RIGHT_SHOULDER:
-				if cur_view == "cars":
-					_nav_dir = 1
-					_show(idx + 1)
-			JOY_BUTTON_A, JOY_BUTTON_START:
-				if cur_view == "home" or cur_view == "cars":
-					_drive()
-			JOY_BUTTON_B:
-				if lmu_menu and lmu_menu.active_view != "home":
-					lmu_menu.switch_view("home")
+		if e.button_index == JOY_BUTTON_START and cur_view == "home":
+			_drive()
 	elif cur_view == "cars" and studio:
 		studio.handle_drag_event(e)
 

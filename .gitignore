@@ -11,9 +11,19 @@ assets/cars/*/*.png.import
 *.mp4
 *.mp4.import
 INTERLAGOS-IN-LE-MANS-ULTIMATE-LMGT3-Track.mp4
-# texturas extraídas do cenário da pista ao importar
+# texturas extraídas do cenário da pista e hero props ao importar (mantendo horizonte.png)
 assets/track/*.png
 assets/track/*.png.import
+assets/tracks/*/*.png
+assets/tracks/*/*.png.import
+!assets/tracks/*/horizonte.png
+!assets/tracks/*/horizonte.png.import
+assets/tracks/*/*.jpg
+assets/tracks/*/*.jpg.import
+assets/props/*/*.png
+assets/props/*/*.png.import
+assets/props/*/*.jpg
+assets/props/*/*.jpg.import
 # exportação (etapa 14)
 build/
 deploy/vercel/index.pck

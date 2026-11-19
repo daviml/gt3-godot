@@ -48,7 +48,6 @@ func _exit_tree() -> void:
 func _btn(text: String, kind := "outline") -> Button:
 	var b := Button.new()
 	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_size_override("font_size", roundi(12 * fs))
 	LmuTheme.apply_button_styles(b, kind, 4, 12, 6)
 	return b
@@ -79,7 +78,7 @@ func make_device_picker() -> Control:
 	_device_opt.custom_minimum_size = Vector2(roundi(220 * fs), roundi(36 * fs))
 	_device_opt.add_theme_font_size_override("font_size", roundi(13 * fs))
 	_device_opt.get_popup().add_theme_font_size_override("font_size", roundi(13 * fs))
-	_device_opt.focus_mode = Control.FOCUS_NONE
+	LmuTheme.apply_focus_outline(_device_opt, 4, 8, 4)
 	_device_opt.item_selected.connect(_on_device_selected)
 	v.add_child(_device_opt)
 	_device_badge = LmuTheme.make_label("", roundi(11 * fs), LmuTheme.TEXT_MUTED, 600)
@@ -145,7 +144,7 @@ func make_slider(key: String, lo: float, hi: float, step: float, value: float, f
 	s.max_value = hi
 	s.step = step
 	s.value = value
-	s.focus_mode = Control.FOCUS_NONE
+	s.focus_mode = Control.FOCUS_ALL
 	s.custom_minimum_size = Vector2(roundi(150 * fs), roundi(24 * fs))
 	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	var l := LmuTheme.make_label(fmt % value, roundi(13 * fs), Color.WHITE, 700)

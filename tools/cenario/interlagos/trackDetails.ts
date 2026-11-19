@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
+import { addProp } from '../propsRegistry';
 
 export type AdScheme = 'verde' | 'vermelho' | 'amarelo' | 'branco' | 'azul' | 'avis';
 type Kind = 'rail' | 'wall' | 'tecpro' | 'tecpro2' | 'rolex_pad';
@@ -619,10 +620,10 @@ function buildMotulGantry(track: Track, group: THREE.Group, renderer: THREE.WebG
   const beam = new THREE.Mesh(new THREE.BoxGeometry(span, 1.5, 0.5), [steel, steel, steel, steel, ad, ad]);
   beam.position.set(0, h, 0);
   g.add(beam);
+  const center = s.p.clone().addScaledVector(s.r, (s.wallR - s.wallL) / 2);
+  const rotY = Math.atan2(-s.r.z, s.r.x);
   for (const x of [-span / 2 + 0.4, span / 2 - 0.4]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.45, h + 0.8, 0.45), steel);
-    leg.position.set(x, (h + 0.8) / 2, 0);
-    g.add(leg);
+    addProp('gantry_tower', center.clone().addScaledVector(s.r, x), rotY, 1, false);
   }
   g.traverse(o => {
     o.castShadow = true;

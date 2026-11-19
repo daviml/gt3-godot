@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
+import { addProp } from '../propsRegistry';
 
 /** volta de referência das tabelas (m): Laguna Seca */
 const LAP = 3598;
@@ -577,33 +578,20 @@ function buildOneBridge(
     for (const x of [-half * 0.25, half * 0.25]) beam(V(x, H * 0.6 + 1.3, 0), V(x * 1.2, H * 0.92, 0), 0.08, mats.steel);
     for (const x of [-half, half]) box(2.4, 1.2, 4, x, 0.6, 0, mats.concrete);
   } else if (kind === 'truss') {
-    // passarela: tabuleiro, duas faces de treliça (banzos, montantes e diagonais), torres de escada nas pontas
+    // passarela modular (corkscrew_bridge + gantry_tower via Blender hero props) + placa com o texto
     const h = 7.2;
     const hh = 2.3;
-    box(span, 0.5, 2.8, 0, h, 0, mats.light);
-    const n = Math.max(4, Math.round(span / 3));
-    for (const z of [-1.35, 1.35]) {
-      beam(V(-half, h + 0.25, z), V(half, h + 0.25, z), 0.25, mats.light);
-      beam(V(-half, h + hh, z), V(half, h + hh, z), 0.25, mats.light);
-      for (let k = 0; k <= n; k++) {
-        const x = -half + (span * k) / n;
-        beam(V(x, h + 0.25, z), V(x, h + hh, z), 0.14, mats.light);
-        if (k < n) {
-          const x2 = -half + (span * (k + 1)) / n;
-          beam(k % 2 ? V(x, h + 0.25, z) : V(x, h + hh, z), k % 2 ? V(x2, h + hh, z) : V(x2, h + 0.25, z), 0.1, mats.light);
-        }
-      }
-    }
-    for (let k = 0; k <= n; k += 2) {
-      const x = -half + (span * k) / n;
-      beam(V(x, h + hh, -1.35), V(x, h + hh, 1.35), 0.12, mats.light);
-    }
+    const rh = new THREE.Vector3(s.r.x, 0, s.r.z).normalize();
+    const center = s.p.clone().addScaledVector(rh, (s.wallR - s.wallL) / 2);
+    const rotY = Math.atan2(-rh.z, rh.x);
+    addProp('corkscrew_bridge', new THREE.Vector3(center.x, center.y + h, center.z), rotY, new THREE.Vector3(span, 1, 1), true);
+    addProp('gantry_tower', center.clone().addScaledVector(rh, -half - 0.6), rotY, 1, true);
+    addProp('gantry_tower', center.clone().addScaledVector(rh, half + 0.6), rotY, 1, true);
     if (t1) {
       const sign = signMaterial(renderer, t1, t2, '#f4f4f2', '#14306b', '#c8102e');
       const w = Math.min(16, span * 0.45);
       box(w, w * 0.19, 0.25, 0, h + hh + 0.4 + w * 0.095, 0, [mats.light, mats.light, mats.light, mats.light, sign, sign]);
     }
-    for (const x of [-half - 1.6, half + 1.6]) box(3.2, h + 2.6, 3.6, x, (h + 2.6) / 2, 0, mats.concrete);
   } else {
     // viaduto de estrada: tabuleiro largo de concreto com guarda-corpo e pilares nas pontas
     const h = 7.6;

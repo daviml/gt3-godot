@@ -32,6 +32,16 @@ static func read_horizon() -> Dictionary:
 var towers := 0
 var preloaded_towers: Array = []
 var preloaded_horizon: Dictionary = {}
+var _torre_mat: ShaderMaterial
+var _horizonte_mat: ShaderMaterial
+
+
+func set_night_amount(amount: float, horizon_tint := Color.WHITE, horizon_brightness := 1.0) -> void:
+	if _torre_mat:
+		_torre_mat.set_shader_parameter("night_amount", amount)
+	if _horizonte_mat:
+		_horizonte_mat.set_shader_parameter("tint_color", Vector3(horizon_tint.r, horizon_tint.g, horizon_tint.b))
+		_horizonte_mat.set_shader_parameter("brightness", horizon_brightness)
 
 
 func _init() -> void:
@@ -217,6 +227,7 @@ func _build_towers() -> void:
 		mm.set_instance_custom_data(k, Color.hex((int(a[o + 7]) << 8) | 0xff).srgb_to_linear())
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/torre.gdshader")
+	_torre_mat = mat
 	var mmi := MultiMeshInstance3D.new()
 	mmi.name = "Torres"
 	mmi.multimesh = mm
@@ -254,6 +265,7 @@ func _build_horizon() -> void:
 		st.add_index(i + 3)
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://shaders/horizonte.gdshader")
+	_horizonte_mat = mat
 	if ResourceLoader.exists(horizon_tex_path()):
 		mat.set_shader_parameter("tex", load(horizon_tex_path()))
 	var mi := MeshInstance3D.new()

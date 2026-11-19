@@ -12,18 +12,48 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { Track, TrackData } from '../../gt3-time-attack/src/track/track';
 import type { Reference } from '../../gt3-time-attack/src/track/reference';
-import { applyFit, fitLap, HZ, readLap } from '../../gt3-time-attack/scripts/ref-lib';
+import { applyFit, fitLap, HZ, outside, readLap, type Fit } from '../../gt3-time-attack/scripts/ref-lib';
+import { applyKerbs, applyWalls, clampRunoff } from './tracks/bank';
 
 const args = process.argv.slice(2).filter(a => a !== '--');
 const [trackId, inFile, outFile, label] = args;
 if (!inFile || !outFile) throw new Error('uso: npx vite-node referencia.ts -- <pista> <volta.csv> <saida.json> "<rótulo>"');
 const trackData = JSON.parse(readFileSync(new URL(`tracks/${trackId}/${trackId}.json`, import.meta.url), 'utf8'));
 const track = new Track(trackData as TrackData);
+applyKerbs(track, trackData.kerbLeft, trackData.kerbRight);
+applyWalls(track, trackData.wallLeft, trackData.wallRight);
+clampRunoff(track, trackData.maxRunoff);
 const lap = readLap(inFile, trackData.origin);
 const { n, speed, latA, longA, thr, brk, gear, rpm, steer } = lap;
-const fit = fitLap(track, lap);
+// busca inicial em grade grossa (±48 m): o GPS do iRacing pode deslocar >24 m da célula do Track.locate()
+const cx = lap.x.reduce((a, b) => a + b) / n;
+const cz = lap.z.reduce((a, b) => a + b) / n;
+let startFit: Fit = { th: 0, s: 1, dx: 0, dz: 0, cx, cz };
+let bestCoarse = Infinity;
+for (let dx = -48; dx <= 48; dx += 8) {
+  for (let dz = -48; dz <= 48; dz += 8) {
+    const cand: Fit = { th: 0, s: 1, dx, dz, cx, cz };
+    const e = outside(track, lap, cand, 0, 12);
+    if (e < bestCoarse) { bestCoarse = e; startFit = cand; }
+  }
+}
+const fit = fitLap(track, lap, startFit);
 console.log('ajuste do GPS:', fit);
 const p = new Vector3();
+
+function nearestTrackPos(pt: Vector3) {
+  const loc = track.locate(pt);
+  if (loc) return loc;
+  let bi = 0;
+  let bd = Infinity;
+  for (let k = 0; k < track.samples.length; k++) {
+    const q = track.samples[k].p;
+    const d2 = (q.x - pt.x) ** 2 + (q.z - pt.z) ** 2;
+    if (d2 < bd) { bd = d2; bi = k; }
+  }
+  const s = track.samples[bi];
+  return { s: s.s, d: (pt.x - s.p.x) * s.r.x + (pt.z - s.p.z) * s.r.z };
+}
 
 // ---- posição na pista de cada amostra (s contínuo ao longo da volta)
 const N = track.samples.length;
@@ -33,7 +63,7 @@ let off = 0;
 let last = -1;
 for (let i = 0; i < n; i++) {
   const [x, z] = applyFit(fit, lap.x[i], lap.z[i]);
-  const loc = track.locate(p.set(x, 0, z))!;
+  const loc = nearestTrackPos(p.set(x, 0, z));
   let s = loc.s + off;
   if (last >= 0 && s < last - track.length / 2) { off += track.length; s += track.length; }
   sArr.push(s);

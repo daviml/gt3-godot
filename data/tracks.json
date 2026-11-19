@@ -135,5 +135,58 @@
       }
     },
     "location": "Monterey, Califórnia, EUA"
+  },
+  {
+    "id": "imola",
+    "name": "Autodromo Internazionale Enzo e Dino Ferrari (Imola)",
+    "short": "Imola",
+    "country": "Itália",
+    "location": "Imola, Emília-Romanha, Itália",
+    "length_m": 4909,
+    "corners": 19,
+    "data_dir": "res://data/tracks/imola/",
+    "assets_dir": "res://assets/tracks/imola/",
+    "sun_u": 0.68,
+    "sun_elev": 52.0,
+    "records": {
+      "sim": "user://recordes-imola-v1.json",
+      "arcade": "user://recordes-imola-arcade-v1.json"
+    },
+    "remote_key": "imola",
+    "refs": {
+      "bmw-m4-gt3": "imola-m4",
+      "audi-r8-lms-gt3": "imola-amg",
+      "ferrari-488-gt3": "imola-m4",
+      "acura-nsx-gt3": "imola-m4"
+    },
+    "min_lap": {
+      "sim": 85.0,
+      "arcade": 60.0
+    },
+    "visual": {
+      "asfalto": {
+        "color_mul": [0.90, 0.91, 0.94],
+        "color_add": [0.020, 0.020, 0.022],
+        "fast_mul": [0.86, 0.87, 0.90],
+        "fast_add": [0.016, 0.016, 0.018]
+      },
+      "grama": {
+        "base_color": [0.36, 0.64, 0.14],
+        "dry_lo": 0.62,
+        "dry_mix": 0.35,
+        "lush_amt": 0.72,
+        "straw_tint": [0.92, 0.78, 0.30],
+        "soil_color": [0.34, 0.24, 0.14],
+        "fast_dry_lo": 0.64,
+        "fast_dry_mix": 0.30,
+        "fast_straw_tint": [0.88, 0.74, 0.28]
+      },
+      "brita": {
+        "sand_color": [0.58, 0.49, 0.36]
+      },
+      "impostor": {
+        "foliage_tint": [0.68, 0.86, 0.56]
+      }
+    }
   }
 ]

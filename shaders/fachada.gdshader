@@ -6,6 +6,7 @@ shader_type spatial;
 render_mode cull_disabled;
 
 uniform sampler2D plaster : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float night_amount = 0.0;
 
 varying vec3 wpos;
 varying vec3 wnorm;
@@ -24,6 +25,7 @@ void fragment() {
 	vec3 c = COLOR.rgb;
 	vec3 pl = texture(plaster, fac / 4.0).rgb;
 	float glass = 0.0;
+	vec3 em = vec3(0.0);
 	if (win < -0.5) {
 		c *= 0.50 + 0.35 * pl.r;
 	} else {
@@ -42,10 +44,16 @@ void fragment() {
 			c = mix(c, vec3(0.75), sill * 0.6);
 			vec3 sky = mix(vec3(0.07, 0.09, 0.12), vec3(0.35, 0.42, 0.5), h1(cell + 7.0));
 			c = mix(c, sky, glass);
+			if (night_amount > 0.01) {
+				float lit_win = step(0.55, h1(cell + vec2(11.0, 23.0)));
+				vec3 warm_col = mix(vec3(1.0, 0.74, 0.38), vec3(0.98, 0.90, 0.72), h1(cell + vec2(3.0, 19.0)));
+				em = warm_col * glass * lit_win * night_amount * 1.35;
+			}
 		}
 		c *= 0.78 + 0.22 * smoothstep(0.0, 1.6, fac.y);
 	}
 	ALBEDO = c;
+	EMISSION = em;
 	ROUGHNESS = mix(0.85, 0.12, glass);
 	SPECULAR = mix(0.5, 0.8, glass);
 }

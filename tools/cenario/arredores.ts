@@ -10,14 +10,17 @@ import { buildTrack } from '../../../gt3-time-attack/src/render/trackView';
 import { QUALITIES } from '../../../gt3-time-attack/src/render/quality';
 import interlagos from '../../../gt3-time-attack/data/tracks/interlagos.json';
 // camber opcional (só pistas com "bank"; Interlagos não tem e nada muda): a malha inclina igual à física
-import { applyBank, clampRunoff } from '../tracks/bank';
+import { applyBank, applyKerbs, applyWalls, clampRunoff } from '../tracks/bank';
 
 async function run() {
   const renderer = new THREE.WebGLRenderer();
   const scene = new THREE.Scene();
   const track = new Track(interlagos as unknown as TrackData);
-  clampRunoff(track, (interlagos as { maxRunoff?: number }).maxRunoff);
-  applyBank(track, (interlagos as { bank?: number[] }).bank);
+  const meta = interlagos as { maxRunoff?: number; bank?: number[]; wallLeft?: number[]; wallRight?: number[]; kerbLeft?: number[]; kerbRight?: number[] };
+  applyKerbs(track, meta.kerbLeft, meta.kerbRight);
+  applyWalls(track, meta.wallLeft, meta.wallRight);
+  clampRunoff(track, meta.maxRunoff);
+  applyBank(track, meta.bank);
   buildTrack(track, scene, renderer, QUALITIES.extremo);
   scene.updateMatrixWorld(true);
 

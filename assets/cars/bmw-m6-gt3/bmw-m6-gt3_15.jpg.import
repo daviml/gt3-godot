@@ -3,8 +3,8 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bynrnusxc0455"
-path.s3tc="res://.godot/imported/bmw-m6-gt3_15.jpg-881e9e5e059b3655b07338f2e1a948a6.s3tc.ctex"
-path.etc2="res://.godot/imported/bmw-m6-gt3_15.jpg-881e9e5e059b3655b07338f2e1a948a6.etc2.ctex"
+path.bptc="res://.godot/imported/bmw-m6-gt3_15.jpg-881e9e5e059b3655b07338f2e1a948a6.bptc.ctex"
+path.astc="res://.godot/imported/bmw-m6-gt3_15.jpg-881e9e5e059b3655b07338f2e1a948a6.astc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -16,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/cars/bmw-m6-gt3/bmw-m6-gt3_15.jpg"
-dest_files=["res://.godot/imported/bmw-m6-gt3_15.jpg-881e9e5e059b3655b07338f2e1a948a6.s3tc.ctex", "res://.godot/imported/bmw-m6-gt3_15.jpg-881e9e5e059b3655b07338f2e1a948a6.etc2.ctex"]
+dest_files=["res://.godot/imported/bmw-m6-gt3_15.jpg-881e9e5e059b3655b07338f2e1a948a6.bptc.ctex", "res://.godot/imported/bmw-m6-gt3_15.jpg-881e9e5e059b3655b07338f2e1a948a6.astc.ctex"]
 
 [params]
 

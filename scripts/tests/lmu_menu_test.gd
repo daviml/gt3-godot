@@ -269,6 +269,102 @@ func run_tests() -> void:
 	ir_pad.filter(0.1, 20.0, {"left": false, "right": false, "gas": false, "brake": false, "up": false, "down": false, "pad": {"x": 0.0, "rt": 0.0, "lt": 0.0, "up": false, "down": false, "reset": false}})
 	check(is_zero_approx(ir_pad.steer) and is_zero_approx(ir_pad.throttle), "InputReader ignora toque proporcional quando controle físico está conectado")
 
+	print("--- 6. Navegação por Controle / Gamepad no LmuMenu ---")
+	var pad_layer := CanvasLayer.new()
+	root.add_child(pad_layer)
+	var pad_root := Control.new()
+	pad_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pad_layer.add_child(pad_root)
+	var pad_menu := LmuMenu.new(LmuMenu.Context.PAUSE)
+	pad_root.add_child(pad_menu)
+	await _frames(2)
+
+	# Todos os botões/opções/sliders/checkboxes têm focus_mode != FOCUS_NONE
+	var any_unfocusable := false
+	for v_name in ["home", "cars", "tracks", "settings", "records", "help"]:
+		pad_menu.switch_view(v_name)
+		await _frames(1)
+		pad_menu._ensure_menu_focus(true)
+		var f_owner := root.get_viewport().gui_get_focus_owner()
+		check(f_owner != null and pad_menu.is_ancestor_of(f_owner), "Visão '%s' define foco inicial ao ativar controle" % v_name)
+		var q_nodes: Array = [pad_menu]
+		while not q_nodes.is_empty():
+			var nd: Node = q_nodes.pop_back()
+			if nd is Button or nd is CheckButton or nd is OptionButton or nd is HSlider:
+				if (nd as Control).focus_mode == Control.FOCUS_NONE:
+					any_unfocusable = true
+					print("    controle sem foco em %s: %s" % [v_name, str(nd.get_class())])
+			q_nodes.append_array(nd.get_children())
+	check(not any_unfocusable, "Todos os botões, opções, checkboxes e sliders do menu aceitam foco")
+
+	# LB / RB em Settings troca de aba mantendo foco
+	pad_menu.switch_view("settings")
+	pad_menu.switch_settings_tab("controls")
+	await _frames(1)
+	pad_menu._ensure_menu_focus(true)
+	var ev_rb := InputEventJoypadButton.new()
+	ev_rb.button_index = JOY_BUTTON_RIGHT_SHOULDER
+	ev_rb.pressed = true
+	pad_menu._unhandled_input(ev_rb)
+	await _frames(1)
+	check(pad_menu.active_settings_tab == "graphics", "RB em Configurações avança para a aba Gráficos")
+	var tab_focus := root.get_viewport().gui_get_focus_owner()
+	check(tab_focus is Button and (tab_focus as Button).text == LmuMenu.SETTINGS_TAB_LABELS["graphics"], "Foco permanece na aba ativa após trocar com RB")
+
+	# Durante captura de botão no ControlsPanel, B não sai da tela de Configurações
+	pad_menu.switch_settings_tab("controls")
+	await _frames(1)
+	check(pad_menu._controls_panel != null, "Aba Controles expõe ControlsPanel para checar captura")
+	pad_menu._controls_panel.start_capture("pad", "camera")
+	var ev_b := InputEventJoypadButton.new()
+	ev_b.button_index = JOY_BUTTON_B
+	ev_b.pressed = true
+	pad_menu._unhandled_input(ev_b)
+	await _frames(1)
+	check(pad_menu.active_view == "settings", "Botão B não fecha Configurações enquanto ControlsPanel captura mapeamento")
+	pad_menu._controls_panel.cancel_capture()
+
+	# X (PS4) / A (Xbox) no controle (JOY_BUTTON_A) aciona o botão focado via ui_accept
+	pad_menu.switch_view("home")
+	await _frames(1)
+	pad_menu._ensure_menu_focus(true)
+	var a_resumed := [false]
+	var conn_a := func(): a_resumed[0] = true
+	pad_menu.resumed.connect(conn_a)
+	var ev_a_down := InputEventJoypadButton.new()
+	ev_a_down.button_index = JOY_BUTTON_A
+	ev_a_down.pressed = true
+	root.push_input(ev_a_down)
+	var ev_a_up := InputEventJoypadButton.new()
+	ev_a_up.button_index = JOY_BUTTON_A
+	ev_a_up.pressed = false
+	root.push_input(ev_a_up)
+	await _frames(1)
+	pad_menu.resumed.disconnect(conn_a)
+	check(a_resumed[0], "Botão X/A (JOY_BUTTON_A) aciona o item focado via ui_accept")
+
+	# Botão B fora de captura volta para Home e na Home do PAUSE retoma a corrida
+	pad_menu._unhandled_input(ev_b)
+	await _frames(1)
+	check(pad_menu.active_view == "home", "Botão B em sub-tela volta para Home")
+	var pad_resumed := [false]
+	pad_menu.resumed.connect(func(): pad_resumed[0] = true)
+	pad_menu._unhandled_input(ev_b)
+	await _frames(1)
+	check(pad_resumed[0], "Botão B na Home (PAUSE) retoma a corrida")
+
+	# LB / RB em Carros troca o carro selecionado
+	pad_menu.switch_view("cars")
+	await _frames(1)
+	var before_car := pad_menu.current_car_id
+	pad_menu._unhandled_input(ev_rb)
+	await _frames(1)
+	check(pad_menu.current_car_id != before_car, "RB na tela de Carros avança para o próximo carro")
+
+	pad_menu.queue_free()
+	pad_layer.queue_free()
+	await _frames(1)
+
 	# Restaura configurações originais
 	Game.save_car(orig_car)
 	Game.set_mode(orig_mode)

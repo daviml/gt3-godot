@@ -15,7 +15,7 @@ const godot = fileURLToPath(new URL('../../', import.meta.url));
 const track = process.env.TRACK || 'interlagos';
 
 /** pasta das cópias adaptadas dos módulos do web (tools/cenario/<pasta>/) */
-const MODULES: Record<string, string> = { 'laguna-seca': 'laguna', interlagos: 'interlagos' };
+const MODULES: Record<string, string> = { 'laguna-seca': 'laguna', imola: 'imola', interlagos: 'interlagos' };
 
 /** dados de Interlagos → dados da pista (a referência alimenta a borracha e as placas de freada) */
 const DATA: Record<string, Record<string, string>> = {
@@ -24,6 +24,12 @@ const DATA: Record<string, Record<string, string>> = {
     'data/tracks/interlagos-osm.json': 'tools/tracks/laguna-seca/laguna-seca-osm.json',
     'data/tracks/interlagos-terrain.json': 'tools/tracks/laguna-seca/laguna-seca-terrain.json',
     'data/reference/interlagos-porsche.json': 'data/reference/laguna-seca-m4.json'
+  },
+  imola: {
+    'data/tracks/interlagos.json': 'tools/tracks/imola/imola.json',
+    'data/tracks/interlagos-osm.json': 'tools/tracks/imola/imola-osm.json',
+    'data/tracks/interlagos-terrain.json': 'tools/tracks/imola/imola-terrain.json',
+    'data/reference/interlagos-porsche.json': 'data/reference/imola-m4.json'
   }
 };
 

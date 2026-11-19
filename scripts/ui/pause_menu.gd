@@ -13,8 +13,11 @@ signal track_selected(track_id: String)
 signal nick_changed(nick: String)
 signal mode_changed(mode: String)
 signal quality_changed(name: String)
+signal time_of_day_changed(preset: String)
 signal volume_changed(v: float)
 signal assist_changed(key: String, on: bool)
+signal ghost_changed(on: bool)
+signal brake_bias_changed(offset: float)
 signal touch_mode_changed(mode: String)
 signal hide_touch_changed(hidden: bool)
 signal hud_gauge_changed(style: String)
@@ -50,7 +53,7 @@ const AIDS := [["abs", "ABS"], ["tc", "Controle de tração"], ["auto", "Câmbio
 const GAUGE_STYLES := ["barra", "circular"]
 const GAUGE_NAMES := {"barra": "Barra Horizontal (Padrão)", "circular": "Circular Clássico"}
 const HELP := """Teclado: W/S ou ↑/↓ acelera e freia · A/D ou ←/→ esterça · E/Shift sobe marcha · Q/Ctrl reduz
-1 = ABS · 2 = controle de tração · G = câmbio automático · C = câmera · R = volta para o grid
+1 = ABS · 2 = controle de tração · G = câmbio automático · C = câmera · L = faróis · R = volta para o grid
 P = piloto automático · T = telemetria · F1 = qualidade · F12 = print · N = nick · Esc = este menu
 Controle: analógico esterça · gatilhos aceleram e freiam · RB/A sobe marcha · LB/X reduz · Y câmera · Back grid · Start menu
 Celular: 4 esquemas (Padrão com pedais por altura, Fly-by-wire, Inclinar com acelerômetro e Legacy) · ☰ ou Voltar abre este menu"""
@@ -73,8 +76,11 @@ func _ready() -> void:
 	lmu_menu.nick_changed.connect(func(nick: String): nick_changed.emit(nick))
 	lmu_menu.mode_changed.connect(func(mode: String): mode_changed.emit(mode))
 	lmu_menu.quality_changed.connect(func(qname: String): quality_changed.emit(qname))
+	lmu_menu.time_of_day_changed.connect(func(preset: String): time_of_day_changed.emit(preset))
 	lmu_menu.volume_changed.connect(func(v: float): volume_changed.emit(v))
 	lmu_menu.assist_changed.connect(func(key: String, on: bool): assist_changed.emit(key, on))
+	lmu_menu.ghost_changed.connect(func(on: bool): ghost_changed.emit(on))
+	lmu_menu.brake_bias_changed.connect(func(off: float): brake_bias_changed.emit(off))
 	lmu_menu.touch_mode_changed.connect(func(tm: String): touch_mode_changed.emit(tm))
 	lmu_menu.hide_touch_changed.connect(func(hidden: bool): hide_touch_changed.emit(hidden))
 	lmu_menu.hud_gauge_changed.connect(func(style: String): hud_gauge_changed.emit(style))
@@ -92,6 +98,7 @@ func open(nick: String, quality: String, volume: float, assists: Dictionary, tou
 		"car_id": car_id if car_id != "" else Game.car_id,
 		"mode": mode,
 		"quality": quality,
+		"time_of_day": Game.get_time_of_day_setting(),
 		"volume": volume,
 		"assists": assists,
 		"touch_mode": touch_mode,

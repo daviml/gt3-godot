@@ -42,6 +42,24 @@ const CHECKPOINTS := [
 ]
 
 ## Laguna Seca: [nome, s, quadro do LMU em build/compare/lmu_laguna/scan/ (perseguição, onboard)]
+const CHECKPOINTS_IMOLA := [
+	["01_reta_boxes", 4815.0, 0.0, 0.0],
+	["02_freada_tamburello", 540.0, 0.0, 0.0],
+	["03_tamburello", 696.0, 0.0, 0.0],
+	["04_villeneuve_ent", 1280.0, 0.0, 0.0],
+	["05_villeneuve_apex", 1412.0, 0.0, 0.0],
+	["06_tosa_ent", 1660.0, 0.0, 0.0],
+	["07_tosa_saida", 1780.0, 0.0, 0.0],
+	["08_piratella", 2240.0, 0.0, 0.0],
+	["09_acque_descida", 2640.0, 0.0, 0.0],
+	["10_acque_apex", 2836.0, 0.0, 0.0],
+	["11_variante_alta", 3340.0, 0.0, 0.0],
+	["12_descida_rivazza", 3890.0, 0.0, 0.0],
+	["13_rivazza_1", 4080.0, 0.0, 0.0],
+	["14_rivazza_2_pit", 4390.0, 0.0, 0.0],
+	["15_traguardo_saida", 150.0, 0.0, 0.0],
+]
+
 const CHECKPOINTS_LAGUNA := [
 	["01_freada_andretti", 300.0, "chase_7", "onb_98"],
 	["02_andretti", 470.0, "chase_16", "onb_100"],
@@ -69,6 +87,7 @@ func _run() -> void:
 	var quality := 2
 	var only: PackedStringArray = []
 	var bench := false
+	var time_opt := ""
 	var cam := 0
 	var moving := false
 	var custom: Array = []
@@ -81,6 +100,8 @@ func _run() -> void:
 			only = a.substr(7).split(",")
 		elif a == "--bench":
 			bench = true
+		elif a.begins_with("--time="):
+			time_opt = a.substr(7)
 		elif a.begins_with("--cam="):
 			cam = int(a.substr(6))
 		elif a == "--mover":
@@ -93,6 +114,10 @@ func _run() -> void:
 					custom.append([kv[0], float(kv[1]), "", ""])
 
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://" + out_dir))
+
+	var prev_time := Game.get_time_of_day_setting()
+	if not time_opt.is_empty():
+		Game.set_time_of_day(time_opt)
 
 	var scene: PackedScene = load("res://scenes/main.tscn")
 	var main := scene.instantiate()
@@ -117,7 +142,7 @@ func _run() -> void:
 	var car: Car = main.car
 	var chase: ChaseCamera = main.chase
 
-	var list: Array = CHECKPOINTS_LAGUNA if Game.track_id == "laguna-seca" else CHECKPOINTS
+	var list: Array = CHECKPOINTS_IMOLA if Game.track_id == "imola" else (CHECKPOINTS_LAGUNA if Game.track_id == "laguna-seca" else CHECKPOINTS)
 	if not custom.is_empty():
 		list = custom
 	if moving:
@@ -160,6 +185,9 @@ func _run() -> void:
 			var dc := Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)
 			var prims := Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)
 			print("bench %s (q=%d): %.2f ms/frame (%.1f FPS), %d draw calls, %.0fk triângulos" % [cname, quality, ms, 1000.0 / maxf(ms, 0.001), dc, prims / 1000.0])
+		if main.paused:
+			main._set_paused(false)
+		chase.mode = cam
 		# presets leves limitam o FPS/redesenho: força um quadro novo antes de ler a tela
 		RenderingServer.force_draw(true, 1.0 / 60.0)
 		var img := root.get_texture().get_image()
@@ -167,6 +195,8 @@ func _run() -> void:
 		img.save_png(ProjectSettings.globalize_path("res://" + path))
 		print("saved ", path, " carro=", car.pos.round(), " cam=", chase.cam.global_position.round() if "cam" in chase else "")
 
+	if not time_opt.is_empty():
+		Game.set_time_of_day(prev_time)
 	quit(0)
 
 

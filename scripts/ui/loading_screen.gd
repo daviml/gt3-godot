@@ -936,6 +936,7 @@ func _load_to_track() -> void:
 	tv.manual_setup = true
 	main_node.add_child(tv)
 	tv.build_scene(cenario_scene)
+	tv.build_props()
 	await _step(78.0, "Plantando vegetação...")
 
 	tv.build_trees(trees_data)

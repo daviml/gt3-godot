@@ -13,6 +13,8 @@ import type { Quality } from '@web/render/quality';
 import { plantTrees, TreeSpot } from '@web/render/trees';
 import { pbr, phTexture, setHiRes } from '@web/render/textures';
 import { buildHorizon, buildTowers, HAZE } from '@web/render/surroundings';
+import porscheRef from '../../../../gt3-time-attack/data/reference/interlagos-porsche.json';
+import { applyLiveAsphaltUV2 } from '../liveAsphalt';
 
 /**
  * Terreno: grama verde-amarelada (leafy_grass) e palha seca alaranjada (sparse_grass) misturadas por um ruído em
@@ -471,7 +473,7 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
         diffuseColor.rgb *= 0.92 + 0.16 * aNoise(gp / 7.0 + 3.0);`
       );
   };
-  mesh(ribbon(track, i => -S[i].wl, i => S[i].wr, 0, 4, 4), asphalt);
+  mesh(applyLiveAsphaltUV2(ribbon(track, i => -S[i].wl, i => S[i].wr, 0, 4, 4), track, porscheRef), asphalt);
   /** tinta sobre o asfalto: a textura de cor pintada + o relevo e a rugosidade do asfalto por baixo */
   const paintOn = (map: THREE.Texture, offset: number, roughness = 1) =>
     new THREE.MeshStandardMaterial({

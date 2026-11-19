@@ -11,8 +11,9 @@ import { Track, type TrackData } from '../../../gt3-time-attack/src/track/track'
 import { buildTrack } from '../../../gt3-time-attack/src/render/trackView';
 import { QUALITIES } from '../../../gt3-time-attack/src/render/quality';
 import interlagos from '../../../gt3-time-attack/data/tracks/interlagos.json';
-// camber opcional (só pistas com "bank"; Interlagos não tem e nada muda): a malha inclina igual à física
-import { applyBank, clampRunoff } from '../tracks/bank';
+// camber/paredes/zebras opcionais (só pistas com os campos no JSON; Interlagos não tem e nada muda)
+import { applyBank, applyKerbs, applyWalls, clampRunoff } from '../tracks/bank';
+import { clearProps, getProps } from './propsRegistry';
 
 // guarda a URL de cada textura carregada (o nome diz qual textura da Poly Haven é)
 const load0 = THREE.TextureLoader.prototype.load;
@@ -62,10 +63,15 @@ async function run() {
   const renderer = new THREE.WebGLRenderer();
   const scene = new THREE.Scene();
   const track = new Track(interlagos as unknown as TrackData);
-  clampRunoff(track, (interlagos as { maxRunoff?: number }).maxRunoff);
-  applyBank(track, (interlagos as { bank?: number[] }).bank);
+  const trData = interlagos as { maxRunoff?: number; bank?: number[]; kerbLeft?: number[]; kerbRight?: number[]; wallLeft?: number[]; wallRight?: number[] };
+  applyKerbs(track, trData.kerbLeft, trData.kerbRight);
+  applyWalls(track, trData.wallLeft, trData.wallRight);
+  clampRunoff(track, trData.maxRunoff);
+  applyBank(track, trData.bank);
+  clearProps();
   buildTrack(track, scene, renderer, QUALITIES.extremo);
   scene.updateMatrixWorld(true);
+  await new Promise(r => setTimeout(r, 800));
 
   const trees: number[] = [];
   const stats: Record<string, number> = {};
@@ -145,6 +151,15 @@ async function run() {
       for (let i = 0; i < w.count; i++) uv1[i * 2] = w.getX(i);
       g.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2));
       g.deleteAttribute('aWin');
+    } else if (conv.length === 1 && conv[0]?.name === 'asfalto' && !g.getAttribute('uv1')) {
+      g = geo.clone();
+      const cnt = g.getAttribute('position').count;
+      const uv1 = new Float32Array(cnt * 2);
+      for (let i = 0; i < cnt; i++) {
+        uv1[i * 2] = 100.0;
+        uv1[i * 2 + 1] = 0.0;
+      }
+      g.setAttribute('uv1', new THREE.BufferAttribute(uv1, 2));
     }
     const out = new THREE.Mesh(g, Array.isArray(mesh.material) ? conv : conv[0]);
     out.position.copy(mesh.position);
@@ -238,7 +253,63 @@ async function run() {
   const bytes = new Uint8Array(glb);
   let bin = '';
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return { glb: btoa(bin), trees, stats, sections: track.sections.map(s => s.name) };
+  return { glb: btoa(bin), trees, props: getProps(), stats, sections: track.sections.map(s => s.name) };
+}
+
+async function previewShots(): Promise<{ name: string; b64: string }[]> {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setSize(960, 540);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x8db7df);
+  scene.fog = new THREE.FogExp2(0xb6cbe0, 0.00028);
+  scene.add(new THREE.HemisphereLight(0xdcebff, 0x556440, 0.85));
+  const sun = new THREE.DirectionalLight(0xfff5e2, 2.1);
+  sun.position.set(120, 220, 90);
+  scene.add(sun);
+
+  const track = new Track(interlagos as unknown as TrackData);
+  const trData = interlagos as { maxRunoff?: number; bank?: number[]; kerbLeft?: number[]; kerbRight?: number[]; wallLeft?: number[]; wallRight?: number[] };
+  applyKerbs(track, trData.kerbLeft, trData.kerbRight);
+  applyWalls(track, trData.wallLeft, trData.wallRight);
+  clampRunoff(track, trData.maxRunoff);
+  applyBank(track, trData.bank);
+  clearProps();
+  buildTrack(track, scene, renderer, QUALITIES.extremo);
+  scene.updateMatrixWorld(true);
+  await new Promise(r => setTimeout(r, 800));
+
+  const cam = new THREE.PerspectiveCamera(58, 960 / 540, 0.3, 6000);
+  const S = track.samples;
+  const N = S.length;
+  const fracs = [
+    ['01_reta', 0.99],
+    ['02_tamburello', 0.14],
+    ['03_tosa', 0.28],
+    ['04_acque_minerali', 0.56],
+    ['05_variante_alta', 0.69],
+    ['06_rivazza', 0.85],
+  ] as const;
+
+  const out: { name: string; b64: string }[] = [];
+  const look = new THREE.Vector3();
+  for (const [name, f] of fracs) {
+    const i = Math.floor(f * N) % N;
+    const s = S[i];
+    const ahead = S[(i + 15) % N];
+    cam.position.copy(s.p).addScaledVector(s.t, -10).add(new THREE.Vector3(0, 4.2, 0));
+    look.copy(ahead.p).add(new THREE.Vector3(0, 1.4, 0));
+    cam.lookAt(look);
+    renderer.render(scene, cam);
+    const dataUrl = renderer.domElement.toDataURL('image/png');
+    out.push({ name, b64: dataUrl.split(',')[1] });
+  }
+  renderer.dispose();
+  return out;
 }
 
 (window as any).exportar = run;
+(window as any).preview = previewShots;

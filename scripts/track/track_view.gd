@@ -21,6 +21,10 @@ static func trees_path() -> String:
 	return Game.track_data_path("arvores_pos.json")
 
 
+static func props_path() -> String:
+	return Game.track_data_path("props.json")
+
+
 ## lê um JSON de lista da pista; arquivo ausente ou inválido = [] (pista sem árvores, sem torres...)
 static func read_json_array(path: String) -> Array:
 	if not FileAccess.file_exists(path):
@@ -54,6 +58,7 @@ func _ready() -> void:
 	if manual_setup:
 		return
 	build_scene()
+	build_props()
 	build_trees()
 	build_surroundings()
 	set_detail(detail_level)
@@ -65,6 +70,55 @@ func build_scene(scene: PackedScene = null) -> void:
 	var root := scene.instantiate()
 	add_child(root)
 	_fix(root)
+
+
+func build_props(data: Array = []) -> void:
+	var a: Array = data if not data.is_empty() else TrackView.read_json_array(props_path())
+	if a.is_empty():
+		return
+	var prop_scenes := {}
+	var container := Node3D.new()
+	container.name = "HeroProps"
+	add_child(container)
+	for entry in a:
+		if not (entry is Array) or entry.size() < 9:
+			continue
+		var prop_id := String(entry[0])
+		if not prop_scenes.has(prop_id):
+			var p := "res://assets/props/%s.glb" % prop_id
+			prop_scenes[prop_id] = load(p) if ResourceLoader.exists(p) else null
+		var ps: PackedScene = prop_scenes[prop_id]
+		if ps == null:
+			continue
+		var inst := ps.instantiate() as Node3D
+		if inst == null:
+			continue
+		inst.position = Vector3(float(entry[1]), float(entry[2]), float(entry[3]))
+		inst.rotation = Vector3(0.0, float(entry[4]), 0.0)
+		inst.scale = Vector3(float(entry[5]), float(entry[6]), float(entry[7]))
+		var is_essential := int(entry[8]) != 0
+		container.add_child(inst)
+		_register_prop_meshes(inst, is_essential)
+
+
+func _register_prop_meshes(n: Node, is_essential: bool) -> void:
+	if n is MeshInstance3D:
+		var mi := n as MeshInstance3D
+		meshes += 1
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		mi.visibility_range_end_margin = 0.0
+		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_DISABLED
+		if not is_essential:
+			_minimal_hide_meshes.append(mi)
+		_cull_meshes.append({"mi": mi, "shadow": true, "essential": is_essential})
+		if detail_level == 0:
+			mi.visibility_range_end = 450.0 if is_essential else CULL_SECONDARY_MIN
+		elif detail_level == 1:
+			mi.visibility_range_end = CULL_SECONDARY_LEVE
+		else:
+			mi.visibility_range_end = CULL_SHADOW_DEFAULT
+	for c in n.get_children():
+		_register_prop_meshes(c, is_essential)
 
 
 func build_surroundings(towers_data: Array = [], horizon_data: Dictionary = {}) -> void:
@@ -105,6 +159,14 @@ func set_detail(level: int) -> void:
 		surroundings.set_detail(level)
 
 
+func set_night_amount(amount: float, horizon_tint := Color.WHITE, horizon_brightness := 1.0) -> void:
+	for mat in _shader_mats:
+		if mat and mat.resource_name in ["asfalto", "fachada"]:
+			mat.set_shader_parameter("night_amount", amount)
+	if surroundings:
+		surroundings.set_night_amount(amount, horizon_tint, horizon_brightness)
+
+
 func _fix(n: Node) -> void:
 	if n is MeshInstance3D:
 		var mi := n as MeshInstance3D
@@ -126,7 +188,7 @@ func _fix(n: Node) -> void:
 			var mat := mi.mesh.surface_get_material(s)
 			if mat:
 				var mat_name := String(mat.resource_name)
-				if mat_name == "asfalto" and maxf(ext.x, ext.z) > 1500.0:
+				if mat_name == "asfalto" and minf(ext.x, ext.z) > 1800.0:
 					# Malha do terreno inteiro (2076x2460m) exportada com nome "asfalto": usa shader de grama
 					var gm := StandardMaterial3D.new()
 					gm.resource_name = "grama"

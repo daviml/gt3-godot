@@ -4,6 +4,8 @@
 // caixas (uma chamada de desenho); a cor do reboco vem de INSTANCE_CUSTOM (já linear).
 shader_type spatial;
 
+uniform float night_amount = 0.0;
+
 varying vec3 v_w;
 varying vec3 v_n;
 varying float v_seed;
@@ -24,6 +26,7 @@ void vertex() {
 void fragment() {
 	vec3 c = v_col * 0.70;
 	float glass = 0.0;
+	vec3 em = vec3(0.0);
 	if (abs(v_n.y) > 0.5) {
 		c = vec3(0.42, 0.42, 0.40) * (0.85 + 0.3 * t_h(floor(v_w.xz / 3.0)));
 	} else {
@@ -41,6 +44,11 @@ void fragment() {
 		glass = in_x * in_y * lit * (1.0 - stair) * (1.0 - ground);
 		vec3 sky = mix(vec3(0.08, 0.1, 0.13), vec3(0.32, 0.38, 0.46), t_h(cell + 3.0));
 		c = mix(c, sky, glass);
+		if (night_amount > 0.01) {
+			float win_on = step(0.58, t_h(cell + v_seed * 29.0 + 17.0));
+			vec3 warm = mix(vec3(1.0, 0.76, 0.42), vec3(1.0, 0.92, 0.75), t_h(cell + 5.0));
+			em = warm * glass * win_on * night_amount * 1.4;
+		}
 		if (balcony) {
 			// laje da varanda (faixa clara) e guarda-corpo (faixa escura translúcida) em cada andar
 			float slab = step(f.y, 0.22) * (1.0 - ground);
@@ -55,5 +63,6 @@ void fragment() {
 		c *= 0.9 + 0.1 * abs(v_n.x);
 	}
 	ALBEDO = c;
+	EMISSION = em;
 	ROUGHNESS = mix(0.85, 0.15, glass);
 }

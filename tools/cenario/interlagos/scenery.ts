@@ -342,24 +342,48 @@ function buildBrakeBoards(track: Track, group: THREE.Group) {
   }
 }
 
-/** Torre de controle (branca com janelas azuis, como a de Interlagos) perto da linha de chegada. */
+/** Torre de controle (branca com janelas azuis em dois níveis e placa INTERLAGOS) perto da linha de chegada. */
 function buildTower(track: Track, group: THREE.Group, heightAt: (x: number, z: number) => number) {
   const S = track.samples;
   const N = S.length;
   const plain = new THREE.MeshStandardMaterial({ color: 0xf0f1f2, roughness: 0.6 });
   const glass = new THREE.MeshStandardMaterial({ color: 0x1d3552, roughness: 0.15, metalness: 0.6 });
-  // torre de controle perto da linha de chegada
+  const metal = new THREE.MeshStandardMaterial({ color: 0xb0b5ba, roughness: 0.4, metalness: 0.7 });
   const s = S[N - Math.round(60 / STEP)];
   const base = s.p.clone().addScaledVector(s.r, -(s.wl + 20));
   const y = Math.min(s.p.y, heightAt(base.x, base.z));
-  const tower = new THREE.Mesh(new THREE.BoxGeometry(6, 18, 6), plain);
-  tower.position.copy(base).setY(y + 9);
-  const cab = new THREE.Mesh(new THREE.BoxGeometry(9, 4, 9), glass);
-  cab.position.copy(base).setY(y + 20);
-  const top = new THREE.Mesh(new THREE.BoxGeometry(10, 0.6, 10), plain);
-  top.position.copy(base).setY(y + 22.3);
-  for (const m of [tower, cab, top]) {
+  const g = new THREE.Group();
+  const add = (geo: THREE.BufferGeometry, mat: THREE.Material | THREE.Material[], py: number) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.position.y = py;
     m.castShadow = true;
-    group.add(m);
-  }
+    g.add(m);
+  };
+  add(new THREE.BoxGeometry(6, 17, 6), plain, 8.5);
+  add(new THREE.BoxGeometry(9.6, 0.5, 9.6), plain, 17.25);
+  add(new THREE.BoxGeometry(9, 3.2, 9), glass, 19.1);
+  add(new THREE.BoxGeometry(10.2, 0.5, 10.2), plain, 20.95);
+  add(new THREE.BoxGeometry(8.2, 2.8, 8.2), glass, 22.6);
+  add(new THREE.BoxGeometry(9.4, 0.6, 9.4), plain, 24.3);
+  add(new THREE.CylinderGeometry(0.12, 0.22, 6, 6), metal, 27.6);
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 96;
+  const cg = c.getContext('2d')!;
+  cg.fillStyle = '#0f3d24';
+  cg.fillRect(0, 0, 512, 96);
+  cg.fillStyle = '#f5c400';
+  cg.fillRect(0, 82, 512, 14);
+  cg.fillStyle = '#ffffff';
+  cg.font = '900 italic 58px Arial';
+  cg.textAlign = 'center';
+  cg.textBaseline = 'middle';
+  cg.fillText('INTERLAGOS', 256, 44, 490);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  const sign = new THREE.MeshStandardMaterial({ map: t, roughness: 0.5 });
+  add(new THREE.BoxGeometry(9.4, 1.8, 0.35), [plain, plain, plain, plain, sign, sign], 25.5);
+  g.position.set(base.x, y, base.z);
+  g.lookAt(s.p.x, y, s.p.z);
+  group.add(g);
 }
