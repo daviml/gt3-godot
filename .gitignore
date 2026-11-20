@@ -7,6 +7,9 @@ assets/cars/*/*.png.import
 *.exe
 *.apk
 *.aab
+*.pck
+*.pck.part*
+*.wasm
 *.avi
 *.mp4
 *.mp4.import
@@ -26,7 +29,7 @@ assets/props/*/*.jpg
 assets/props/*/*.jpg.import
 # exportação (etapa 14)
 build/
-deploy/vercel/index.pck
+deploy/vercel/
 # instalador Windows
 Build-Windows.bat
 deploy/windows/
