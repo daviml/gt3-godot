@@ -174,8 +174,8 @@ Ainda não feito, em ordem de ganho:
      guindastes, cones, postes, banheiros químicos, motorhomes, cercas, pórticos.
    - Conferir a licença de cada um e registrar nos créditos; gerar impostores/LOD pelo mesmo processo das árvores
      de hoje (árvore vira imagem: 50 espécies custam quase o mesmo que 5 no celular).
-   - Gerador de placas e banners com dezenas de marcas **fictícias** (fontes, cores, formatos variados), puxando o
-     estilo das placas do vídeo da pista. Nunca copiar logo real de patrocinador.
+   - Placas e banners com as **marcas reais que aparecem no vídeo de referência** (mesma marca, cor, formato e
+     posição), o mais próximo possível. Decisão do Davi em 20/11/2026: o jogo não será comercializado.
 9. **Detalhes iguais ao vídeo de referência do Davi**: tudo o que aparece no vídeo do LMU que ele fornecer vira
    item a reproduzir, não só a pista em si:
    - marcos de cada pista modelados sob medida a partir dos quadros do vídeo (arcos, passarelas, torre de

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "godot": {
+      "command": "node",
+      "args": ["C:\\Users\\davim\\Tools\\godot-mcp\\build\\index.js"],
+      "env": {
+        "GODOT_PATH": "C:\\Users\\davim\\Tools\\godot\\Godot_v4.7.2-stable_win64.exe"
+      }
+    },
+    "blender": {
+      "command": "python",
+      "args": ["-m", "uv", "tool", "run", "blender-mcp"]
+    }
+  }
+}

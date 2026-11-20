@@ -6,7 +6,41 @@
 #      --mover: o carro chega andando (piloto automático lançado 260 m antes, o jogo rodando de verdade, com a
 #      câmera e o desfoque de velocidade dele); sem --mover, parado e assentado na pista (inclinado com ela).
 #      Para o --mover, use um carro com referência na pista (ex.: --car=bmw-m4-gt3); sem ela vale o Bot simples.
+#
+# Modo --atlas (PLANO-INTERLAGOS-DETALHES.md §2, Fase 0): fotografa por METRO DE PISTA, no mesmo índice dos quadros
+# do vídeo do LMU (build/ref/interlagos/<chase|onboard>/sNNNN.jpg), com uma câmera de comparação própria igual à
+# do vídeo (a câmera do jogo não muda):
+#   -- --atlas --s0=0 --s1=4290 --passo=50 --cam=0 --quality=2 --out=build/ref/interlagos/godot/chase [--regua]
+#   --s1 < --s0 cruza a linha de chegada (ex.: --s0=3884 --s1=250). Arquivos: <out>/sNNNN.png (1280x720, 16:9).
+#   --cam=0 perseguição do LMU, --cam=1 olho do piloto (modelo do carro escondido).
+#   --regua desenha na pista uma linha a cada 10 m de s (número a cada 50 m) e marcas a cada 2 m de d.
+#   O carro fica parado sobre a linha da referência do Garage 61 (RefBot); sem --car usa um carro com referência
+#   na pista; --car=<id> sem referência falha. Pista sem referência nenhuma: linha central.
 extends SceneTree
+
+# ---- câmera de comparação do modo --atlas ----
+# Perseguição do LMU (--cam=0). O vídeo mostra "Vertical FOV: 50°". Medido em 3 quadros 1920x1080 de
+# build/compare/lmu_30 (01_reta_freada_senna, 08_reta_oposta_meio, 30_reta_grid), Porsche 911 GT3 R de trás, carro
+# centrado: carroceria traseira 408 px de largura (≈2,05 m → 21% da tela), pneus traseiros tocam o chão em
+# y≈735, topo do teto em y≈435, horizonte em y≈300 (média do ponto de fuga entre a reta em subida e a em descida).
+# Com f = 540/tan(25°) = 1158 px, o ajuste (mínimos quadrados) dá: câmera 4,46 m atrás do para-choque traseiro
+# (o 911 tem ~2,31 m do centro à traseira → 6,8 m do centro do carro), 2,14 m acima do chão, inclinada 12° para
+# baixo. A câmera do LMU segue o carro quase rígida: aqui fica presa atrás dele, na direção dele.
+const ATLAS_CHASE_FOV := 50.0
+const ATLAS_CHASE_DIST := 6.8
+const ATLAS_CHASE_ALT := 2.14
+const ATLAS_CHASE_PITCH := -12.0
+# Onboard do LMU (--cam=1): olho do piloto. FOV estimado no quadro de t=120 s do vídeo (Reta Oposta) comparando a
+# largura angular dos prédios do horizonte com o quadro de perseguição do mesmo trecho (FOV 50° conhecido): 1,21×
+# maior no onboard → f ≈ 1350–1400 px → FOV vertical ≈ 43° (±3°). Horizonte em y≈490 de 1080 (acima do meio)
+# → olha ~2° para baixo.
+# Posição: lado esquerdo do cockpit, um pouco à frente do centro, altura de olho de GT3.
+const ATLAS_ONB_FOV := 43.0
+const ATLAS_ONB_POS := Vector3(-0.35, 1.05, 0.35)  # x direita, y altura sobre o chão, z para a frente (m)
+const ATLAS_ONB_PITCH := -2.0
+## saída do atlas: mesma proporção e tamanho dos quadros do LMU em build/ref/interlagos/
+const ATLAS_W := 1280
+const ATLAS_H := 720
 
 const CHECKPOINTS := [
 	["01_reta_freada_senna", 135.0, 4.2, 0.0],
@@ -83,6 +117,9 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	if "--atlas" in OS.get_cmdline_user_args():
+		await _run_atlas()
+		return
 	var out_dir := "build/compare/godot_atual"
 	var quality := 2
 	var only: PackedStringArray = []
@@ -242,3 +279,283 @@ func _drive_to(main: Node, track: Track, car: Car, chase: ChaseCamera, s_target:
 	await process_frame
 	main.set_process(false)
 	await process_frame
+
+
+# ------------------------------------------------------------------ modo --atlas
+
+func _run_atlas() -> void:
+	var out_dir := "build/ref/interlagos/godot/chase"
+	var quality := 2
+	var cam_mode := 0
+	var time_opt := ""
+	var s_from := 0.0
+	var s_to := -1.0
+	var passo := 25.0
+	var regua := false
+	var car_arg := ""
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("--out="):
+			out_dir = a.substr(6)
+		elif a.begins_with("--quality="):
+			quality = int(a.substr(10))
+		elif a.begins_with("--cam="):
+			cam_mode = clampi(int(a.substr(6)), 0, 1)
+		elif a.begins_with("--time="):
+			time_opt = a.substr(7)
+		elif a.begins_with("--s0="):
+			s_from = float(a.substr(5))
+		elif a.begins_with("--s1="):
+			s_to = float(a.substr(5))
+		elif a.begins_with("--passo="):
+			passo = maxf(0.5, float(a.substr(8)))
+		elif a == "--regua":
+			regua = true
+		elif a.begins_with("--car="):
+			car_arg = a.substr(6)
+
+	# carro com referência do Garage 61 na pista (o RefBot dá a linha onde o carro fica)
+	var car_id: String = Game.car_id
+	var refs = Game.get_track_info().get("refs", {})
+	var ref_ids: Array = (refs as Dictionary).keys() if refs is Dictionary else []
+	if car_arg != "":
+		if Game.track_ref_for_car(car_arg) == "":
+			printerr("[atlas] o carro %s não tem referência em %s (data/tracks.json → refs). Use um destes: %s"
+				% [car_arg, Game.track_id, str(ref_ids)])
+			quit(1)
+			return
+		car_id = car_arg
+	elif Game.track_ref_for_car(car_id) == "":
+		if not ref_ids.is_empty():
+			car_id = String(ref_ids[0])
+			print("[atlas] usando %s (carro com referência nesta pista)" % car_id)
+		else:
+			push_warning("[atlas] %s não tem referência de nenhum carro: carro na linha central" % Game.track_id)
+
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("res://" + out_dir))
+	var prev_time := Game.get_time_of_day_setting()
+	if not time_opt.is_empty():
+		Game.set_time_of_day(time_opt)
+
+	var scene: PackedScene = load("res://scenes/main.tscn")
+	var main := scene.instantiate()
+	main.car_id = car_id  # antes do _ready (o --car= da linha de comando, se houver, é o mesmo)
+	root.add_child(main)
+	await process_frame
+	await process_frame
+
+	main.set_physics_process(false)
+	main.set_process(false)
+	if main.hud:
+		main.hud.visible = false
+	if main.touch:
+		main.touch.visible = false
+	if main.speed_blur:
+		main.speed_blur.visible = false
+	if main.ghost_car:
+		main.ghost_car.visible = false
+	main._set_quality(quality)
+	main.chase.mode = 0
+
+	var track: Track = main.track
+	var car: Car = main.car
+	var L := track.length
+	if s_to < 0.0:
+		s_to = s_from
+	var lista := _atlas_s_list(s_from, s_to, passo, L)
+	var shots := lista.size()
+
+	# câmera de comparação (a do jogo fica como está, só deixa de ser a atual)
+	var game_cam: Camera3D = main.cam
+	var acam := Camera3D.new()
+	acam.near = 0.05
+	acam.far = game_cam.far
+	acam.environment = game_cam.environment
+	acam.attributes = game_cam.attributes
+	acam.compositor = game_cam.compositor
+	main.add_child(acam)
+	acam.make_current()
+	# FOV vertical do LMU num quadro 16:9; em janela mais estreita que 16:9 fixa o horizontal equivalente
+	var vfov := ATLAS_CHASE_FOV if cam_mode == 0 else ATLAS_ONB_FOV
+	var vp_size := root.get_visible_rect().size
+	if vp_size.x / vp_size.y >= 16.0 / 9.0 - 0.001:
+		acam.keep_aspect = Camera3D.KEEP_HEIGHT
+		acam.fov = vfov
+	else:
+		acam.keep_aspect = Camera3D.KEEP_WIDTH
+		acam.fov = rad_to_deg(2.0 * atan(tan(deg_to_rad(vfov) * 0.5) * 16.0 / 9.0))
+	if cam_mode == 1:
+		main.car_view.visible = false  # o interesse é a pista; o modelo tamparia a vista
+
+	if regua:
+		main.add_child(_build_regua(track))
+
+	# deixa o cenário terminar de carregar e os shaders compilarem (senão os prints repetem um quadro antigo)
+	for _f in 45:
+		await process_frame
+
+	var bot = main.bot
+	print("[atlas] pista=%s carro=%s bot=%s cam=%d s=%.0f→%.0f passo=%.0f (%d prints) tela=%s"
+		% [Game.track_id, car_id, "RefBot" if bot is RefBot else "linha central", cam_mode, s_from, s_to, passo,
+		shots, str(vp_size)])
+	for s: float in lista:
+		_place_on_line(main, track, car, bot, s)
+		_place_atlas_cam(acam, car, cam_mode)
+		for _f in 6:
+			await process_frame
+		if main.paused:
+			main._set_paused(false)
+		RenderingServer.force_draw(true, 1.0 / 60.0)
+		var img := _crop_16x9(root.get_texture().get_image())
+		var path := "%s/s%04d.png" % [out_dir, roundi(s)]
+		img.save_png(ProjectSettings.globalize_path("res://" + path))
+		track.locate(car.pos, -1)
+		print("saved %s s=%.1f d=%+.2f carro=%s" % [path, track.ls, track.ld, str(car.pos.round())])
+
+	if not time_opt.is_empty():
+		Game.set_time_of_day(prev_time)
+	quit(0)
+
+
+## Metros a fotografar de s0 a s1 a cada passo. Se s1 < s0 o trecho cruza a linha de chegada: depois dela a
+## contagem recomeça na grade alinhada com s = 0 (0, passo, 2·passo…), a mesma dos quadros do LMU (s0000, s0010…).
+static func _atlas_s_list(s0: float, s1: float, passo: float, L: float) -> Array[float]:
+	var out: Array[float] = []
+	var cruza := s1 < s0
+	var s := s0
+	while s < L - 1e-6 and (cruza or s <= s1 + 1e-6):
+		out.append(s)
+		s += passo
+	if cruza:
+		s = 0.0
+		while s <= s1 + 1e-6:
+			out.append(s)
+			s += passo
+	return out
+
+
+## Carro parado em s sobre a linha da referência (RefBot), na direção dela, assentado na pista. Sem RefBot: centro.
+func _place_on_line(main: Node, track: Track, car: Car, bot, s: float) -> void:
+	if bot is RefBot:
+		var p0: Vector3 = bot.line_point(s)
+		var pa: Vector3 = bot.line_point(s - 2.0)
+		var pb: Vector3 = bot.line_point(s + 2.0)
+		track.locate(p0, -1)
+		var up := track.ln
+		var fwd := ((pb - pa) - up * (pb - pa).dot(up)).normalized()
+		var rgt := fwd.cross(up).normalized()
+		car.reset_basis(p0 + up * (float(car.p.cg) + 0.05), Basis(rgt, up, -fwd))
+	else:
+		car.reset_at(track.index_at(s))
+	# 0,4 s de física freado para a suspensão assentar (pitch e roll pela pista)
+	for _k in int(0.4 * Car.HZ):
+		car.step(1.0 / Car.HZ, 0.0, 0.0, 1.0)
+	car.vel = Vector3.ZERO
+	car.prev_pos = car.pos
+	car.prev_rot = car.rot
+	main._update_car_view(1.0)
+
+
+## Posiciona a câmera de comparação presa ao carro (perseguição ou olho do piloto), sem rolagem.
+func _place_atlas_cam(acam: Camera3D, car: Car, cam_mode: int) -> void:
+	var b := Basis(car.rot)
+	var fwd := -b.z
+	var rgt := fwd.cross(Vector3.UP).normalized()
+	var up := rgt.cross(fwd).normalized()
+	var ground := car.pos - b.y * float(car.p.cg)
+	var look := Basis(rgt, up, -fwd)
+	if cam_mode == 0:
+		acam.global_position = ground - fwd * ATLAS_CHASE_DIST + up * ATLAS_CHASE_ALT
+		acam.global_basis = Basis(rgt, deg_to_rad(ATLAS_CHASE_PITCH)) * look
+	else:
+		acam.global_position = ground + b.x * ATLAS_ONB_POS.x + b.y * ATLAS_ONB_POS.y + fwd * ATLAS_ONB_POS.z
+		acam.global_basis = Basis(rgt, deg_to_rad(ATLAS_ONB_PITCH)) * look
+
+
+## Recorta o centro da tela em 16:9 e reduz para ATLAS_W x ATLAS_H (mesmo enquadramento dos quadros do LMU).
+func _crop_16x9(img: Image) -> Image:
+	var w := img.get_width()
+	var h := img.get_height()
+	var cw := w
+	var ch := h
+	if float(w) / h > 16.0 / 9.0:
+		cw = roundi(h * 16.0 / 9.0)
+	else:
+		ch = roundi(w * 9.0 / 16.0)
+	var out := img.get_region(Rect2i((w - cw) / 2, (h - ch) / 2, cw, ch))
+	out.convert(Image.FORMAT_RGB8)
+	out.resize(ATLAS_W, ATLAS_H, Image.INTERPOLATE_LANCZOS)
+	return out
+
+
+## Régua desenhada na pista (só no teste): linha transversal a cada 10 m de s (mais grossa, ciano e com número a
+## cada 50 m) e marcas amarelas curtas a cada 2 m de d (a do centro, d = 0, mais longa).
+func _build_regua(track: Track) -> Node3D:
+	var node := Node3D.new()
+	node.name = "Regua"
+	var im := ImmediateMesh.new()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.vertex_color_use_as_albedo = true
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	im.surface_begin(Mesh.PRIMITIVE_TRIANGLES, mat)
+	var magenta := Color(1.0, 0.1, 0.9)
+	var ciano := Color(0.1, 0.95, 1.0)
+	var amarelo := Color(1.0, 0.9, 0.1)
+	var s := 0.0
+	while s < track.length - 0.5:
+		var i := track.index_at(s)
+		var dl := -(track.wl[i] + 3.0)
+		var dr := track.wr[i] + 3.0
+		var big := roundi(s) % 50 == 0
+		var half := 0.12 if big else 0.06
+		var col := ciano if big else magenta
+		# transversal, em pedaços de 1 m para acompanhar o relevo
+		var d := dl
+		while d < dr - 0.01:
+			var d2 := minf(d + 1.0, dr)
+			_quad(im, _regua_pt(track, s - half, d), _regua_pt(track, s + half, d), _regua_pt(track, s + half, d2),
+				_regua_pt(track, s - half, d2), col)
+			d = d2
+		# marcas de d a cada 2 m (ao longo da pista)
+		var dd := ceilf(dl / 2.0) * 2.0
+		while dd <= dr:
+			var lng := 1.5 if absf(dd) < 0.01 else 0.6
+			_quad(im, _regua_pt(track, s - lng, dd - 0.05), _regua_pt(track, s + lng, dd - 0.05),
+				_regua_pt(track, s + lng, dd + 0.05), _regua_pt(track, s - lng, dd + 0.05), amarelo)
+			dd += 2.0
+		if big:
+			var lbl := Label3D.new()
+			lbl.text = "%d" % roundi(s)
+			lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+			lbl.pixel_size = 0.01
+			lbl.font_size = 96
+			lbl.outline_size = 16
+			lbl.modulate = ciano
+			lbl.outline_modulate = Color(0, 0, 0)
+			lbl.position = _regua_pt(track, s, dl + 0.5) + Vector3.UP * 1.2
+			node.add_child(lbl)
+		s += 10.0
+	im.surface_end()
+	var mi := MeshInstance3D.new()
+	mi.mesh = im
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	node.add_child(mi)
+	return node
+
+
+## Ponto da pista em (s, d), 4 cm acima dela (acima da pintura e do asfalto).
+func _regua_pt(track: Track, s: float, d: float) -> Vector3:
+	var n := track.n
+	var x := fposmod(s / Track.STEP, n)
+	var i := int(x)
+	var j := (i + 1) % n
+	var f := x - i
+	var r := track.R[i].lerp(track.R[j], f)
+	var nn := track.N[i].lerp(track.N[j], f).normalized()
+	return track.P[i].lerp(track.P[j], f) + r * d + nn * 0.04
+
+
+func _quad(im: ImmediateMesh, a: Vector3, b: Vector3, c: Vector3, d: Vector3, col: Color) -> void:
+	for p: Vector3 in [a, b, c, a, c, d]:
+		im.surface_set_color(col)
+		im.surface_add_vertex(p)
