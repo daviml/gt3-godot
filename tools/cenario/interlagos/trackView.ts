@@ -1,23 +1,28 @@
 // Malha da pista: asfalto, faixas brancas, zebras, grama até o muro, guard-rail, linha de chegada,
 // terreno em volta seguindo a altitude, árvores e arquibancadas simples.
+//
+// Fase 2B etapa F: a pista é a nova (a da física, tools/tracks/interlagos/interlagos.json, com camber), o relevo é o
+// do LiDAR (interlagos-terrain.json, grade de 8 m), o OSM é o da fonte própria e a referência do Garage 61 é a
+// reconvertida na pista nova (data/reference/interlagos-porsche.json). Metros da pista antiga: ./sNovo.ts.
 import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { buildExtras } from '@web/render/scenery';
 import { buildBarriers, buildBridge, buildGrid, buildPatches } from '@web/render/trackDetails';
 import { buildBanners, buildCornerDetails, buildMarshalPosts, buildPits, buildStands, occupied } from '@web/render/trackside';
 import { buildOsmScenery, OsmData } from '@web/render/osmScenery';
-import osm from '../../../../gt3-time-attack/data/tracks/interlagos-osm.json';
-import terrain from '../../../../gt3-time-attack/data/tracks/interlagos-terrain.json';
+import osm from '../../tracks/interlagos/interlagos-osm.json';
+import terrain from '../../tracks/interlagos/interlagos-terrain.json';
 import { mulberry32 } from '@web/util/random';
 import type { Quality } from '@web/render/quality';
 import { plantTrees, TreeSpot } from '@web/render/trees';
 import { pbr, phTexture, setHiRes } from '@web/render/textures';
 import { buildHorizon, buildTowers, HAZE } from '@web/render/surroundings';
-import porscheRef from '../../../../gt3-time-attack/data/reference/interlagos-porsche.json';
+import porscheRef from '../../../data/reference/interlagos-porsche.json';
 import { applyLiveAsphaltUV2 } from '../liveAsphalt';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TINTA, tintaEscura } from './tintas';
 import { aplicarPerfil } from './perfil';
+import { L_ANTIGO, sNovo } from './sNovo';
 
 /**
  * Pintura da borda de Interlagos (PLANO-INTERLAGOS-DETALHES.md, Fase 1): uma tabela só com as medidas, em vez
@@ -535,8 +540,9 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
 }
 
 /**
- * Grade SRTM (data/tracks/interlagos-terrain.json) suavizada e alinhada à altura da pista: devolve a altura do
- * relevo real em coordenadas do jogo. O alinhamento usa a mediana da diferença ao longo do traçado.
+ * Grade de relevo (tools/tracks/interlagos/interlagos-terrain.json: LiDAR GeoSampa a cada 8 m desde a Fase 2B; antes
+ * SRTM de 40 m) suavizada e alinhada à altura da pista: devolve a altura do relevo real em coordenadas do jogo. O
+ * alinhamento usa a mediana da diferença ao longo do traçado (igual ao tools/pista.ts, que faz o terrain.json).
  */
 function srtmGrid(S: Track['samples']): (x: number, z: number) => number {
   const T = terrain as { x0: number; z0: number; step: number; nx: number; nz: number; h: number[] };
@@ -675,8 +681,8 @@ function buildScenery(
   const MAX = 5200;
   for (let tries = 0; tries < 9000 && spots.length < MAX; tries++) {
     const s = S[Math.floor(rand() * S.length)];
-    // reta dos boxes: arquibancada e paddock, sem mata
-    if (s.s > track.length - 560 || s.s < 120) continue;
+    // reta dos boxes: arquibancada e paddock, sem mata (s antigo 3734 e 120 → s novo)
+    if (s.s > sNovo(L_ANTIGO - 560) || s.s < sNovo(120)) continue;
     const side = rand() < 0.5 ? -1 : 1;
     const off = (side < 0 ? s.wallL : s.wallR) + 10 + Math.pow(rand(), 1.4) * 150;
     p.copy(s.p).addScaledVector(s.r, side * off);

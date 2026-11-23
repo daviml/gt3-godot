@@ -70,7 +70,7 @@ func _initialize() -> void:
 	var track := Track.new("res://data/track/track.json")
 	car = Car.load_car(track, "audi-r8-lms-gt3")
 	car.assists.auto = true
-	var bot := RefBot.new(track, car, RefBot.load_ref("interlagos-r8"))
+	var bot := RefBot.new(track, car, RefBot.load_ref(String(Game.get_track_info("interlagos").refs["audi-r8-lms-gt3"])))
 	var s0 := track.length - 300.0
 	var p0 := bot.line_point(s0)
 	var p1 := bot.line_point(s0 + 4.0)

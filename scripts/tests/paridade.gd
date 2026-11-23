@@ -46,6 +46,8 @@ func _init() -> void:
 				print("%s: data/cars/%s.json diferente do acerto do web — rodar tools/prep.ts -- dados" % [id, id])
 				fails += 1
 		var t0 := Time.get_ticks_msec()
+		if (entry.web as Dictionary).has("refbot_ref"):
+			REFS[id] = String(entry.web.refbot_ref)
 		var got := measure(id, params, fast)
 		fails += compare(id, entry.web, got)
 		print("  (%.1f s)" % ((Time.get_ticks_msec() - t0) / 1000.0))
@@ -266,7 +268,13 @@ func ref_lap(params: Dictionary, ref_name: String) -> Dictionary:
 		refs[ref_name] = RefBot.load_ref(ref_name)
 	var car := Car.new(track, params)
 	car.assists.auto = true
+	# o RefBot do web (src/track/refBot.ts) não tem o termo de camber no limite de curva (v_cap) que o do Godot
+	# usa em pista com `bank` (Interlagos com LiDAR desde a Fase 2B): desliga só na construção para comparar o
+	# mesmo piloto; a física (normal inclinada, locate) continua com o camber, igual ao web (applyBank no paridade.ts)
+	var had_bank := track.has_bank
+	track.has_bank = false
 	var bot := RefBot.new(track, car, refs[ref_name])
+	track.has_bank = had_bank
 	var s0 := track.length - 300.0
 	var p0 := bot.line_point(s0)
 	var p1 := bot.line_point(s0 + 4.0)
@@ -306,7 +314,9 @@ func ref_lap(params: Dictionary, ref_name: String) -> Dictionary:
 	return {"refbot_volta": t - lap_start if crossed >= 2 else NAN, "refbot_erro_max": max_err, "refbot_fora": off, "refbot_maxima": vmax}
 
 
-const REFS := {"audi-r8-lms-gt3": "interlagos-r8"}
+## referência da volta lançada de cada carro: a mesma que o tools/paridade.ts usou (refbot_ref no paridade-web.json;
+## desde a Fase 2B, a do R8 em data/tracks.json → refs de Interlagos)
+var REFS := {}
 
 func measure(id: String, params: Dictionary, fast: bool) -> Dictionary:
 	var r := {}

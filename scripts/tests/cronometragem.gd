@@ -33,7 +33,7 @@ func _init() -> void:
 func bot_laps() -> void:
 	var car := Car.load_car(track, "audi-r8-lms-gt3")
 	car.assists.auto = true
-	var bot := RefBot.new(track, car, RefBot.load_ref("interlagos-r8"), BOT_OPTS)
+	var bot := RefBot.new(track, car, RefBot.load_ref(String(Game.get_track_info("interlagos").refs["audi-r8-lms-gt3"])), BOT_OPTS)
 	var s0 := track.length - 300.0
 	var p0 := bot.line_point(s0)
 	var p1 := bot.line_point(s0 + 4.0)
@@ -65,7 +65,9 @@ func bot_laps() -> void:
 	var a: LapTimer.Lap = got[0]
 	var b: LapTimer.Lap = got[1]
 	print("    voltas %s / %s, setores %.2f %.2f %.2f" % [LapTimer.format_time(a.time), LapTimer.format_time(b.time), a.sectors[0], a.sectors[1], a.sectors[2]])
-	check(absf(a.time - 94.02) < 0.25, "1ª volta ≈ 1:34,02 (RefBot R8)")
+	# pista da Fase 2B (4.308 m, relevo e camber do LiDAR) + referência do R8 em data/tracks.json (interlagos-nsx);
+	# antes: 1:34,02 na pista antiga, 1:32,72 na 2B sem LiDAR
+	check(absf(a.time - 90.81) < 0.25, "1ª volta ≈ 1:30,81 (RefBot R8)")
 	check(a.valid and b.valid, "as duas voltas válidas")
 	check(absf(a.sectors[0] + a.sectors[1] + a.sectors[2] - a.time) < 1e-4, "setores somam a volta")
 	check(a.sectors.all(func(x): return x > 20.0 and x < 45.0), "3 setores de tamanho plausível")

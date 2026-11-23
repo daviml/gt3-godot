@@ -1,195 +1,2719 @@
 {
-  "versao": 1,
-  "pista": "interlagos",
-  "passo": 2,
-  "comprimento": 4294,
-  "n": 2147,
-  "lados": {
+ "versao": 2,
+ "pista": "interlagos",
+ "passo": 2,
+ "comprimento": 4308,
+ "n": 2154,
+ "lados": {
   "esq": [
-    {"s0":0,"s1":154,"faixas":[{"tipo":"escape","cor":"verde","larg":1.4}],"barreira":{"tipo":"wall","dist":1.4,"banner":"verde","alambrado":true}},
-    {"s0":156,"s1":162,"faixas":[{"tipo":"escape","cor":"verde","larg":[1.3897101017200144,1.3348178320371553,1.2463588900853673,1.1400433918653463]}],"barreira":{"tipo":"wall","dist":[1.3998074872607056,1.3922750635993886,1.3570807442621815,1.2771319307038658],"banner":"verde","alambrado":true}},
-    {"s0":164,"s1":168,"faixas":[{"tipo":"escape","cor":"verde","larg":[1.0315814533777885,0.9366831906233906,0.8710587196028459]}],"barreira":{"tipo":"rolex_pad","dist":[1.153214135463232,1.009704607543779,0.8913111307123991],"alambrado":true}},
-    {"s0":170,"s1":284,"faixas":[{"tipo":"escape","cor":"verde","larg":0.85}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape","alambrado":true}},
-    {"s0":286,"s1":294,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.8745117665881426,0.9847089653399764,1.1643744630236992,1.3924201067690587,1.6477577437058026]}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape","alambrado":true}},
-    {"s0":296,"s1":304,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[1.9092992209636783,2.155956385672428,2.3666410849618136,2.520265165961575,2.59574047580146]}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape","alambrado":true}},
-    {"s0":306,"s1":320,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":2.6}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape","alambrado":true}},
-    {"s0":322,"s1":374,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":2.6}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape","alambrado":true}},
-    {"s0":376,"s1":384,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":[2.6093,2.6349,2.673,2.7202,2.7728]}],"barreira":{"tipo":"rolex_pad","dist":[3.8093,3.8349,3.873,3.9202,3.9728],"alambrado":true}},
-    {"s0":386,"s1":392,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":[2.8272,2.8798,2.927,2.9651]}],"barreira":{"tipo":"rolex_pad","dist":[4.0272,4.0798,4.127,4.1651],"alambrado":true}},
-    {"s0":394,"s1":394,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":2.9907}],"barreira":{"tipo":"rolex_pad","dist":4.1907}},
-    {"s0":396,"s1":416,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":3}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape"}},
-    {"s0":418,"s1":510,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":3}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape"}},
-    {"s0":512,"s1":530,"faixas":[{"tipo":"escape","cor":"verde","larg":3}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape"}},
-    {"s0":532,"s1":562,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"},{"tipo":"escape","cor":"verde","larg":3}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape"}},
-    {"s0":564,"s1":578,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"},{"tipo":"escape","cor":"verde","larg":3}],"barreira":{"tipo":"rail","dist":0,"de":"escape"}},
-    {"s0":580,"s1":594,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2,"visual":"normal"},{"tipo":"pintura","cor":"verde","larg":0.2},{"tipo":"escape","cor":"verde","larg":[2.489583002381948,2.1534841166621983,1.7844919160833674,1.4127323333172441,1.068331301035618,0.781414751910277,0.5821086186130104,0.5005388338156069]}],"barreira":{"tipo":"rail","dist":[3.2572,3.9465,4.9444,6.1276,7.3724,8.5556,9.5535,10.2428]}},
-    {"s0":596,"s1":740,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2,"visual":"normal"},{"tipo":"pintura","cor":"verde","larg":0.2},{"tipo":"escape","cor":"verde","larg":0.5}],"barreira":{"tipo":"rail","dist":10.5}},
-    {"s0":742,"s1":782,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2,"visual":"normal"},{"tipo":"escape","cor":"verde","larg":0.5}],"barreira":{"tipo":"rail","dist":10.5}},
-    {"s0":784,"s1":796,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"},{"tipo":"escape","cor":"verde","larg":[0.4191725816016589,0.3557605618604372,0.2836190276752506,0.20877316558045705,0.13724816211041407,0.07506920379947951,0.028261477182011163]}],"barreira":{"tipo":"rail","dist":[9.31991969138422,8.394104203162385,7.340837804058659,6.248088217474672,5.203823166812046,4.296010375472401,3.612617566857363]}},
-    {"s0":798,"s1":798,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"},{"tipo":"escape","cor":"verde","larg":0.0028501687923668806}],"barreira":{"tipo":"rail","dist":3.2416124643685578,"alambrado":true}},
-    {"s0":800,"s1":802,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"}],"barreira":{"tipo":"rail","dist":3.2,"alambrado":true}},
-    {"s0":804,"s1":1176,"faixas":[],"barreira":{"tipo":"rail","dist":3.2,"alambrado":true}},
-    {"s0":1178,"s1":1352,"faixas":[],"barreira":{"tipo":"rail","dist":3.2}},
-    {"s0":1354,"s1":1354,"faixas":[{"tipo":"escape","cor":"verde","larg":0.0010397229375395645}],"barreira":{"tipo":"rail","dist":3.2072780605627775}},
-    {"s0":1356,"s1":1360,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[0.010453958842936413,0.028500455104742486,0.05375101935925417]}],"barreira":{"tipo":"rail","dist":[3.273177711900556,3.399503185733197,3.576257135514779]}},
-    {"s0":1362,"s1":1372,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":[0.08477745924277366,0.12015158239160584,0.15844519644204313,0.19823010903039445,0.23807812779295132,0.27656106036602307]}],"barreira":{"tipo":"rail","dist":[3.7934422146994153,4.041061076741241,4.309116375094302,4.58761076321276,4.866546894550659,5.135927422562162]}},
-    {"s0":1374,"s1":1382,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":0.4}],"barreira":{"tipo":"rail","dist":6}},
-    {"s0":1384,"s1":1466,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2},{"tipo":"escape","cor":"verde","larg":0.4}],"barreira":{"tipo":"rail","dist":6}},
-    {"s0":1468,"s1":1528,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2,"listrada":false},{"tipo":"escape","cor":"verde","larg":0.4}],"barreira":{"tipo":"rail","dist":6}},
-    {"s0":1530,"s1":1576,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2},{"tipo":"escape","cor":"verde","larg":0.4}],"barreira":{"tipo":"rail","dist":6}},
-    {"s0":1578,"s1":1606,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":[0.39994425606308875,0.3938200619018522,0.3785737041896843,0.35563337529028116,0.32642726756734775,0.292383573384577,0.2549304851056762,0.21549619509433654,0.17550889571426645,0.13639677932915667,0.09958803830271568,0.06651086499863818,0.03859345178062068,0.017263991012369195,0.003950675057578457]}],"barreira":{"tipo":"tecpro","dist":[5.999609792441622,5.956740433312966,5.850015929327789,5.689433627031968,5.4849908729714345,5.246685013692039,4.984513395739733,4.708473365660357,4.428562269999866,4.154777455304097,3.8971162681190092,3.665576054990466,3.4701541624643433,3.320847937086584,3.22765472540305]}},
-    {"s0":1608,"s1":1638,"faixas":[{"tipo":"zebra","larg":"fisica"}],"barreira":{"tipo":"tecpro","dist":3.2}},
-    {"s0":1640,"s1":1674,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"tecpro","dist":3.2}},
-    {"s0":1676,"s1":1772,"faixas":[],"barreira":{"tipo":"tecpro","dist":3.2}},
-    {"s0":1774,"s1":1796,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.01814946926518803,0.09500678780088498,0.2218716973173227,0.38763857399440094,0.5812017940119547,0.7914557335498986,1.007294768788058,1.2176132759063523,1.4113056310846062,1.5772662105027353,1.704389390340574,1.7815695467780224]}],"barreira":{"tipo":"tecpro","dist":[3.2332740269861775,3.3741791109682904,3.6067647784150916,3.910670718989735,4.265536622355249,4.651002178174815,5.046707076111439,5.432291005828311,5.787393656988445,6.091654719255014,6.324713882291053,6.466210835759706]}},
-    {"s0":1798,"s1":1976,"faixas":[{"tipo":"escape","cor":"verde","larg":1.8}],"barreira":{"tipo":"rolex_pad","dist":6.5,"alambrado":true}},
-    {"s0":1978,"s1":1996,"faixas":[{"tipo":"escape","cor":"verde","larg":[1.8007647633868276,1.8095783464998916,1.827115527853087,1.851948115082718,1.8826479158250793,1.9177867377164781,1.955936388393207,1.995668675491575,2.0355554066478736,2.0741683894984115]}],"barreira":{"tipo":"rolex_pad","dist":[6.500573572540121,6.507183759874919,6.520336645889816,6.538961086312039,6.561985936868809,6.588340053287358,6.616952291294906,6.64675150661868,6.676666554985904,6.705626292123809],"alambrado":true}},
-    {"s0":1998,"s1":2000,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[2.1100794316794813,2.1418603408273915]}],"barreira":{"tipo":"rolex_pad","dist":[6.732559573759611,6.756395255620543],"alambrado":true}},
-    {"s0":2002,"s1":2022,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[2.1680829245784343,2.187318990568917,2.198140346435135,3.484436803526811,4.331124744134575,5.260880390164646,6.197786391284321,7.065925397160484,7.789380057460421,8.292233021851064,8.498566939999613]}],"barreira":{"tipo":"wall","dist":[6.776062193433827,6.790489242926688,6.798605259826351,7.391248687337738,7.780993929839726,8.208976687536106,8.640250878527702,9.039870420915143,9.37288923279924,9.604361232280649,9.69934033746014],"banner":"amarelo","alambrado":true}},
-    {"s0":2024,"s1":2126,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":8.5}],"barreira":{"tipo":"wall","dist":8.5,"de":"zebra","banner":"amarelo","alambrado":true}},
-    {"s0":2128,"s1":2136,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[7.063991996223669,6.153053272774646,5.160532122444236,4.167166044792845,3.253692539381074]}],"barreira":{"tipo":"wall","dist":[9.799815915693449,9.228779694510937,8.606602249926635,7.983895149403765,7.411269960405669],"banner":"amarelo","alambrado":true}},
-    {"s0":2138,"s1":2142,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[2.5008491057689,1.9893732435169493,1.800002452185633]}],"barreira":{"tipo":"wall","dist":[6.906462598665855,6.600945226717992,6.500001192107313],"banner":"branco"}},
-    {"s0":2144,"s1":2174,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":1.8}],"barreira":{"tipo":"wall","dist":6.5,"banner":"branco"}},
-    {"s0":2176,"s1":2222,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":1.8}],"barreira":{"tipo":"wall","dist":6.5,"banner":"branco"}},
-    {"s0":2224,"s1":2240,"faixas":[{"tipo":"escape","cor":"verde","larg":1.8}],"barreira":{"tipo":"wall","dist":6.5,"banner":"branco"}},
-    {"s0":2242,"s1":2266,"faixas":[{"tipo":"escape","cor":"verde","larg":[1.8082,1.831,1.8661,1.911,1.9633,2.0204,2.08,2.1396,2.1967,2.249,2.2939,2.329,2.3518]}],"barreira":{"tipo":"wall","dist":[6.500785494774791,6.692396997242726,7.181564470470418,7.910971946462789,8.823796022386691,9.863418311323919,10.973243079610654,12.096723476850112,13.177156128318956,14.15731895714033,14.97939671035613,15.584916720046191,15.913251992024332],"banner":"branco"}},
-    {"s0":2268,"s1":2280,"faixas":[{"tipo":"escape","cor":"verde","larg":"fisica"}],"barreira":{"tipo":"wall","dist":"fisica","banner":"branco"}},
-    {"s0":2282,"s1":2330,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":"fisica"}],"barreira":{"tipo":"wall","dist":"fisica","banner":"branco"}},
-    {"s0":2332,"s1":2404,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":"fisica"}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2406,"s1":2466,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":"fisica"}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2468,"s1":2474,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"pintura","cor":"verde","larg":1},{"tipo":"escape","cor":"verde","larg":"fisica"}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2476,"s1":2476,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"pintura","cor":"verde","larg":1},{"tipo":"escape","cor":"verde","larg":"fisica"}],"barreira":{"tipo":"wall","dist":"fisica","banner":"branco"}},
-    {"s0":2478,"s1":2496,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"pintura","cor":"verde","larg":1},{"tipo":"escape","cor":"verde","larg":[2.4618503058506955,2.3008519883795504,2.0415590580281844,1.714097447468267,1.3485930893716418,0.9751719164101029,0.623959861255519,0.32508285657951896,0.10866683505398012,0.004837729350696485]}],"barreira":{"tipo":"wall","dist":[15.77389625102623,15.083595357984986,14.020077809067013,12.683460331161934,11.191891233904277,9.667099964182476,8.233766685832057,7.013542689202284,6.1362282505206,5.719298316265126],"banner":"branco"}},
-    {"s0":2498,"s1":2504,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"pintura","cor":"verde","larg":1}],"barreira":{"tipo":"wall","dist":4.5,"de":"zebra","banner":"branco"}},
-    {"s0":2506,"s1":2506,"faixas":[{"tipo":"zebra","larg":"fisica"}],"barreira":{"tipo":"wall","dist":4.5,"de":"zebra","banner":"branco"}},
-    {"s0":2508,"s1":2552,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.6}],"barreira":{"tipo":"wall","dist":4.5,"de":"zebra","banner":"branco"}},
-    {"s0":2554,"s1":2606,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.6,"listrada":false}],"barreira":{"tipo":"wall","dist":4.5,"de":"zebra","banner":"branco"}},
-    {"s0":2608,"s1":2636,"faixas":[],"barreira":{"tipo":"wall","dist":4.5,"de":"zebra","banner":"branco"}},
-    {"s0":2638,"s1":2736,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"wall","dist":4.5,"de":"zebra","banner":"branco"}},
-    {"s0":2738,"s1":2762,"faixas":[{"tipo":"zebra","larg":"fisica"}],"barreira":{"tipo":"wall","dist":4.5,"de":"zebra","banner":"branco"}},
-    {"s0":2764,"s1":2806,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"wall","dist":4.5,"de":"zebra","banner":"branco"}},
-    {"s0":2808,"s1":2824,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[0.10389082945395962,0.4019683971302198,0.8462197925423603,1.3884435234155115,1.980438097474665,2.57400202244523,3.1209338060522054,3.5730319560206314,3.882094980075853]}],"barreira":{"tipo":"wall","dist":[6.751945462410696,6.900984246248826,7.123109943954895,7.39422180939147,7.690219096421048,7.987001058906332,8.260466950709818,8.486516025694034,8.641047537721642],"banner":"branco"}},
-    {"s0":2826,"s1":2826,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":3.999921385942884}],"barreira":{"tipo":"rail","dist":8.699960740655158}},
-    {"s0":2828,"s1":2834,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":4}],"barreira":{"tipo":"rail","dist":6.5,"de":"zebra"}},
-    {"s0":2836,"s1":2874,"faixas":[{"tipo":"escape","cor":"verde","larg":4}],"barreira":{"tipo":"rail","dist":6.5,"de":"zebra"}},
-    {"s0":2876,"s1":2878,"faixas":[{"tipo":"escape","cor":"verde","larg":[3.999989593436024,3.885675066439667]}],"barreira":{"tipo":"rail","dist":[6.500014309025468,6.657196783645458]}},
-    {"s0":2880,"s1":2880,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"},{"tipo":"escape","cor":"verde","larg":3.579339245799474}],"barreira":{"tipo":"rail","dist":7.078408537025722}},
-    {"s0":2882,"s1":2894,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":[3.1291836237903157,2.5834096926871926,1.9902189447647198,1.397812872297882,0.8543929675616622,0.40816072283067717,0.10731763037992659]}],"barreira":{"tipo":"rail","dist":[8.636127604425411,9.222834580361267,9.860514634377925,10.497351162279777,11.081527559871212,11.561227222957024,11.884633547341581]}},
-    {"s0":2896,"s1":3016,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":0.5}],"barreira":{"tipo":"rail","dist":12}},
-    {"s0":3018,"s1":3034,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"},{"tipo":"escape","cor":"verde","larg":0.5}],"barreira":{"tipo":"rail","dist":12}},
-    {"s0":3036,"s1":3198,"faixas":[{"tipo":"escape","cor":"verde","larg":0.5}],"barreira":{"tipo":"rail","dist":12}},
-    {"s0":3200,"s1":3200,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"},{"tipo":"escape","cor":"verde","larg":0.5}],"barreira":{"tipo":"rail","dist":12}},
-    {"s0":3202,"s1":3230,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":[0.4964967846353015,0.4814082156115189,0.45604828639066286,0.4222022374273666,0.3816553091762394,0.33619274209191286,0.2875997766290116,0.23766165324217203,0.188163612385996,0.14089089451511938,0.09762874008416711,0.06016238954777181,0.030277083360540802,0.009758061977108212,0.000390565852099678]}],"barreira":{"tipo":"rail","dist":[11.975477492447114,11.869857509280632,11.69233800473464,11.455415661991564,11.171587164233674,10.853349194643389,10.51319843640308,10.163631572695206,9.817145286701972,9.486236261605836,9.18340118058917,8.921136726834403,8.711939583523785,8.568306433839759,8.502733960964697]}},
-    {"s0":3232,"s1":3288,"faixas":[{"tipo":"zebra","larg":"fisica"}],"barreira":{"tipo":"rail","dist":8.5}},
-    {"s0":3290,"s1":3324,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"rail","dist":8.5}},
-    {"s0":3326,"s1":3340,"faixas":[],"barreira":{"tipo":"rail","dist":8.5}},
-    {"s0":3342,"s1":3350,"faixas":[],"barreira":{"tipo":"rail","dist":[8.56513809244834,8.799193955848924,9.175868796850274,9.666015189240246,10.241479721630032]}},
-    {"s0":3352,"s1":3352,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"}],"barreira":{"tipo":"rail","dist":10.873846842299187}},
-    {"s0":3354,"s1":3370,"faixas":[{"tipo":"zebra","larg":"fisica"}],"barreira":{"tipo":"rail","dist":[11.549533846098342,12.24354025074148,12.929713620434185,13.584673002177567,14.18664110892821,14.716443405412985,15.151053684371771,15.479408542532653,15.70087716400287]}},
-    {"s0":3372,"s1":3412,"faixas":[{"tipo":"zebra","larg":"fisica"}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":3414,"s1":3426,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":3428,"s1":3494,"faixas":[],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":3496,"s1":3520,"faixas":[],"barreira":{"tipo":"rail","dist":[15.84450917467882,15.40702985343522,14.617272444379736,13.554732105500797,12.294070021476129,10.904992402865986,9.463685843657434,8.043777648666513,6.718203903096686,5.567156066972685,4.647200649105377,4.033562635782092,3.8003773992515724]}},
-    {"s0":3522,"s1":3534,"faixas":[],"barreira":{"tipo":"rail","dist":3.8}},
-    {"s0":3536,"s1":3544,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.012861499214738824,0.11722207481515338,0.30649574436484767,0.556581761726477,0.8433793807625718]}],"barreira":{"tipo":"wall","dist":[3.7884246507067347,3.694500132666361,3.5241538300716364,3.299076414446171,3.0409585573136866],"banner":"avis","alambrado":true}},
-    {"s0":3546,"s1":3554,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.4,"listrada":false},{"tipo":"escape","cor":"verde","larg":[1.1427878553356974,1.4307064393083557,1.6830343865432473,1.875670950902869,1.984515386249786]}],"barreira":{"tipo":"wall","dist":[3.571442428932861,3.5138587121383296,3.4633931226913495,3.4248658098194262,3.403096922750043],"banner":"avis","alambrado":true}},
-    {"s0":3556,"s1":3644,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.4,"listrada":false},{"tipo":"escape","cor":"verde","larg":2}],"barreira":{"tipo":"wall","dist":2,"de":"zebra","banner":"avis","alambrado":true}},
-    {"s0":3646,"s1":3658,"faixas":[{"tipo":"escape","cor":"verde","larg":2}],"barreira":{"tipo":"wall","dist":2,"de":"zebra","banner":"avis","alambrado":true}},
-    {"s0":3660,"s1":3672,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"},{"tipo":"escape","cor":"verde","larg":[1.9996545154689767,1.8917420049267486,1.630282208398834,1.2724028204332296,0.875231535577931,0.49589604838101153,0.1915240533902829]}],"barreira":{"tipo":"wall","dist":[2.000034548453103,2.010825799507325,2.036971779160117,2.0727597179566777,2.112476846442208,2.1504103951618987,2.180847594660972],"banner":"avis","alambrado":true}},
-    {"s0":3674,"s1":3674,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"},{"tipo":"escape","cor":"verde","larg":0.01924324515383069}],"barreira":{"tipo":"rail","dist":2.198075675484618}},
-    {"s0":3676,"s1":3696,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"normal"}],"barreira":{"tipo":"rail","dist":2.2}},
-    {"s0":3698,"s1":3854,"faixas":[],"barreira":{"tipo":"rail","dist":2.2}},
-    {"s0":3856,"s1":3908,"faixas":[],"barreira":{"tipo":"rail","dist":[2.2135247131478977,2.2787227411157867,2.394141345760554,2.555608617307537,2.758952645982082,3.000001522009473,3.27458333561517,3.5785261770244636,3.907658136462702,4.2578073041551505,4.624801770327311,5.004469625204451,5.392638959011832,5.785137861974975,6.177794424319135,6.566436736269662,6.946892888051813,7.314990969891108,7.666559072012806,7.997425284642252,8.303417698004726,8.580364402325717,8.824093487830488,9.03043304474439,9.19521116329274,9.314255933700949,9.383395446194335]}},
-    {"s0":3910,"s1":4008,"faixas":[],"barreira":{"tipo":"rail","dist":9.4}},
-    {"s0":4010,"s1":4034,"faixas":[],"barreira":{"tipo":"rail","dist":[9.2834,8.9569,8.4554,7.814,7.0676,6.2513,5.4,4.5487,3.7324,2.986,2.3446,1.8431,1.5166]}},
-    {"s0":4036,"s1":4042,"faixas":[{"tipo":"escape","cor":"verde","larg":1.4}],"barreira":{"tipo":"rail","dist":1.4}},
-    {"s0":4044,"s1":4292,"faixas":[{"tipo":"escape","cor":"verde","larg":1.4}],"barreira":{"tipo":"wall","dist":1.4,"banner":"verde","alambrado":true}}
+   {
+    "s0": 0,
+    "s1": 154,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.4
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "verde",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 156,
+    "s1": 162,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.39,1.335,1.246,1.14]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "verde",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 164,
+    "s1": 168,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.032,0.937,0.871]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 170,
+    "s1": 284,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0.85
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 286,
+    "s1": 294,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.875,0.985,1.164,1.392,1.648]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 296,
+    "s1": 304,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.17,2.39,2.65,2.93,3.22]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 306,
+    "s1": 320,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [3.41,3.58,3.61,3.62,3.63,3.63,3.62,3.6]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 322,
+    "s1": 376,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [3.25,2.69,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.6,2.5,2.26,1.98,1.72,1.45]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 378,
+    "s1": 386,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.32,1.21,1.11,1.02,0.94]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 388,
+    "s1": 394,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.86,0.83,0.82,0.91]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 396,
+    "s1": 396,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.03
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 398,
+    "s1": 420,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.19,1.36,1.5,1.64,1.75,1.86,1.93,1.98,1.97,1.95,2.37,3.03]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 422,
+    "s1": 518,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.91,2.78,2.58,2.35,1.99,1.59,1.51,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.55,1.62,1.82,2.06,2.27,2.48,2.79,3.13,3.43,3.71,4.03,4.37,4.69,5.02,5.2,5.2,5.2,5.2,5.2,5.2,5.2,5.2,4.89,4.57,4.26]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 520,
+    "s1": 536,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 3
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 538,
+    "s1": 538,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 2.55
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 540,
+    "s1": 572,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.95,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 574,
+    "s1": 588,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.8
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 590,
+    "s1": 604,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "pintura",
+      "cor": "verde",
+      "larg": 0.2
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.49,2.153,1.784,1.413,1.068,0.781,0.582,0.501]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 606,
+    "s1": 748,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "pintura",
+      "cor": "verde",
+      "larg": 0.2
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0.5
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 750,
+    "s1": 790,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0.5
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 792,
+    "s1": 804,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 806,
+    "s1": 806,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 808,
+    "s1": 810,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 812,
+    "s1": 1184,
+    "faixas": [],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 1186,
+    "s1": 1358,
+    "faixas": [],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1360,
+    "s1": 1360,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0.001
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1362,
+    "s1": 1366,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.21,1.229,1.254]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1368,
+    "s1": 1378,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.465,0.12,0.158,0.198,0.238,0.277]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1380,
+    "s1": 1388,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0.4
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1390,
+    "s1": 1470,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.4,0.59]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1472,
+    "s1": 1532,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.19,1.6,1.6,1.6,1.6,1.6,1.6,1.6,1.6,1.6,1.6,1.6,1.6,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.5,1.55,1.6,1.6,1.6,1.6,0.83]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1534,
+    "s1": 1580,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0.4
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1582,
+    "s1": 1610,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.4,0.394,0.379,0.356,0.326,0.292,0.255,0.215,0.176,0.136,0.1,0.067,0.039,0.017,0.004]
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1612,
+    "s1": 1680,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1682,
+    "s1": 1778,
+    "faixas": [],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1780,
+    "s1": 1802,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.018,0.095,0.222,0.388,0.581,0.791,1.007,1.218,1.411,1.577,1.704,1.782]
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1804,
+    "s1": 1982,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.8
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 1984,
+    "s1": 2002,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.801,1.81,1.827,1.852,1.883,1.918,1.956,1.996,2.036,2.074]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 2004,
+    "s1": 2006,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [3.31,3.342]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 2008,
+    "s1": 2026,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [3.368,3.387,3.398,4.684,5.531,6.461,7.398,8.266,8.989,9.492]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "amarelo",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 2028,
+    "s1": 2130,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [9.7,9.7,9.7,9.7,9.7,9.76,10.07,10.39,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7,10.7]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "amarelo",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 2132,
+    "s1": 2140,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [9.264,8.353,7.361,6.367,5.454]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "amarelo",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 2142,
+    "s1": 2146,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [4.391,3.559,3.06]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2148,
+    "s1": 2178,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [3,3,3,3,3,3,3,3,3,3,3,3.06,3.37,3.69,4,4]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2180,
+    "s1": 2226,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.91,1.81,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.97,1.83,1.83,1.85]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2228,
+    "s1": 2228,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.18
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2230,
+    "s1": 2244,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.8
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2246,
+    "s1": 2270,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.808,1.831,1.866,1.911,1.963,2.02,2.08,2.14,2.197,2.249,2.294,2.329,2.352]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2272,
+    "s1": 2284,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2286,
+    "s1": 2334,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2336,
+    "s1": 2470,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2472,
+    "s1": 2480,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "pintura",
+      "cor": "verde",
+      "larg": 1
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2482,
+    "s1": 2482,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "pintura",
+      "cor": "verde",
+      "larg": 1
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2484,
+    "s1": 2502,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "pintura",
+      "cor": "verde",
+      "larg": 1
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.462,2.301,2.042,1.714,1.349,0.975,0.624,0.325,0.109,0.005]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2504,
+    "s1": 2510,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "pintura",
+      "cor": "verde",
+      "larg": 1
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2512,
+    "s1": 2614,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2616,
+    "s1": 2642,
+    "faixas": [],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2644,
+    "s1": 2814,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2816,
+    "s1": 2832,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.304,2.602,3.046,3.588,4.18,4.774,5.321,5.773,6.082]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2834,
+    "s1": 2834,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 6.2
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2836,
+    "s1": 2842,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [6.2,5.89,5.57,5.26]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2844,
+    "s1": 2882,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 4
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2884,
+    "s1": 2886,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [4,3.886]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2888,
+    "s1": 2888,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 3.179
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2890,
+    "s1": 2902,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [3.339,2.583,1.99,1.398,0.854,0.408,0.107]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2904,
+    "s1": 3026,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0.5
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3028,
+    "s1": 3046,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0,0,0,0,0,0,0,0,0,0.5]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3048,
+    "s1": 3210,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0.5
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3212,
+    "s1": 3212,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0.19
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3214,
+    "s1": 3242,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.796,0.481,0.456,0.422,0.382,0.336,0.288,0.238,0.188,0.141,0.098,0.06,0.03,0.01,0]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3244,
+    "s1": 3338,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3340,
+    "s1": 3362,
+    "faixas": [],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3364,
+    "s1": 3440,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3442,
+    "s1": 3548,
+    "faixas": [],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3550,
+    "s1": 3558,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.013,0.117,0.306,0.557,0.843]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "avis",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3560,
+    "s1": 3568,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.543,2.831,3.083,3.276,3.385]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "avis",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3570,
+    "s1": 3660,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 3.4
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "avis",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3662,
+    "s1": 3672,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 2
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "avis",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3674,
+    "s1": 3674,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.22
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "avis",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3676,
+    "s1": 3688,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.8,0.692,0.43,0.072,0,0,0]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "avis",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3690,
+    "s1": 3690,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3692,
+    "s1": 3714,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 3716,
+    "s1": 4048,
+    "faixas": [],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 4050,
+    "s1": 4056,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.4
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 4058,
+    "s1": 4306,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.4
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "verde",
+     "alambrado": true
+    }
+   }
   ],
   "dir": [
-    {"s0":0,"s1":154,"faixas":[{"tipo":"escape","cor":"verde","larg":1.4}],"barreira":{"tipo":"wall","dist":1.4,"banner":"verde","alambrado":true}},
-    {"s0":156,"s1":162,"faixas":[{"tipo":"escape","cor":"verde","larg":[1.3962582188072779,1.3762973934680565,1.344130505485588,1.3054703243146712]}],"barreira":{"tipo":"wall","dist":[1.3999299953675282,1.397190932217959,1.3843929979135208,1.355320702074132],"banner":"verde","alambrado":true}},
-    {"s0":164,"s1":168,"faixas":[{"tipo":"escape","cor":"verde","larg":[1.2660296194101048,1.2315211602266876,1.2076577162192166]}],"barreira":{"tipo":"rolex_pad","dist":[1.3102596856229924,1.2580744027431923,1.2150222293499624],"alambrado":true}},
-    {"s0":170,"s1":294,"faixas":[{"tipo":"escape","cor":"verde","larg":[1.200084188407396,1.2073707728559424,1.2260171379404894,1.2554581694833378,1.2951287533067906,1.3444637752331485,1.4028981210847138,1.4698666766837865,1.5448043278526706,1.6271459604136667,1.7163264601890762,1.8117807130011996,1.9129436046723414,2.0192500210248014,2.130134847880882,2.2450329710628827,2.3633792763931076,2.4846086496938584,2.608155976787436,2.7334561434961415,2.8599440356422754,2.9870545390481427,3.114222539536043,3.2408829229282787,3.366470575047149,3.4904203817149595,3.612167228754009,3.7311460019866,3.8467915872350336,3.958538870321613,4.065822737068639,4.168078073298412,4.264739764833235,4.355242697495409,4.439021757107237,4.515511829491019,4.584147800469058,4.644364555863652,4.695596981497109,4.7372799631917255,4.768848386769806,4.789737138053649,4.79938110286556,4.8052128058249055,4.831066500454653,4.876918926971343,4.9409191480716235,5.021216226452136,5.115959224809531,5.223297205840451,5.341379232241541,5.468354366709447,5.602371671940815,5.741580210632288,5.884129045480514,6.028167239182137,6.1718438544337975,6.31330795393215,6.4507086003738365,6.5821948564555,6.7059157848737865,6.820020448325343,6.922657909506814]}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape","alambrado":true}},
-    {"s0":296,"s1":304,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[7.011977231114843,7.086127475846077,7.143257706397161,7.181516985464741,7.199054375745462]}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape","alambrado":true}},
-    {"s0":306,"s1":384,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":7.2}],"barreira":{"tipo":"rolex_pad","dist":0,"de":"escape","alambrado":true}},
-    {"s0":386,"s1":388,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[7.198757829637015,7.193483861864376]}],"barreira":{"tipo":"rolex_pad","dist":[10.003713731745309,10.192224444014535],"alambrado":true}},
-    {"s0":390,"s1":410,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[7.184181467199386,7.170967646271128,7.1539593997086826,7.1332737281411305,7.109027632197555,7.081338112507037,7.050322169698658,7.0160968044015,6.978779017244644,6.938485808857172,6.895334179868166]}],"barreira":{"tipo":"rail","dist":[10.39127752205982,10.596471076609474,10.80340321839181,11.007672058135144,11.204875706567794,11.390612274418059,11.56047987241426,11.710076611284716,11.835000601757738,11.930849954561634,11.99322278042472]}},
-    {"s0":412,"s1":414,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":[6.8494411309067065,6.8009236626018765]}],"barreira":{"tipo":"rail","dist":[12.017717190075311,11.999931294241717]}},
-    {"s0":416,"s1":474,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":[6.749898775582757,6.696483470478431,6.640794747917978,6.5829496085304795,6.523065052945018,6.461258081790676,6.397645695696534,6.332344895291674,6.265472681205177,6.197146054066127,6.127482014503602,6.056597563146686,5.98460970062446,5.911635427566005,5.837791744600404,5.763195652356738,5.687964151464088,5.612214242551537,5.536062926248167,5.459627203183057,5.38302407398529,5.306370539283947,5.229783599708112,5.153380255886864,5.077277508449285,5.001592358024459,4.926441805241465,4.851942850729386,4.778212495117302,4.705367739034296]}],"barreira":{"tipo":"rail","dist":3,"de":"escape"}},
-    {"s0":476,"s1":510,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[4.633525583109449,4.562803027971843,4.493317074250561,4.425184722574681,4.358522973573288,4.293448827875466,4.230079286110289,4.168531348906843,4.10892201689421,4.051368290701471,3.9959871709577075,3.9428956582920014,3.8922107533334342,3.8440494567110886,3.798528769054044,3.7557656909913835,3.7158772231521877,3.6789803661655394]}],"barreira":{"tipo":"rail","dist":3,"de":"escape"}},
-    {"s0":512,"s1":524,"faixas":[{"tipo":"escape","cor":"verde","larg":[3.6451921206605196,3.6146294872662104,3.587409466611693,3.5636490593260493,3.5434652660383605,3.5269750873777084,3.514295523973175]}],"barreira":{"tipo":"rail","dist":3,"de":"escape"}},
-    {"s0":526,"s1":538,"faixas":[{"tipo":"escape","cor":"verde","larg":[3.5055435764538423,3.5008362454487902,3.4752484744049448,3.1916075141936155,2.670529573517222,2.0119881178347376,1.3159566126051363]}],"barreira":{"tipo":"rail","dist":[6.499044510509844,6.47324141676665,6.420236742188558,6.194407458475495,5.9251867917686205,5.760238350656191,5.763239127005961]}},
-    {"s0":540,"s1":544,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.6824085232873918,0.2113173153404766,0.0026564542233642463]}],"barreira":{"tipo":"wall","dist":[5.907834895670905,6.095689965310013,6.198631280324137],"banner":"vermelho"}},
-    {"s0":546,"s1":744,"faixas":[],"barreira":{"tipo":"wall","dist":6.2,"banner":"vermelho"}},
-    {"s0":746,"s1":772,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"}],"barreira":{"tipo":"wall","dist":6.2,"banner":"vermelho"}},
-    {"s0":774,"s1":792,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"}],"barreira":{"tipo":"wall","dist":[6.200039754078246,6.224254953777084,6.286571751671794,6.377349849307406,6.486948948228947,6.605728749981444,6.724048956109924,6.832269268159417,6.92074938767495,6.979849016201547],"banner":"vermelho"}},
-    {"s0":794,"s1":878,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"}],"barreira":{"tipo":"wall","dist":7,"banner":"vermelho"}},
-    {"s0":880,"s1":1146,"faixas":[],"barreira":{"tipo":"wall","dist":7,"banner":"vermelho"}},
-    {"s0":1148,"s1":1148,"faixas":[],"barreira":{"tipo":"rolex_pad","dist":7,"alambrado":true}},
-    {"s0":1150,"s1":1162,"faixas":[],"barreira":{"tipo":"rolex_pad","dist":[7.127641678150635,7.198199226151952,7.272939374573055,7.345836936879576,7.4108667265371615,7.462003557011463,7.493222241768109],"alambrado":true}},
-    {"s0":1164,"s1":1354,"faixas":[],"barreira":{"tipo":"rolex_pad","dist":7.5,"alambrado":true}},
-    {"s0":1356,"s1":1362,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"rolex_pad","dist":7.5,"alambrado":true}},
-    {"s0":1364,"s1":1382,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[0.04476938148452145,0.4297657054548297,1.1347624886772845,2.0693819331363668,3.1432462408169135,4.265977613703322,5.347198253780475,6.296530363032766,7.023596143445037,7.4380177970017645]}],"barreira":{"tipo":"rolex_pad","dist":[7.507163101037523,7.568762512872772,7.681561998188365,7.8311011093018195,8.002919398530707,8.182556418192531,8.355551720604875,8.507444858085243,8.623775382951205,8.690082847520282],"alambrado":true}},
-    {"s0":1384,"s1":1488,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":7.5}],"barreira":{"tipo":"tecpro","dist":7.5,"de":"zebra"}},
-    {"s0":1490,"s1":1504,"faixas":[{"tipo":"escape","cor":"verde","larg":7.5}],"barreira":{"tipo":"tecpro","dist":7.5,"de":"zebra"}},
-    {"s0":1506,"s1":1534,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"},{"tipo":"escape","cor":"verde","larg":7.5}],"barreira":{"tipo":"tecpro","dist":7.5,"de":"zebra"}},
-    {"s0":1536,"s1":1540,"faixas":[{"tipo":"escape","cor":"verde","larg":7.5}],"barreira":{"tipo":"tecpro","dist":7.5,"de":"zebra"}},
-    {"s0":1542,"s1":1576,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":7.5}],"barreira":{"tipo":"tecpro","dist":7.5,"de":"zebra"}},
-    {"s0":1578,"s1":1656,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2,"listrada":false},{"tipo":"escape","cor":"verde","larg":7.5}],"barreira":{"tipo":"tecpro","dist":7.5,"de":"zebra"}},
-    {"s0":1658,"s1":1668,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2,"listrada":false},{"tipo":"escape","cor":"verde","larg":[7.499335958840606,7.465981108071158,7.387414004857851,7.270775611019169,7.123206888373635,6.951848798739735]}],"barreira":{"tipo":"rail","dist":[9.702027345638385,9.80405579127251,10.044686598789024,10.402672803633816,10.856822898636022,11.386175986804208]}},
-    {"s0":1670,"s1":1686,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2,"visual":"normal"},{"tipo":"escape","cor":"verde","larg":[6.763842303935944,6.566328365780802,6.366447946092762,6.171342006690369,5.988151509392075,5.824017416016421,5.6860806883818675,5.581482288306944,5.5173631776101235]}],"barreira":{"tipo":"rail","dist":[11.771145860068595,12.251344204711614,12.806309119777282,13.49709132600255,14.174186235383008,14.781047982447618,15.292021627274135,15.681760750206049,15.915328857264232]}},
-    {"s0":1688,"s1":1746,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2,"visual":"normal"},{"tipo":"escape","cor":"verde","larg":5.5}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":1748,"s1":1756,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.2,"listrada":false},{"tipo":"escape","cor":"verde","larg":5.5}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":1758,"s1":1796,"faixas":[{"tipo":"escape","cor":"verde","larg":[5.497867762921578,5.440187491073605,5.30994926068716,5.115437703247016,4.8649374502378695,4.566733133144519,4.22910938345168,3.8603508326440483,3.4687421122064523,3.062567853623542,2.6501126883801533,2.239661247960934,1.839498163850719,1.4579080675341594,1.1031755904960843,0.7835853642211541,0.5074220201941841,0.2829701898998538,0.11851450482295522,0.02233959644819361]}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":1798,"s1":1966,"faixas":[],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":1968,"s1":1986,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.004112020500443537,0.05161485399925483,0.14272322353275926,0.26538675603224565,0.40755507842901767,0.557177817654328,0.7022046006394942,0.8305850543157689,0.9302688056144648,0.9892054814668444]}],"barreira":{"tipo":"rail","dist":[15.962195015154474,15.632116846340566,14.996806867251163,14.140481887767415,13.147114450996876,12.097746072801918,11.072615411267602,10.173042418551184,9.479600323017674,9.073696584074824]}},
-    {"s0":1988,"s1":1996,"faixas":[{"tipo":"pintura","cor":"verde","larg":0.65},{"tipo":"salsicha","larg":0.4},{"tipo":"escape","cor":"verde","larg":1}],"barreira":{"tipo":"rail","dist":9}},
-    {"s0":1998,"s1":2044,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"pintura","cor":"verde","larg":0.65},{"tipo":"salsicha","larg":0.4},{"tipo":"escape","cor":"verde","larg":1}],"barreira":{"tipo":"rail","dist":9}},
-    {"s0":2046,"s1":2176,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"pintura","cor":"verde","larg":0.65},{"tipo":"salsicha","larg":0.4},{"tipo":"escape","cor":"verde","larg":1}],"barreira":{"tipo":"rail","dist":9}},
-    {"s0":2178,"s1":2196,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"pintura","cor":"verde","larg":0.65},{"tipo":"salsicha","larg":0.4},{"tipo":"escape","cor":"verde","larg":[0.9987,0.9949,0.9888,0.9803,0.9697,0.957,0.9424,0.9259,0.9077,0.8879]}],"barreira":{"tipo":"rail","dist":[8.9955,8.9823,8.9607,8.9311,8.894,8.8496,8.7984,8.7407,8.677,8.6076]}},
-    {"s0":2198,"s1":2222,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[0.8665,0.8438,0.8197,0.7944,0.7681,0.7407,0.7125,0.6836,0.654,0.6238,0.5933,0.5624,0.5312]}],"barreira":{"tipo":"rail","dist":[8.5328,8.4531,8.3689,8.2805,8.1882,8.0926,7.9939,7.8926,7.789,7.6834,7.5764,7.4682,7.3593]}},
-    {"s0":2224,"s1":2240,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.5,0.4688,0.4376,0.4067,0.3762,0.346,0.3164,0.2875,0.2593]}],"barreira":{"tipo":"rail","dist":[7.25,7.1407,7.0318,6.9236,6.8166,6.711,6.6074,6.5061,6.4074]}},
-    {"s0":2242,"s1":2250,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.2319,0.2056,0.1803,0.1562,0.1335]}],"barreira":{"tipo":"rail","dist":[6.3118,6.2195,6.1311,6.0469,5.9672]}},
-    {"s0":2252,"s1":2270,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.1121,0.0923,0.0741,0.0576,0.043,0.0303,0.0197,0.0112,0.0051,0.0013]}],"barreira":{"tipo":"rail","dist":[5.8924,5.823,5.7593,5.7016,5.6504,5.606,5.5689,5.5393,5.5177,5.5045]}},
-    {"s0":2272,"s1":2280,"faixas":[],"barreira":{"tipo":"rail","dist":5.5}},
-    {"s0":2282,"s1":2304,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"rail","dist":5.5}},
-    {"s0":2306,"s1":2466,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"wall","dist":5.5,"banner":"branco"}},
-    {"s0":2468,"s1":2474,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"wall","dist":[5.5193,5.5748,5.6631,5.7808],"banner":"branco"}},
-    {"s0":2476,"s1":2486,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"rail","dist":[5.9243,6.0903,6.2753,6.4758,6.6883,6.9096]}},
-    {"s0":2488,"s1":2490,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"rail","dist":[7.1359,7.3641]}},
-    {"s0":2492,"s1":2510,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"rail","dist":[7.5904,7.8117,8.0242,8.2247,8.4097,8.5757,8.7192,8.8369,8.9252,8.9807]}},
-    {"s0":2512,"s1":2562,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"rail","dist":9}},
-    {"s0":2564,"s1":2584,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"}],"barreira":{"tipo":"rail","dist":9}},
-    {"s0":2586,"s1":2600,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"}],"barreira":{"tipo":"rail","dist":9}},
-    {"s0":2602,"s1":2610,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"},{"tipo":"escape","cor":"verde","larg":[0.013207502425647277,0.17316107215052723,0.3932046457147007,0.5643982546717863,0.6235594834555276]}],"barreira":{"tipo":"rail","dist":[9.02043704171319,9.325843823621481,9.928813514188402,10.743454198709188,11.686931405809986]}},
-    {"s0":2612,"s1":2620,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"}],"barreira":{"tipo":"rail","dist":[12.67873529185297,13.639985493013882,14.491357317263528,15.15377648381326,15.552275970659288]}},
-    {"s0":2622,"s1":2636,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2638,"s1":2638,"faixas":[{"tipo":"zebra","larg":"fisica","visual":"saida"}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2640,"s1":2660,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2662,"s1":2680,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[0.0022743694500419057,0.03032510437773126,0.08464845500756879,0.15801419749832116,0.2431921080087577,0.33295196269762756,0.4200635377237424,0.4972966092458513,0.557420953422724,0.593206346413125]}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2682,"s1":2748,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":0.6}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2750,"s1":2810,"faixas":[{"tipo":"zebra","larg":"fisica"},{"tipo":"escape","cor":"verde","larg":0.6}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2812,"s1":2830,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":0.6}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2832,"s1":2834,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[0.6126384091906896,0.7125299732136361]}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2836,"s1":2850,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.8578664146321946,1.0038604663507864,1.3128703717014658,1.7104620318578503,2.18073254543989,2.6942590665677533,3.207299562375031,3.660160748214026]}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2852,"s1":2880,"faixas":[{"tipo":"escape","cor":"verde","larg":"fisica"}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2882,"s1":2884,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":"fisica"}],"barreira":{"tipo":"rail","dist":"fisica"}},
-    {"s0":2886,"s1":2894,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[8.309607900694333,8.441097699309482,8.536779455026899,8.592411611738175,8.609260520254736]}],"barreira":{"tipo":"wall","dist":[15.864411538589042,15.693971650897664,15.34466873270014,14.865169995710286,14.259608584752407],"banner":"amarelo","alambrado":true}},
-    {"s0":2896,"s1":2910,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.4,"listrada":false},{"tipo":"escape","cor":"verde","larg":[8.591170348255345,8.544449891665204,8.47828108793128,8.405026566005448,8.334530913612348,8.273370363412814,8.227679033213688,8.202962760690674]}],"barreira":{"tipo":"wall","dist":[13.64441990680801,12.925063048604292,12.146149259274912,11.367399906734223,10.700453892543738,10.182213450824186,9.814684284688376,9.623004448101725],"banner":"amarelo","alambrado":true}},
-    {"s0":2912,"s1":2974,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.4,"listrada":false},{"tipo":"escape","cor":"verde","larg":8.2}],"barreira":{"tipo":"wall","dist":8.2,"de":"zebra","banner":"amarelo","alambrado":true}},
-    {"s0":2976,"s1":3228,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.6,"listrada":false},{"tipo":"escape","cor":"verde","larg":8.2}],"barreira":{"tipo":"wall","dist":8.2,"de":"zebra","banner":"amarelo","alambrado":true}},
-    {"s0":3230,"s1":3230,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":1.6,"listrada":false},{"tipo":"escape","cor":"verde","larg":8.2}],"barreira":{"tipo":"wall","dist":8.2,"de":"zebra","banner":"azul","alambrado":true}},
-    {"s0":3232,"s1":3238,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":2,"listrada":false},{"tipo":"escape","cor":"verde","larg":[8.06578789620005,7.527804920690728,6.670058289772144,5.591361062608047]}],"barreira":{"tipo":"wall","dist":[10.111616419448815,9.757334947771941,9.192477410337755,8.482115821717496],"banner":"azul","alambrado":true}},
-    {"s0":3240,"s1":3250,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":2,"visual":"saida"},{"tipo":"escape","cor":"verde","larg":[4.39052629836141,3.166367056195944,2.017696395275131,1.043327374762649,0.3420730538215242,0.01274649161548247]}],"barreira":{"tipo":"wall","dist":[7.691322196481905,6.8851685492022074,6.128726894449476,5.487069246794915,5.025267620809298,4.808394031063855],"banner":"azul","alambrado":true}},
-    {"s0":3252,"s1":3252,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":2,"visual":"saida"}],"barreira":{"tipo":"wall","dist":2.8,"de":"zebra","banner":"azul","alambrado":true}},
-    {"s0":3254,"s1":3332,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":2,"listrada":false}],"barreira":{"tipo":"wall","dist":2.8,"de":"zebra","banner":"azul","alambrado":true}},
-    {"s0":3334,"s1":3364,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":2,"visual":"saida"}],"barreira":{"tipo":"wall","dist":2.8,"de":"zebra","banner":"azul","alambrado":true}},
-    {"s0":3366,"s1":3410,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":2,"listrada":false}],"barreira":{"tipo":"wall","dist":2.8,"de":"zebra","banner":"azul","alambrado":true}},
-    {"s0":3412,"s1":3414,"faixas":[{"tipo":"zebra","larg":"fisica","minimo":2,"listrada":false},{"tipo":"escape","cor":"verde","larg":[0.020005982034975334,0.08592491401343577]}],"barreira":{"tipo":"wall","dist":[4.948556093198093,4.779050265865441],"banner":"azul","alambrado":true}},
-    {"s0":3416,"s1":3426,"faixas":[{"tipo":"zebra","larg":"fisica","listrada":false},{"tipo":"escape","cor":"verde","larg":[0.1894932020937429,0.32207313886023997,0.4750270168972337,0.6397171287891387,0.8075057671202651,0.9697552244749562]}],"barreira":{"tipo":"wall","dist":[4.512731807274279,4.171811965359066,3.7785019880543613,3.184337372996784,2.6575387944040925,2.2165870313090306],"banner":"avis","alambrado":true}},
-    {"s0":3428,"s1":3460,"faixas":[{"tipo":"escape","cor":"verde","larg":[0.9736,0.9845,1.0016,1.0241,1.0509,1.0813,1.1144,1.1492,1.1849,1.2206,1.2554,1.2885,1.3188,1.3457,1.3681,1.3852,1.3962]}],"barreira":{"tipo":"wall","dist":[2.2093,2.1886,2.1561,2.1135,2.0626,2.0049,1.9422,1.8761,1.8083,1.7405,1.6744,1.6117,1.554,1.5031,1.4605,1.428,1.4073],"banner":"avis","alambrado":true}},
-    {"s0":3462,"s1":4028,"faixas":[{"tipo":"escape","cor":"verde","larg":1.4}],"barreira":{"tipo":"wall","dist":1.4,"banner":"avis","alambrado":true}},
-    {"s0":4030,"s1":4292,"faixas":[{"tipo":"escape","cor":"verde","larg":1.4}],"barreira":{"tipo":"wall","dist":1.4,"banner":"verde","alambrado":true}}
+   {
+    "s0": 0,
+    "s1": 154,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.4
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "verde",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 156,
+    "s1": 162,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.396,1.376,1.344,1.305]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "verde",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 164,
+    "s1": 168,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.266,1.232,1.208]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 170,
+    "s1": 294,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.2,1.207,1.226,1.255,1.295,1.344,1.403,1.47,1.545,1.627,1.716,1.812,1.913,2.019,2.13,2.245,2.34,2.35,2.36,2.37,2.38,2.4,2.42,2.44,2.46,2.47,2.48,2.48,2.48,2.48,2.49,2.5,2.53,2.56,2.63,2.7,3.22,3.8,4.696,4.737,4.769,4.79,4.799,4.805,4.831,4.877,4.941,5.021,5.116,5.223,5.341,5.468,5.602,5.742,5.884,6.028,6.172,6.313,6.451,6.582,6.706,6.82,6.923]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 296,
+    "s1": 304,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [8.212,8.286,8.343,8.382,8.399]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 306,
+    "s1": 386,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [8.4,7.86,7.63,7.59,7.52,7.44,7.32,7.21,7.18,7.15,7.17,7.19,7.26,7.33,7.29,7.23,6.98,6.7,6.37,6.03,5.83,5.65,5.64,5.67,5.87,6.1,6.4,6.71,6.9,7.08,7.25,7.42,7.58,7.76,7.93,8.09,8.25,8.42,8.77,9.09,9.4]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 388,
+    "s1": 390,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [9.399,9.393]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 392,
+    "s1": 412,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [9.384,9.371,9.354,9.333,9.309,9.281,9.25,9.216,9.179,9.138,9.095]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 414,
+    "s1": 418,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [8.159,7.011,6.75]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 420,
+    "s1": 482,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [6.75,6.696,6.641,6.583,6.523,6.561,6.628,6.522,6.425,6.167,6.107,6.057,5.985,5.985,5.912,5.838,5.763,5.688,5.612,5.536,5.46,5.383,5.306,5.23,5.23,5.153,5.077,5.002,4.926,4.852,4.778,5.175]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 484,
+    "s1": 518,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [5.834,5.763,5.693,5.625,5.559,5.493,5.43,5.369,5.309,5.251,5.196,5.143,5.092,5.044,4.87,4.57,4.29,3.61]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 520,
+    "s1": 532,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.81,2.53,2.42,2.33,2.26,2.25,2.27]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 534,
+    "s1": 546,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.32,2.38,2.35,2.28,2.23,2.012,1.316]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 548,
+    "s1": 552,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.682,0.211,0.003]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "vermelho"
+    }
+   },
+   {
+    "s0": 554,
+    "s1": 748,
+    "faixas": [],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "vermelho"
+    }
+   },
+   {
+    "s0": 750,
+    "s1": 888,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "vermelho"
+    }
+   },
+   {
+    "s0": 890,
+    "s1": 1154,
+    "faixas": [],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "vermelho"
+    }
+   },
+   {
+    "s0": 1156,
+    "s1": 1360,
+    "faixas": [],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 1362,
+    "s1": 1368,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 1370,
+    "s1": 1388,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.245,1.63,2.335,3.269,4.343,5.466,6.547,7.497,8.224,8.638]
+     }
+    ],
+    "barreira": {
+     "tipo": "rolex_pad",
+     "dist": "fisica",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 1390,
+    "s1": 1492,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.7,8.76,9.07,9.39,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.7,9.39,9.07,8.76]
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1494,
+    "s1": 1508,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 7.5
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1510,
+    "s1": 1538,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [7.17,6.07,5.3,5.3,5.3,5.3,5.3,5.3,5.3,5.3,5.3,5.3,5.3,5.3,5.61]
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1540,
+    "s1": 1540,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 6.71
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1542,
+    "s1": 1544,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 7.5
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1546,
+    "s1": 1580,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [8.7,8.7,8.76,9.07,9.39,9.7,9.7,9.7,9.68,9.35,9.04,8.75,8.45,8.1,7.77,7.45,7.14,6.86]
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1582,
+    "s1": 1662,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [6.6,6.34,6.1,5.9,5.72,5.57,5.44,5.33,5.21,5.08,4.9,4.6,4.37,4.36,4.39,4.55,4.72,4.96,5.22,5.55,5.92,6.42,6.91,7.39,7.78,7.91,8.03,8.15,8.28,8.45,8.62,8.8,8.99,9.19,9.38,9.51,9.65,9.7,9.7,9.7,9.7]
+     }
+    ],
+    "barreira": {
+     "tipo": "tecpro",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1664,
+    "s1": 1674,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [9.699,9.666,9.587,9.471,9.323,9.152]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1676,
+    "s1": 1692,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [7.924,6.936,6.426,6.171,5.988,5.824,5.686,5.581,5.517]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1694,
+    "s1": 1752,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.5,5.61,6.21]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1754,
+    "s1": 1762,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 6.7
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1764,
+    "s1": 1802,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [5.498,5.44,5.31,5.115,4.865,4.567,4.229,3.86,3.469,3.063,2.65,2.24,1.839,1.458,1.103,0.784,0.507,0.283,0.119,0.022]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1804,
+    "s1": 1972,
+    "faixas": [],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1974,
+    "s1": 1992,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.004,0.052,0.143,0.265,0.408,0.557,0.702,0.831,0.93,0.989]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 1994,
+    "s1": 2002,
+    "faixas": [
+     {
+      "tipo": "pintura",
+      "cor": "verde",
+      "larg": 0.65
+     },
+     {
+      "tipo": "salsicha",
+      "larg": 0.4
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2004,
+    "s1": 2180,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "pintura",
+      "cor": "verde",
+      "larg": 0.65
+     },
+     {
+      "tipo": "salsicha",
+      "larg": 0.4
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 2.2
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2182,
+    "s1": 2200,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "pintura",
+      "cor": "verde",
+      "larg": 0.65
+     },
+     {
+      "tipo": "salsicha",
+      "larg": 0.4
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.199,2.195,2.189,2.18,2.17,2.157,2.142,2.126,2.108,2.088]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2202,
+    "s1": 2226,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.067,2.044,2.02,1.994,1.968,1.941,1.913,1.884,1.854,1.824,1.793,1.762,1.731]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2228,
+    "s1": 2244,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.5,0.469,0.438,0.407,0.376,0.346,0.316,0.288,0.259]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2246,
+    "s1": 2254,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.232,0.206,0.18,0.156,0.134]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2256,
+    "s1": 2274,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.112,0.092,0.074,0.058,0.043,0.03,0.02,0.011,0.005,0.001]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2276,
+    "s1": 2284,
+    "faixas": [],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2286,
+    "s1": 2308,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2310,
+    "s1": 2480,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "branco"
+    }
+   },
+   {
+    "s0": 2482,
+    "s1": 2608,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2610,
+    "s1": 2618,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 0
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2620,
+    "s1": 2666,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2668,
+    "s1": 2686,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.202,1.23,1.285,1.358,1.443,1.533,1.62,1.697,1.757,1.793]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2688,
+    "s1": 2754,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.8
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2756,
+    "s1": 2818,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.37,0.77,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6,0.6]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2820,
+    "s1": 2838,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.01,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8,1.8]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2840,
+    "s1": 2842,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [1.813,1.913]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2844,
+    "s1": 2858,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.858,1.004,1.313,1.71,2.181,2.694,3.207,3.66]
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2860,
+    "s1": 2888,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2890,
+    "s1": 2892,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "rail",
+     "dist": "fisica"
+    }
+   },
+   {
+    "s0": 2894,
+    "s1": 2902,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [8.68,8.58,8.49,8.48,8.49]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "amarelo",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 2904,
+    "s1": 2918,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [8.56,8.67,8.83,9.02,9.27,9.54,9.628,9.603]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "amarelo",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 2920,
+    "s1": 2984,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [9.6,9.6,9.6,9.6,9.6,9.6,9.17,9.08,8.98,8.9,8.8,8.71,8.61,8.53,8.44,8.36,8.28,8.19,8.1,8,7.92,7.84,7.76,7.68,7.63,7.58,7.68,7.84,7.93,7.95,7.9,7.82,7.68]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "amarelo",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 2986,
+    "s1": 3240,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [7.52,7.35,7.17,7.02,6.88,6.8,6.75,6.72,6.71,6.74,6.8,6.9,7.01,7.11,7.19,7.19,7.14,7,6.81,6.72,6.7,6.76,6.89,7,7.1,7.2,7.3,7.44,7.6,7.8,8.01,8.24,8.48,8.74,9.01,9.25,9.48,9.69,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.8,9.39,8.87,8.37]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "amarelo",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3242,
+    "s1": 3242,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 7.91
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "azul",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3244,
+    "s1": 3250,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [7.5,7.16,6.84,6.55]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "azul",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3252,
+    "s1": 3264,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [4.96,2.01,0.5,0.5,0.5,0.142,0]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "azul",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3266,
+    "s1": 3424,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "azul",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3426,
+    "s1": 3428,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.22,2.286]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "azul",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3430,
+    "s1": 3440,
+    "faixas": [
+     {
+      "tipo": "zebra",
+      "larg": "fisica"
+     },
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [2.389,2.522,2.675,2.53,2.378,2.03]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "avis",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3442,
+    "s1": 3474,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": [0.974,0.985,1.002,1.024,1.051,1.081,1.114,1.149,1.185,1.221,1.255,1.289,1.319,1.346,1.368,1.385,1.396]
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "avis",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 3476,
+    "s1": 4042,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.4
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "avis",
+     "alambrado": true
+    }
+   },
+   {
+    "s0": 4044,
+    "s1": 4306,
+    "faixas": [
+     {
+      "tipo": "escape",
+      "cor": "verde",
+      "larg": 1.4
+     }
+    ],
+    "barreira": {
+     "tipo": "wall",
+     "dist": "fisica",
+     "banner": "verde",
+     "alambrado": true
+    }
+   }
   ]
-  }
+ },
+ "origem": "Fase 2B etapa F: v1 da Fase 2 (pista antiga, 4.294 m) levada para a pista nova por tools/cenario/interlagos/migrarPerfil2B.ts (mapa tools/tracks/interlagos/s_antigo_novo.json); zebras = física; barreiras na distância do muro da física."
 }

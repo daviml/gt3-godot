@@ -360,7 +360,7 @@ static func get_tracks_list() -> Array:
 			# sem índice: só Interlagos, como antes do multi-pista
 			_tracks_cache.append({"id": DEFAULT_TRACK, "name": "Interlagos", "short": "Interlagos",
 				"data_dir": "res://data/track/", "assets_dir": "res://assets/track/", "available": true,
-				"sun_u": 0.5947, "sun_elev": 48.0, "refs": {"audi-r8-lms-gt3": "interlagos-r8"}})
+				"sun_u": 0.5947, "sun_elev": 48.0, "refs": {"audi-r8-lms-gt3": "interlagos-nsx"}})
 	return _tracks_cache
 
 

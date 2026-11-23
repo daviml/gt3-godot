@@ -1,28 +1,25 @@
-// Cópia do scripts/build-reference.ts do web, para pistas que não vêm do web (Interlagos continua lá).
+// Cópia do scripts/build-reference.ts do web, para pistas com fonte própria em tools/tracks/<id>/ (Laguna, Imola e,
+// desde a Fase 2B, Interlagos). A pista é montada como no pista.ts (tools/tracks/fonte.ts), então o s e o d da
+// referência são os do track.json exportado.
 // Converte uma volta exportada do Garage 61 (telemetria do iRacing, CSV a 60 Hz) na referência usada pelo
 // ajuste de física (scripts/tune-physics.ts) e pela comparação no jogo.
-// 1) lat/lon → coordenadas do jogo (mesma origem de data/tracks/interlagos.json)
+// 1) lat/lon → coordenadas do jogo (mesma origem do <id>.json da pista)
 // 2) o GPS do iRacing não bate com o OSM (até ~40 m): ajusta rotação + escala + translação para a volta
 //    caber na largura da pista do jogo (scripts/ref-lib.ts)
 // 3) reamostra por distância (uma linha a cada amostra da pista, 2 m): deslocamento lateral, velocidade,
 //    g, pedais, marcha, rpm e o tempo em cada ponto
 //
 // uso (de REPOS/gt3-godot/tools): npx vite-node referencia.ts -- <pista> <volta.csv> <saida.json> "<rótulo>"
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { Vector3 } from 'three';
-import { Track, TrackData } from '../../gt3-time-attack/src/track/track';
 import type { Reference } from '../../gt3-time-attack/src/track/reference';
 import { applyFit, fitLap, HZ, outside, readLap, type Fit } from '../../gt3-time-attack/scripts/ref-lib';
-import { applyKerbs, applyWalls, clampRunoff } from './tracks/bank';
+import { lePista } from './tracks/fonte';
 
 const args = process.argv.slice(2).filter(a => a !== '--');
 const [trackId, inFile, outFile, label] = args;
 if (!inFile || !outFile) throw new Error('uso: npx vite-node referencia.ts -- <pista> <volta.csv> <saida.json> "<rótulo>"');
-const trackData = JSON.parse(readFileSync(new URL(`tracks/${trackId}/${trackId}.json`, import.meta.url), 'utf8'));
-const track = new Track(trackData as TrackData);
-applyKerbs(track, trackData.kerbLeft, trackData.kerbRight);
-applyWalls(track, trackData.wallLeft, trackData.wallRight);
-clampRunoff(track, trackData.maxRunoff);
+const { data: trackData, track } = lePista(trackId);
 const lap = readLap(inFile, trackData.origin);
 const { n, speed, latA, longA, thr, brk, gear, rpm, steer } = lap;
 // busca inicial em grade grossa (±48 m): o GPS do iRacing pode deslocar >24 m da célula do Track.locate()

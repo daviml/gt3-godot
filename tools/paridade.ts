@@ -15,10 +15,11 @@ import { Vector3 } from 'three';
 import { Car, CarInput, CarParams, PHYSICS_HZ } from '../../gt3-time-attack/src/physics/car';
 import { FlatGround } from '../../gt3-time-attack/src/physics/ground';
 import { CARS, carParams, modelMeta } from '../../gt3-time-attack/src/cars';
-import { Track, TrackData } from '../../gt3-time-attack/src/track/track';
 import { Bot } from '../../gt3-time-attack/src/track/bot';
 import { RefBot } from '../../gt3-time-attack/src/track/refBot';
 import { refAt, Reference } from '../../gt3-time-attack/src/track/reference';
+import { lePista } from './tracks/fonte';
+import { applyBank } from './tracks/bank';
 
 const WEB = new URL('../../gt3-time-attack/', import.meta.url);
 const web = (p: string) => fileURLToPath(new URL(p, WEB));
@@ -26,11 +27,18 @@ const OUT = fileURLToPath(new URL('../data/tests/paridade-web.json', import.meta
 
 const DT = 1 / PHYSICS_HZ;
 const flat = new FlatGround();
-const track = new Track(JSON.parse(readFileSync(web('data/tracks/interlagos.json'), 'utf8')) as TrackData);
+// a MESMA pista do Godot (data/track/track.json): Interlagos da Fase 2B, montada da fonte própria como no pista.ts
+// (antes da 2B era a do web, data/tracks/interlagos.json)
+const { track, data: trackData } = lePista('interlagos');
+// camber do LiDAR (desde a 2B): igual ao pista.ts/track.gd, gira r e n das amostras (física pela normal inclinada)
+applyBank(track, trackData.bank);
 const inp = (o: Partial<CarInput> = {}): CarInput => ({ steer: 0, throttle: 0, brake: 0, shiftUp: false, shiftDown: false, ...o });
-// referência do iRacing de cada carro que tem uma (a mesma do tune-physics)
+// volta lançada do RefBot só com o R8 (como antes da 2B), na referência que o jogo usa para ele em Interlagos
+// (data/tracks.json → refs; desde a 2B, uma das 6 voltas do Garage 61 convertidas pelo referencia.ts)
+const GODOT = (p: string) => fileURLToPath(new URL(`../${p}`, import.meta.url));
+const TRACKS = JSON.parse(readFileSync(GODOT('data/tracks.json'), 'utf8')) as { id: string; refs?: Record<string, string> }[];
 const REFS: Record<string, string> = {
-  'audi-r8-lms-gt3': 'interlagos-r8'
+  'audi-r8-lms-gt3': TRACKS.find(t => t.id === 'interlagos')!.refs!['audi-r8-lms-gt3']
 };
 
 function newCar(p: CarParams): Car {
@@ -164,7 +172,7 @@ function botLap(p: CarParams): { lap: number; maxOff: number } {
 }
 
 function refLap(p: CarParams, refName: string): { lap: number; maxErr: number; offTrack: number; vmax: number } {
-  const ref = JSON.parse(readFileSync(web(`data/reference/${refName}.json`), 'utf8')) as Reference;
+  const ref = JSON.parse(readFileSync(GODOT(`data/reference/${refName}.json`), 'utf8')) as Reference;
   const car = new Car(p);
   car.assists.autoGearbox = true;
   const bot = new RefBot(track, car, ref);

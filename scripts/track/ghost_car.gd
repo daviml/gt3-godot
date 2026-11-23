@@ -47,8 +47,13 @@ func setup(p_track_id: String, p_car_id: String, p_mode: String, timer: LapTimer
 		_load_garage61_reference(timer)
 
 
+## data/tracks.json → ghost_key troca quando a geometria da pista muda (Interlagos: "interlagos-v4", Fase 2B):
+## a volta gravada na pista antiga não vale na nova (posições e tempo)
 func ghost_path() -> String:
-	return "%s/%s__%s__%s.json" % [GHOST_DIR, track_id, car_id, mode]
+	var key := String(Game.get_track_info(track_id).get("ghost_key", track_id))
+	if key == "":
+		key = track_id
+	return "%s/%s__%s__%s.json" % [GHOST_DIR, key, car_id, mode]
 
 
 func has_ghost() -> bool:

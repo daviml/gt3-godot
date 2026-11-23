@@ -702,6 +702,41 @@ for col, W, K, cf in ((0, WLn, KL, cfL), (1, WRn, KR, cfR)):
     GPS_FIX[:, col] = fix
 WLn = np.clip(circ_gauss(WLn, 1.5), 3.8, 10.5)
 WRn = np.clip(circ_gauss(WRn, 1.5), 3.8, 10.5)
+
+# ---- etapa E: trechos onde a borda medida é artefato → reta entre as pontas (s antigo, como as zebras)
+#   dir 1472–1498 e 3644–3664: "calombos" de ~3 m para dentro do escape turquesa (borda presa no escape da mesma
+#     cor / piso do TUMFTM); nas faixas desenroladas (faixa_1200/3600) a linha branca segue reta.
+#   esq 834–932: saída dos boxes; a borda pula entre a linha branca e a faixa de aceleração (5,0 ↔ 8,2 m).
+#   esq 3641–3666 (Subida dos Boxes): fim do piso do TUMFTM (9,4 m) + borda de confiança média que entra 1,5 m
+#     (7,4 m) por 15 m; as 6 voltas passam a 8,6–9,2 m (RefBot com a volta da Ferrari freava ali: 170 × 191 km/h).
+ALISAR = [('dir', 1472, 1498), ('dir', 3644, 3664), ('esq', 834, 932), ('esq', 3641, 3666)]
+ALISADO = np.zeros((len(P), 2), bool)
+for lado, a_old, b_old in ALISAR:
+    W = WLn if lado == 'esq' else WRn
+    ia = int(math.floor(s_novo_de_antigo(a_old) / step))
+    ib = int(math.ceil(s_novo_de_antigo(b_old) / step))
+    idx = np.arange(ia, ib + 1) % len(P)
+    W[idx] = np.interp(np.arange(ia, ib + 1), [ia, ib], [W[ia % len(P)], W[ib % len(P)]])
+    ALISADO[idx, 0 if lado == 'esq' else 1] = True
+say(f'bordas alisadas (artefatos): esq {ALISADO[:, 0].sum()} m, dir {ALISADO[:, 1].sum()} m')
+# ---- etapa E: borda que pegou o asfalto de outra via. Bico de Pato (s antigo 2676–2742, esq.): a borda medida
+# (6,7–7,7 m) passa por cima de um muro baixo (linha cinza clara no satélite, cima_bico_mergulho.jpg) e vai até o
+# asfalto do traçado antigo do outro lado; o LiDAR 2017 mostra o muro (classe 19) e um degrau de 0,9 m a ~4 m do
+# centro. As 6 voltas passam até 2,9 m à esquerda (lado do carro a ~3,9 m). Borda = wmax (4,2 m), nunca a menos de
+# meio carro além do GPS das voltas; rampa de 10 m nas pontas.
+LIMITAR = [('esq', 2676, 2742, 4.2)]
+for lado, a_old, b_old, wmax in LIMITAR:
+    col = 0 if lado == 'esq' else 1
+    W = WLn if col == 0 else WRn
+    ia = int(math.floor(s_novo_de_antigo(a_old) / step))
+    ib = int(math.ceil(s_novo_de_antigo(b_old) / step))
+    k = np.arange(ia - 10, ib + 11)
+    idx = k % len(P)
+    peso = np.clip(np.minimum(k - (ia - 10), (ib + 10) - k) / 10.0, 0.0, 1.0)
+    alvo = np.maximum(wmax, env[idx, col] + 1.0)
+    W[idx] = np.minimum(W[idx], W[idx] * (1 - peso) + alvo * peso)
+    ALISADO[idx, col] |= peso > 0
+say(f'borda limitada (outra via além do muro): {LIMITAR}')
 say(f'larguras: total mediana {np.median(WLn + WRn):.2f} m (p5 {np.percentile(WLn + WRn, 5):.2f}, p95 '
     f'{np.percentile(WLn + WRn, 95):.2f}, min {np.min(WLn + WRn):.2f}, max {np.max(WLn + WRn):.2f}); confiança alta '
     f'L {np.mean(cfL == 2) * 100:.0f}% R {np.mean(cfR == 2) * 100:.0f}%, baixa L {np.mean(cfL == 0) * 100:.0f}% R '
@@ -726,7 +761,11 @@ def bin_min(j, val, n):
 
 
 # (a) perfil visual de hoje (muro desenhado): `wall` por amostra antiga, medido do centro antigo
-PERF = json.load(open(os.path.join(ROOT, 'data', 'track', 'visual_profile.json'), encoding='utf-8'))
+# o perfil é o da pista ANTIGA (s antigo, muros desenhados à mão): desde a etapa F o data/track/visual_profile.json
+# está no s novo e usa dist "fisica" (este muro), então a cópia antiga fica congelada em build/interlagos/
+# (recriar com `git show 76624e4:data/track/visual_profile.json > build/interlagos/visual_profile_antigo.json`)
+PERF = json.load(open(os.path.join(RAW, 'visual_profile_antigo.json'), encoding='utf-8'))
+assert PERF.get('n') == N0, 'visual_profile_antigo.json não é o da pista antiga'
 perf_wall = {}
 for lado, sg, col in (('esq', -1, 0), ('dir', 1, 1)):
     A = PZ.avalia(PERF, t0, lado)
@@ -778,6 +817,12 @@ for lado, sg, col in (('esq', -1, 0), ('dir', 1, 1)):
     sw = bin_min(j, dist, len(P))
     sat_wall[lado] = sw
 
+WALL_MIN_GAP = 1.5    # m da borda (o applyWalls padrão força 2,5; aqui vai como `wallMinGap` no interlagos.json)
+PIT_EXIT_GAP = 5.5    # m da borda + zebra até o guard-rail na saída dos boxes
+# saída dos boxes: s antigo 800–1000 (do fim da mureta até a última faixa de convergência, vídeo s0860–s1000),
+# rampa de 20 m nas pontas
+_sa = np.asarray(s_old) % L0
+PIT_EXIT = np.clip(np.minimum((_sa - 800.0) / 20.0, (1000.0 - _sa) / 20.0), 0.0, 1.0)
 WALL = np.zeros((len(P), 2))
 EMPURRADO = {}
 WSRC = np.zeros((len(P), 2), int)    # 3 osm · 2 satélite (confirmado pelo perfil) · 1 perfil, sat. diverge · 0 perfil, não medido
@@ -803,9 +848,16 @@ for lado, col in (('esq', 0), ('dir', 1)):
                 w[ii] = pw[ii]
                 src[ii] = 0
     w = median_filter(w, size=5, mode='wrap')
-    # nunca dentro da zebra nova (o muro do perfil foi medido da borda antiga; onde a borda abriu, empurra)
+    # nunca dentro da zebra nova (o muro do perfil foi medido da borda antiga; onde a borda abriu, empurra) e
+    # (etapa E) nunca a menos de WALL_MIN_GAP da borda nem de meio carro + 0,5 m além do GPS das 6 voltas: a física
+    # do muro é só um limite lateral (track.gd wall_penetration), então muro colado não quebra nada, mas a linha
+    # real (RefBot) não pode encostar nele
     Wn, Kn = (WLn, KL) if col == 0 else (WRn, KR)
-    piso = Wn + Kn + 0.5
+    piso = np.maximum.reduce([Wn + Kn + 0.5, Wn + WALL_MIN_GAP, env[:, col] + 1.5])
+    # saída dos boxes (esquerda): a faixa de aceleração (~4–5 m de asfalto, vídeo s0860/s0940) fica antes do
+    # guard-rail; o muro do OSM/perfil ali (2,5 m, e 1,0 m na ponta do muro em s antigo 825) cortaria a faixa
+    if col == 0:
+        piso = np.where(PIT_EXIT > 0, np.maximum(piso, Wn + Kn + PIT_EXIT_GAP * PIT_EXIT), piso)
     EMPURRADO[lado] = int(np.sum(w < piso))
     WALL[:, col] = np.maximum(w, piso)
     WSRC[:, col] = src
@@ -825,18 +877,13 @@ def altitude_e_camber(P, s_old):
         y = interp_c(Y0, s_old, 2, L0)
         return y - y.min(), None
     import lidar  # noqa: E402  (tools/tracks/interlagos/lidar.py, do agente do LiDAR)
-    _, Rr = frames(P)
-    y_raw = lidar.altura(P[:, 0], P[:, 1])
-    y_med = median_filter(y_raw, size=65, mode='wrap')
-    y = np.where(np.abs(y_raw - y_med) > 0.35, y_med, y_raw)
-    y = circ_gauss(median_filter(y, size=9, mode='wrap'), 4)
-    hb = 3.5
-    hl = lidar.altura(P[:, 0] - Rr[:, 0] * hb, P[:, 1] - Rr[:, 1] * hb)
-    hr = lidar.altura(P[:, 0] + Rr[:, 0] * hb, P[:, 1] + Rr[:, 1] * hb)
-    hl = np.where(np.abs(hl - y_med) > 0.8, y, hl)
-    hr = np.where(np.abs(hr - y_med) > 0.8, y, hr)
-    bank = circ_gauss(np.arctan2(median_filter(hr - hl, size=15, mode='wrap'), 2 * hb), 10)
-    return y - y.min(), bank
+    # piso real (classes 2 + 20, registro LiDAR × mundo aplicado em lidar.jogo_para_utm); perfil(): mediana de 65 m
+    # contra pontes/passarelas, altitude σ 6 m; camber = reta robusta entre ±3,5 m (camber_bruto, ignora degrau/muro
+    # num dos lados) + mediana curta + σ 10 m. Conferido contra o VertAccel das 6 voltas (LEIA-ME, seção LiDAR).
+    # bank + = lado direito mais alto (mesma convenção de tools/tracks/bank.ts e scripts/track/track.gd).
+    pf = lidar.perfil(P, L / len(P), [], sig_y=6.0, sig_b=10.0)
+    y = pf['y']
+    return y - y.min(), pf['bank']
 
 
 Yn, BANK = altitude_e_camber(P, s_old)
@@ -857,7 +904,50 @@ def spans(code_arr, names):
     return sorted(out)
 
 
+# ---- etapa F (conferência do GLB, build/interlagos/perfil_2b/conferencia_glb.json): trechos em que o muro da
+# física não batia com a barreira real/desenhada. Janelas em s antigo (como as zebras), rampa nas pontas.
+#   1. separador da saída dos boxes (esq, s antigo 564–734; trackDetails.ts buildPitExit: guard-rail a borda + 4,4 m)
+#   2. barreira Goodyear do Lago (esq, 1385–1580, 3 m de folga nas pontas do desenho 1388–1578; buildDescidaLagoGoodyear: face a borda + 1,35 m, colada na zebra)
+#   3. S do Senna (esq, 333–428): o muro é o guard-rail ao longo da saída dos boxes, 13–27 m do centro, com grama
+#      larga antes (LMU folha_01 s=0382). A cerca do OSM (barrier=fence) bate com a faixa clara no satélite a ±1 m;
+#      não entrava porque passava 3 m do muro desenhado antes ("muro externo").
+#   4. Bico de Pato (dir, 2713–2796, lado de dentro do grampo, raio 21–25 m): sem barreira a 30 m no satélite (só
+#      grama); 23 m de muro dobrava sobre o centro da curva. Limite de 14 m (raio do muro ≥ ~7,5 m).
+# Piso de segurança em todos: meio carro (1,0 m) além do GPS das 6 voltas.
+def janela_antigo(a, b, rampa):
+    sa = np.asarray(s_old) % L0
+    return np.clip(np.minimum((sa - (a - rampa)) / rampa, ((b + rampa) - sa) / rampa), 0.0, 1.0)
+
+
+_osm_esq = osm_wall['esq']
+MURO_F = []
+for lado, a, b, rampa, alvo_fn, desc in [
+        ('esq', 564.2, 734.0, 6.0, lambda: WLn + 4.4, 'separador da saída dos boxes: borda + 4,4 m'),
+        ('esq', 1385.0, 1580.0, 6.0, lambda: WLn + 1.35, 'Goodyear do Lago: borda + 1,35 m'),
+        ('esq', 333.0, 428.0, 6.0, lambda: fill_circ(np.nan_to_num(_osm_esq), np.isfinite(_osm_esq)),
+         'S do Senna: cerca do OSM (= guard-rail no satélite)'),
+        ('dir', 2713.0, 2796.0, 10.0, lambda: np.minimum(WALL[:, 1], 14.0), 'Bico de Pato: no máx. 14 m'),
+]:
+    col = 0 if lado == 'esq' else 1
+    w = janela_antigo(a, b, rampa)
+    m = w > 0
+    antes = WALL[m, col].copy()
+    alvo = np.maximum(alvo_fn(), env[:, col] + 1.0)
+    WALL[m, col] = WALL[m, col] * (1 - w[m]) + alvo[m] * w[m]
+    WSRC[m, col] = np.where(w[m] >= 1, 4, WSRC[m, col])
+    dentro = w >= 1
+    MURO_F.append({'lado': lado, 's_antigo': [a, b], 'desc': desc,
+                   'antes_m': [round(float(antes.min()), 2), round(float(antes.max()), 2)],
+                   'depois_m': [round(float(WALL[dentro, col].min()), 2), round(float(WALL[dentro, col].max()), 2)],
+                   'gps_mais_1m_venceu': int(np.sum(dentro & (alvo_fn() < env[:, col] + 1.0)))})
+    say(f'muro etapa F {lado} {a:.0f}–{b:.0f}: {desc}; antes {MURO_F[-1]["antes_m"]} → {MURO_F[-1]["depois_m"]} m '
+        f'(GPS + 1 m venceu em {MURO_F[-1]["gps_mais_1m_venceu"]} amostras)')
+WALL_MIN_GAP_JSON = 1.3   # Goodyear do Lago a borda + 1,35 m; o resto continua ≥ 1,5 m pelo piso acima
+
 ko = np.arange(0, len(P), K_OUT)
+ARC_DIV = 20000
+# faixa de aceleração da saída dos boxes = escape asfaltado até 0,5 m do guard-rail (bank.ts applyRunoffMin)
+RUN_L = PIT_EXIT * np.maximum(0.0, WALL[:, 0] - WLn - KL - 0.5)
 medicao = {
     'obs': 's em m da linha de 1 m (= s do Track, exceto a escala do Catmull-Rom); [s0, s1, fonte]',
     'centro': spans(fonte_centro, {0: 'vizinhança (sem borda confiável)', 1: 'uma borda + largura vizinha'}),
@@ -865,9 +955,16 @@ medicao = {
                       {0: 'vizinhança', 9: 'GPS das voltas', 8: 'dois tons: até a linha branca', 7: 'piso TUMFTM'}),
     'bordaDir': spans(np.where(GPS_FIX[:, 1], 9, np.where(PISO_TUM[:, 1], 7, np.where(DOIS_TONS[1], 8, cfR))),
                       {0: 'vizinhança', 9: 'GPS das voltas', 8: 'dois tons: até a linha branca', 7: 'piso TUMFTM'}),
-    'muroEsq': spans(np.where(WSRC[:, 0] >= 2, WSRC[:, 0], 0), {3: 'osm', 2: 'satélite', 0: 'não medido (perfil atual)'}),
-    'muroDir': spans(np.where(WSRC[:, 1] >= 2, WSRC[:, 1], 0), {3: 'osm', 2: 'satélite', 0: 'não medido (perfil atual)'}),
+    'muroEsq': spans(np.where(WSRC[:, 0] >= 2, WSRC[:, 0], 0), {4: 'etapa F (ver muroEtapaF)', 3: 'osm', 2: 'satélite', 0: 'não medido (perfil atual)'}),
+    'muroDir': spans(np.where(WSRC[:, 1] >= 2, WSRC[:, 1], 0), {4: 'etapa F (ver muroEtapaF)', 3: 'osm', 2: 'satélite', 0: 'não medido (perfil atual)'}),
+    'muroEtapaF': MURO_F,
     'altitude': 'track.json atual por projeção' if BANK is None else 'LiDAR GeoSampa (lidar.py)',
+    'bordaAlisada': [[round(float(s_novo_de_antigo(a)), 1), round(float(s_novo_de_antigo(b)), 1), l]
+                     for l, a, b in ALISAR],
+    'bordaLimitada': [[round(float(s_novo_de_antigo(a)), 1), round(float(s_novo_de_antigo(b)), 1), l, w]
+                      for l, a, b, w in LIMITAR],
+    'saidaBoxes': [round(float(s_novo_de_antigo(800.0)), 1), round(float(s_novo_de_antigo(1000.0)), 1),
+                   'esq: escape asfaltado até o guard-rail, muro ≥ borda + zebra + 5,5 m'],
 }
 out = {
     # NÃO usar 'Interlagos': a classe Track do web reescala as larguras (realWidth) e põe muros da reta por nome
@@ -883,6 +980,12 @@ out = {
     'kerbRight': [round(float(KR[i]), 2) for i in ko],
     'wallLeft': [round(float(WALL[i, 0]), 2) for i in ko],
     'wallRight': [round(float(WALL[i, 1]), 2) for i in ko],
+    # etapa E (tools/tracks/fonte.ts): muro a ≥ 1,5 m da borda (não 2,5), escape asfaltado da saída dos boxes,
+    # comprimento e espaçamento das amostras medidos com 20.000 cordas (o Track usaria 200: 4.300 m, 2,00–2,07 m)
+    'wallMinGap': WALL_MIN_GAP_JSON,
+    'runLeft': [round(float(RUN_L[i]), 2) for i in ko],
+    'runRight': [0.0 for i in ko],
+    'arcLengthDivisions': ARC_DIV,
     'sections': sections,
     'medicao': medicao,
 }
@@ -945,11 +1048,13 @@ pts3 = np.array(out['points'])
 web_pts = np.array(json.load(open(os.path.join(ROOT, '..', 'gt3-time-attack', 'data', 'tracks', 'interlagos.json')))['points'])
 V['comprimento']['track_web_novo'], V['comprimento']['curva_3d_novo'] = track_length(pts3)
 V['comprimento']['track_web_atual'], V['comprimento']['curva_3d_atual'] = track_length(web_pts)
+V['comprimento']['track_godot_novo'] = 2 * round(V['comprimento']['curva_3d_novo'] / 2)   # com arcLengthDivisions
 V['comprimento']['curva_3d_novo'] = round(V['comprimento']['curva_3d_novo'], 1)
 V['comprimento']['curva_3d_atual'] = round(V['comprimento']['curva_3d_atual'], 1)
 say(f'comprimento: {L:.1f} m na linha de 1 m (plano), {V["comprimento"]["curva_3d_novo"]} m na curva 3D; o Track do web '
     f'(getLength com 200 cordas) daria {V["comprimento"]["track_web_novo"]} m (hoje: {V["comprimento"]["track_web_atual"]} '
-    f'para uma curva de {V["comprimento"]["curva_3d_atual"]} m); oficial {OFICIAL:.0f} ({V["comprimento"]["erro_pct"]:+.2f}%)')
+    f'para uma curva de {V["comprimento"]["curva_3d_atual"]} m); com {ARC_DIV} cordas (pista.ts): '
+    f'{V["comprimento"]["track_godot_novo"]} m; oficial {OFICIAL:.0f} ({V["comprimento"]["erro_pct"]:+.2f}% na linha plana)')
 
 # ---- voltas entre as bordas
 dentro = {}
@@ -1130,7 +1235,7 @@ if '--sem-imagens' in sys.argv:
 
 # ================================================================ 9) imagens de conferência
 PX = 4
-COR_MURO = {3: (255, 0, 255), 2: (255, 150, 0), 1: (200, 200, 200), 0: (255, 255, 255)}
+COR_MURO = {4: (0, 255, 255), 3: (255, 0, 255), 2: (255, 150, 0), 1: (200, 200, 200), 0: (255, 255, 255)}   # 4 = etapa F
 
 
 def faixa(a, b):

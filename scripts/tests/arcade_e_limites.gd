@@ -148,8 +148,8 @@ func _test_records_separation_and_api() -> void:
 	check(merged.size() == 2 and merged[0].nick == "Local", "merge_records combina remoto e local mantendo menor tempo primeiro")
 
 	# ranking direto no GitHub (gt3-tempos), mesmos arquivos e regras da antiga função da Vercel
-	check(Records.contents_url("sim").ends_with("/contents/interlagos-godot.json?ref=main"), "sim lê interlagos-godot.json")
-	check(Records.contents_url("arcade", false).ends_with("/contents/interlagos-godot-arcade.json"), "arcade grava interlagos-godot-arcade.json")
+	check(Records.contents_url("sim").ends_with("/contents/interlagos-v4-godot.json?ref=main"), "sim lê interlagos-v4-godot.json")
+	check(Records.contents_url("arcade", false).ends_with("/contents/interlagos-v4-godot-arcade.json"), "arcade grava interlagos-v4-godot-arcade.json")
 	check(Records.unscramble(Records.scramble("github_pat_abc123")) == "github_pat_abc123", "token embaralhado volta ao original")
 	var rec := Records.validate_remote(" Da<vi> ", "bmw-m4-gt3", lap_arc.time, Array(lap_arc.sectors), true, "arcade")
 	check(not rec.is_empty() and rec.nick == "Davi" and absf(float(rec.time) - 74.5) < 1e-9, "volta válida vira registro com nick limpo")

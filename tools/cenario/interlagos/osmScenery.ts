@@ -9,6 +9,13 @@ import { mulberry32 } from '@web/util/random';
 import { plantTrees, TreeSpot } from '@web/render/trees';
 import { phTexture } from '@web/render/textures';
 import { TOWER_COLORS, trackDistance } from '@web/render/surroundings';
+// Fase 2B etapa F: OSM da fonte própria (tools/tracks/interlagos/interlagos-osm.json, o mesmo do web + muros/cercas);
+// prédios e o resto do OSM são por coordenada de mundo e não mudam. Os metros da pista antiga passam por ./sNovo.ts.
+import { L_ANTIGO, s4300, sNovo } from './sNovo';
+
+/** entrada (3840–4050) e saída (300–800) dos boxes, em s real da pista antiga, levadas para a nova */
+const PIT_A = [sNovo(3840), sNovo(4050)];
+const PIT_B = [sNovo(300), sNovo(800)];
 
 type Pt = [number, number];
 export interface OsmData {
@@ -79,8 +86,10 @@ export function trackSections(osm: OsmData, track: Track) {
 function buildPaddockCanopy(track: Track, group: THREE.Group, heightAt: (x: number, z: number) => number) {
   const S = track.samples;
   const N = S.length;
-  const L = track.length;
-  const inPitStraight = (s: number) => s > L - 210 || s < 150;
+  // 210 m antes até 150 m depois da linha na pista antiga (s real), levados para a nova
+  const pA = sNovo(L_ANTIGO - 210);
+  const pB = sNovo(150);
+  const inPitStraight = (s: number) => s > pA || s < pB;
   // sobre os prédios dos boxes: além do muro dos boxes (concreto) + pit lane, ~22 m para fora
   const behindPitWall = (i: number) => -(S[i].wallL + 22);
   // não pode cair sobre outro trecho da pista (o miolo do S do Senna fica logo atrás dos boxes)
@@ -203,18 +212,19 @@ export function buildOsmScenery(
   const nearTrack = (x: number, z: number, treeMargin = false) => {
     const loc = track.locate(tmp.set(x, heightAt(x, z), z));
     if (!loc) return false;
-    const k43 = track.length / 4300;
-    const sm = loc.s / k43;
+    const sm = s4300(loc.s);
     const margin = treeMargin && ((sm >= 340 && sm <= 780) || (sm >= 1850 && sm <= 3400)) ? 38 : 4;
     // arquibancadas, pit lane e garagens (trackside.ts) também ocupam a beira da pista
     return Math.abs(loc.d) < (loc.d < 0 ? loc.wallL : loc.wallR) + margin || occupied(track, x, z, tmp.y);
   };
   const nearTrees = (x: number, z: number) => nearTrack(x, z, true);
   // complexo dos boxes: perto da reta principal (antes da linha de chegada), do lado de dentro
-  const L = track.length;
+  // de 520 m antes a 40 m depois da linha na pista antiga (s real), levados para a nova
+  const zA = sNovo(L_ANTIGO - 520);
+  const zB = sNovo(40);
   const pitZone = (x: number, z: number) => {
     const loc = track.locate(tmp.set(x, heightAt(x, z), z));
-    return !!loc && loc.d < 0 && (loc.s > L - 520 || loc.s < 40) && Math.abs(loc.d) < 140;
+    return !!loc && loc.d < 0 && (loc.s > zA || loc.s < zB) && Math.abs(loc.d) < 140;
   };
 
   buildBuildings(osm, track, group, heightAt, nearTrack, pitZone, renderer, rand);
@@ -580,7 +590,8 @@ function buildRibbons(lines: Pt[][], width: number, group: THREE.Group, heightAt
       const nz = dx / l;
       const loc = track.locate(tmp.set(x, heightAt(x, z) + 3, z));
       // só interrompe onde o asfalto do pit-lane entraria por cima da pista, da saída ou da entrada dos boxes
-      const inCustomPit = atTrackHeight && loc && ((loc.s >= 3840 && loc.s <= 4050) || (loc.s >= 300 && loc.s <= 800));
+      // s real da pista antiga (entrada 3840–4050, saída 300–800) levado para a nova
+      const inCustomPit = atTrackHeight && loc && ((loc.s >= PIT_A[0] && loc.s <= PIT_A[1]) || (loc.s >= PIT_B[0] && loc.s <= PIT_B[1]));
       if (loc && (inCustomPit || Math.abs(loc.d) - width / 2 < (loc.d < 0 ? loc.wl : loc.wr) - 0.5)) {
         prev = -1;
         return;

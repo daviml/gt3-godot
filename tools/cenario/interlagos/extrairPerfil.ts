@@ -7,6 +7,10 @@
  * Depois da migração o perfil é a fonte; este arquivo só serve para refazer o perfil v1 (idêntico ao gerador antigo)
  * e como registro de onde cada número veio. Regenerar: (de REPOS/gt3-godot/tools) node cenario.mjs --extrair-perfil
  * A página também confere: avalia o perfil gerado com ./perfil.ts e compara com o código antigo em cada amostra.
+ *
+ * OBSOLETO desde a Fase 2B etapa F: o perfil passou para a pista nova (./migrarPerfil2B.ts) e o vite.config.ts troca o
+ * import do interlagos.json do web abaixo pela fonte nova; o cenario.mjs recusa --extrair-perfil. Fica só como
+ * registro de onde vieram os números da v1.
  */
 import { STEP, Track, type TrackData } from '@web/track/track';
 import interlagos from '../../../../gt3-time-attack/data/tracks/interlagos.json';

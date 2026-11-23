@@ -7,7 +7,8 @@ Cada linha leva "s = NNNN m" e o nome do trecho (data/track/track.json → secti
 Uso:
   python tools/ref/folha.py --lmu build/ref/interlagos/chase --godot build/ref/interlagos/godot/chase \
       --out build/ref/interlagos/folhas/chase --s0 0 --s1 4290 --passo 50
-  --s1 < --s0 cruza a linha de chegada (ex.: --s0 3884 --s1 250).
+  --s1 < --s0 cruza a linha de chegada (ex.: --s0 3884 --s1 250). --lista 352,382,… no lugar de --s0/--s1/--passo.
+  Interlagos desde a Fase 2B etapa F: --lmu build/ref/interlagos/chase_v2 (quadros no s novo, atlas_s_novo.py).
 Gera folha_01.jpg, folha_02.jpg… com --por-pagina linhas cada (padrão 6). s faltando em um dos lados: avisa e pula.
 """
 from __future__ import annotations
@@ -81,6 +82,7 @@ def main() -> int:
     ap.add_argument("--s0", type=float, default=0.0)
     ap.add_argument("--s1", type=float, default=4290.0)
     ap.add_argument("--passo", type=float, default=50.0)
+    ap.add_argument("--lista", default="", help="metros livres separados por vírgula (no lugar de --s0/--s1/--passo)")
     ap.add_argument("--por-pagina", type=int, default=6)
     ap.add_argument("--largura", type=int, default=960, help="largura de cada imagem na folha (px)")
     ap.add_argument("--track", default=str(RAIZ / "data/track/track.json"), help="track.json com as seções")
@@ -96,7 +98,8 @@ def main() -> int:
         comprimento = 1e9
 
     pares: list[tuple[int, Path, Path]] = []
-    for s in lista_s(a.s0, a.s1, a.passo, comprimento):
+    metros = [round(float(x)) for x in a.lista.split(",") if x.strip()] if a.lista else lista_s(a.s0, a.s1, a.passo, comprimento)
+    for s in metros:
         pl, pg = achar(lmu, s), achar(godot, s)
         if pl is None or pg is None:
             falta = " e ".join(n for n, p in (("LMU", pl), ("Godot", pg)) if p is None)

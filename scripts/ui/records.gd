@@ -6,16 +6,19 @@ class_name Records
 extends RefCounted
 
 # v3: R8 e motores centrais recalibrados (07/11/2026), igual à chave do web
-const PATH_SIM := "user://recordes-interlagos-v3.json"
+# v4: geometria física de Interlagos refeita (Fase 2B do PLANO-INTERLAGOS-DETALHES.md, 4.308 m): placar zerado
+# no simulador e no arcade (os arquivos v3/godot-arcade antigos ficam no user://, sem uso). Iguais a data/tracks.json.
+const PATH_SIM := "user://recordes-interlagos-v4.json"
 const PATH := PATH_SIM
-const PATH_ARCADE := "user://recordes-interlagos-godot-arcade.json"
+const PATH_ARCADE := "user://recordes-interlagos-arcade-v4.json"
 const SETTINGS := "user://ajustes.cfg"
 
 const SECRETS := "res://segredos.cfg"
 const GH_CONTENTS := "https://api.github.com/repos/daviml/gt3-tempos/contents/"
 const GH_BRANCH := "main"
 ## mesmos arquivos e limites que a antiga função da Vercel usava
-const REMOTE_FILES := {"godot-sim": "interlagos-godot.json", "godot-arcade": "interlagos-godot-arcade.json"}
+# v4: pista nova da Fase 2B (20/11/2026); os arquivos antigos do gt3-tempos ficam como histórico da pista antiga
+const REMOTE_FILES := {"godot-sim": "interlagos-v4-godot.json", "godot-arcade": "interlagos-v4-godot-arcade.json"}
 const MIN_TIME := {"godot-sim": 85.0, "godot-arcade": 60.0}
 ## chave só para o token não ficar em texto puro no pacote exportado (não é criptografia)
 const SCRAMBLE_KEY := "gt3-interlagos-2026"

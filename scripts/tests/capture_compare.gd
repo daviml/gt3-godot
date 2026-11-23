@@ -8,8 +8,11 @@
 #      Para o --mover, use um carro com referência na pista (ex.: --car=bmw-m4-gt3); sem ela vale o Bot simples.
 #
 # Modo --atlas (PLANO-INTERLAGOS-DETALHES.md §2, Fase 0): fotografa por METRO DE PISTA, no mesmo índice dos quadros
-# do vídeo do LMU (build/ref/interlagos/<chase|onboard>/sNNNN.jpg), com uma câmera de comparação própria igual à
-# do vídeo (a câmera do jogo não muda):
+# do vídeo do LMU, com uma câmera de comparação própria igual à do vídeo (a câmera do jogo não muda).
+# O s é sempre o da pista ATUAL do jogo (track.json; carro na linha do RefBot da referência atual). Interlagos, desde
+# a Fase 2B etapa F, é a pista nova (4.308 m): os quadros do LMU no mesmo s estão em
+# build/ref/interlagos/<chase_v2|onboard_v2>/sNNNN.jpg (tools/ref/atlas_s_novo.py, NNNN = s novo); as pastas
+# <chase|onboard>/ da Fase 0 continuam no s antigo (4.294 m; s novo = tools/tracks/interlagos/s_antigo_novo.json).
 #   -- --atlas --s0=0 --s1=4290 --passo=50 --cam=0 --quality=2 --out=build/ref/interlagos/godot/chase [--regua]
 #   --s1 < --s0 cruza a linha de chegada (ex.: --s0=3884 --s1=250). Arquivos: <out>/sNNNN.png (1280x720, 16:9).
 #   --lista=600,750,1500 fotografa só esses metros (no lugar de --s0/--s1/--passo).

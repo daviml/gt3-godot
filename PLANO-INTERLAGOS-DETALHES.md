@@ -5,7 +5,7 @@ corrigir os detalhes trecho a trecho. Substitui `PLANO-VISUAL-PISTA.md` como pla
 parte de Interlagos do `PLANO-ARVORES.md`.
 
 Status: **aprovado pelo Davi em 20/11/2026**, em execução por fases (decisões no §8). Fases 0 e 1 concluídas (folha da Fase 1
-aprovada); Fase 2 feita, aguardando o Davi olhar a folha; próxima: **2B**.
+aprovada); Fases 2 e 2B feitas, aguardando o Davi olhar as folhas; próxima: **4** (ordem dos setores, §8).
 
 ---
 
@@ -222,36 +222,54 @@ Mesmo processo de Laguna Seca (`GUIA-PISTAS.md` §1–4), antes dos setores para
 - **Pronto quando:** comprimento a ≤ 0,5% do oficial (4.309 m), RefBot dá volta válida a ≤ 3% do tempo real,
   velocidade mínima por curva a ≤ 10 km/h do Garage 61, suíte de testes verde.
 
-**Andamento (20/11/2026) — pausada no início da etapa E; o jogo continua na pista antiga, consistente com o GLB:**
-- **Descoberta:** Interlagos vinha do jogo web (`../gt3-time-attack`, via `tools/prep.ts`: TUMFTM alisado, SRTM
-  30 m, sem camber). A 2B dá a ela fonte própria em `tools/tracks/interlagos/`, como Laguna e Imola. O repo
-  `gt3-time-attack` não é alterado (a pista do web diverge daqui em diante).
-- **D1, relevo — feito, falta um ajuste:** LiDAR GeoSampa/PMSP 2017 (36 folhas LAZ, bucket público
-  `laz-m3dc-pmsp`, em `build/interlagos/lidar/raw/laz/`), `download_lidar.py` e `lidar.py`
-  (`altura(x,z)`, `copa(x,z)`, `--conferir`). `laspy[lazrs]` instalado por pip. Rasterizado: MDT 0,5 m, MDS 1 m,
-  `copa.npy`; `interlagos-terrain.json` já é o do LiDAR. Conferência: desnível 43,4 m (oficial ~43), emendas
-  ≤ 9 cm, sem buracos, relevo atual erra 2,3 m rms (até ~6 m: S/Curva do Sol ~4 m altos, Mergulho e Café/Subida
-  ~4 m baixos), lado de fora mais alto em todas as curvas (S do Senna ~8°, Subida dos Boxes ~6°, Mergulho ~4,5°).
-  **Ajuste pendente:** o MDT usa só a classe 2 e só 36% da linha central tem ponto direto; sobre o asfalto 89%
-  dos pontos são classe 20, ao nível do chão (classe 2 fica ~0,15 m abaixo). Refazer o raster perto da pista
-  (~40 m) com classes 2 + 20 (mediana por célula) antes de calcular altitude e camber. LiDAR 2020 não baixado
-  (portal com proteção anti-robô).
-- **D2, traçado — feito:** `build_track.py` → `interlagos.json` (1.076 pontos a 4 m, larguras, zebras da Fase 2
-  em s novo, muros), `interlagos-osm.json`, `s_antigo_novo.json`, `LEIA-ME.md`; imagens em
-  `build/interlagos/tracado/`. Comprimento 4.303,7 m (−0,12%); borda × satélite mediana ~0,1–0,2 m, p95 ~1 m;
-  6 voltas do Garage 61 dentro da pista em 99,9–100% com meio carro de folga; linha de chegada no mesmo ponto;
-  referencial do mundo mantido (GPS e satélite ficam ~3 m deslocados do OSM, só anotado). Deslocamento lateral
-  da linha: mediana 0,9 m, máximo 4,5 m (Lago); `s` muda até 12 m.
-- **E, integração — interrompida logo no começo** (só mexeu em `build_track.py`/`interlagos.json`; nada em
-  `data/` mudou; conferir esses dois arquivos ao retomar, rodando `build_track.py` de novo). A fazer: exportar
-  para `data/track/` pelo `pista.ts` (e o `prep.ts` parar de sobrescrever Interlagos); resolver muro mínimo do
-  `applyWalls`, comprimento por 200 cordas da classe `Track`, `name` ≠ "Interlagos", larguras de 9–10,5 m (Reta
-  Oposta, subida do Lago, Junção), faixa de aceleração da saída dos boxes como asfalto, calombos da borda direita
-  em 1490–1510 e 3650–3668; mapa de `s` definitivo; 6 referências do Garage 61 + `refs`; recordes
-  `recordes-interlagos-v4`; paridade na pista nova; teste `scripts/tests/interlagos.gd`; suíte.
-- **Depois:** religar o LiDAR (`build_track.py --lidar`, altitude + `bank`) e repetir RefBot/testes; etapa F
-  (gerador lendo a pista nova, perfil/código/atlas remapeados pelo mapa de `s`, zebras do perfil voltando a
-  `"fisica"`, GLB, folha, bench com `--track=interlagos --disable-vsync`, suíte).
+**Resultado (23/11/2026) — feita, aguardando o Davi olhar a folha:**
+- **Fonte própria:** Interlagos deixou de vir do jogo web (`../gt3-time-attack`, TUMFTM alisado + SRTM 30 m, sem
+  camber). Agora é `tools/tracks/interlagos/` como Laguna e Imola: `build_track.py --lidar` → `interlagos.json` →
+  `tools/pista.ts -- interlagos` → `data/track/`. O `prep.ts` não grava mais pista/relevo/OSM/referências de
+  Interlagos. Passo a passo completo em `tools/tracks/interlagos/LEIA-ME.md`.
+- **Traçado (satélite + GPS):** linha central recentralizada pelas bordas do satélite; borda × satélite mediana
+  ~0,1–0,2 m, p95 ~1 m (antes 1,3–1,5 m / ~4 m). Comprimento **4.308 m** (oficial 4.309; antes 4.294), amostras a
+  2,00 m. Asfalto mediano 12,9 m. Deslocamento da linha: mediana 0,9 m, máximo 4,5 m (Lago); `s` muda até 16 m
+  (`s_antigo_novo.json`). Linha de chegada no mesmo ponto; referencial do mundo mantido (GPS e satélite ficam
+  ~3 m deslocados do OSM: só anotado). Zebras da física = tabela da Fase 2. Correções locais: saída dos boxes com
+  escape asfaltado, Bico de Pato estreitado (muro baixo), Subida dos Boxes e dois calombos alisados.
+- **Relevo e camber (LiDAR GeoSampa/PMSP 2017):** 36 folhas LAZ (bucket público `laz-m3dc-pmsp`), piso pelas
+  classes 2 + 20 (a classe 2 sozinha fica ~0,15 m abaixo do asfalto), registro LiDAR × mundo (+1,50, −1,75) m.
+  Desnível 43,1 m. Camber com o lado de fora mais alto em 98% das amostras em curva (S do Senna 8,1°, Subida dos
+  Boxes 5,7°, Mergulho 4,5°, Ferradura −2,5°). Aceleração vertical das 6 voltas × pista: **0,032 g rms** (relevo
+  antigo 0,21 g); a crista falsa da Ferradura sumiu. Altura de copa (`copa.npy`) pronta para as árvores (§5 B).
+- **Muros:** medidos (OSM, satélite, barreiras desenhadas); mínimo de 1,5 m da borda em Interlagos (1,3 m na
+  Goodyear do Lago), Laguna/Imola seguem 2,5 m. Nenhuma das 6 voltas passa além do muro. Corrigidos depois da
+  conferência do GLB: separador da saída dos boxes, Goodyear do Lago, S do Senna (cerca a ~27 m, grama larga como
+  no LMU) e Bico de Pato.
+- **Referências e recordes:** 6 voltas do Garage 61 → `data/reference/interlagos-{nsx,ferrari,mclaren,m4,
+  corvette,porsche}.json` (a antiga `interlagos-r8` foi substituída); os 6 carros do jogo têm referência (R8 usa a
+  do NSX). Recordes zerados: `recordes-interlagos-v4` (sim) e `recordes-interlagos-arcade-v4`, fantasma
+  `interlagos-v4`, placar online em `interlagos-v4-godot.json` / `interlagos-v4-godot-arcade.json` (os antigos
+  ficam no `gt3-tempos` como histórico).
+- **RefBot (`scripts/tests/interlagos.gd`):** os 6 carros fazem volta válida a **+1,07% a +1,50%** do iRacing
+  (antes +3,3–3,4%, e NSX/488/720S rodavam na Ferradura); mínimas por trecho a ≤ 6,7 km/h; câmera com folga
+  ≥ 0,17 m. Nenhuma pendência no teste.
+- **Cenário na pista nova:** o gerador monta a mesma pista da física (posição 0,01 cm) e para com erro se
+  divergir. Perfil, 45 posições fixas do código e atlas do vídeo remapeados para o `s` novo
+  (`tools/cenario/interlagos/sNovo.ts`, `migrarPerfil2B.ts`; atlas em `atlas_v2.json`, quadros `chase_v2/`, nome =
+  s novo). Zebras visual = física amostra a amostra; barreiras do perfil no muro da física. Conferência do GLB
+  (`tools/cenario/interlagos/conferir_glb.py`): asfalto a ≤ 4 cm da física, nenhuma árvore/prop no asfalto ou
+  dentro do muro, barreira dentro do limite da física ≤ 0,35 m (amostragem). Laguna e Imola byte a byte iguais.
+- **Folha:** `build/ref/interlagos/folhas/fase2b_muros/folha_01..04.jpg` (16 pares, s novo).
+- **Bench (`--disable-vsync --track=interlagos`, 1ª rodada × 1ª rodada da Fase 2):** Mínimo 5,36 → 5,20 ms
+  (150 draw calls); Leve 5,38 → 5,44 ms (293); Médio 14,21 → 14,51 ms (348, 543k triângulos). Zebras e linhas
+  visíveis no Mínimo.
+- **Testes:** os 23 scripts de `scripts/tests` passam (paridade web × Godot na pista nova, com camber).
+- **Pendências:**
+  - Goodyear do Lago: a barreira desenhada (e agora o muro da física) fica colada na zebra em s ~1394–1582; no
+    quadro do LMU em s 1407 há grama e guard-rail baixo. Conferir a posição real na Fase 6.
+  - Âncoras ainda fora do lugar (setores): passarela, pórtico da Reta Oposta, saída dos boxes (Fase 2).
+  - Bico de Pato dir: muro de 14 m é limite geométrico, não barreira medida.
+  - Pior resíduo de aceleração vertical em s ≈ 4038 (Arquibancadas, +0,24 g): causa não identificada.
+  - `maxRunoff` não definido; pontos do bench (`CHECKPOINTS`) ainda nos metros antigos; `atlas_video.py` e
+    `ref_garage61.py` seguem na pista antiga (o atlas v2 é derivado pelo mapa).
+  - A pista do jogo web (`gt3-time-attack`) continua a antiga.
 
 ### Fases 3 a 10 — Setores, um por sessão
 

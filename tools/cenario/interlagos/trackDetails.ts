@@ -2,6 +2,12 @@
 // muros com placas por trecho, barreiras azuis acolchoadas, alambrado alto com a ponta virada para a pista,
 // outdoors atrás das curvas, passarela sobre a reta, grid de largada pintado e remendos no asfalto.
 // As marcas das placas são fictícias.
+//
+// Fase 2B etapa F: todos os metros abaixo continuam escritos como na pista antiga ("s numa volta de 4.300 m", ou o s
+// real antigo onde indicado) e passam por ./sNovo.ts (iNovo4300 / s4300 / sNovo): passarela, pórticos, saída e
+// entrada dos boxes, Goodyear do Lago, muro da Ferradura, placas, telão etc. ficam no MESMO lugar físico de antes
+// (não foram movidos para as âncoras medidas no satélite: isso é dos setores). A lateral segue a pista nova (bordas
+// e muros medidos).
 import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
@@ -9,6 +15,7 @@ import { addProp } from '../propsRegistry';
 import { phTexture } from '@web/render/textures';
 import { TINTA } from './tintas';
 import { perfilDe, type TipoBarreira } from './perfil';
+import { dNovo4300, iNovo4300, L_ANTIGO, s4300, sNovo } from './sNovo';
 
 export type AdScheme = 'verde' | 'vermelho' | 'amarelo' | 'branco' | 'azul' | 'avis';
 type Kind = TipoBarreira;
@@ -270,8 +277,7 @@ export function barrierLayout(track: Track) {
   const kind: Record<-1 | 1, Kind[]> = { [-1]: p.L.map(a => a.tipo), [1]: p.R.map(a => a.tipo) };
   const ads: Record<-1 | 1, (AdScheme | null)[]> = { [-1]: p.L.map(a => a.banner as AdScheme | null), [1]: p.R.map(a => a.banner as AdScheme | null) };
   const fence: Record<-1 | 1, boolean[]> = { [-1]: p.L.map(a => a.alambrado), [1]: p.R.map(a => a.alambrado) };
-  const k = track.length / 4300;
-  const outdoors = OUTDOORS.map(o => ({ ...o, i0: Math.round((o.s0 * k) / STEP), i1: Math.round((o.s1 * k) / STEP) }));
+  const outdoors = OUTDOORS.map(o => ({ ...o, i0: iNovo4300(o.s0), i1: iNovo4300(o.s1) }));
   return { kind, ads, fence, outdoors };
 }
 
@@ -520,7 +526,7 @@ function buildBillboards(track: Track, group: THREE.Group, renderer: THREE.WebGL
 /** Passarela ROLEX sobre a reta na freada do S do Senna + marcos visuais do LMU (pórtico MOTUL, prédio Senna, telão). */
 export function buildBridge(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer, heightAt?: (x: number, z: number) => number) {
   const S = track.samples;
-  const s = S[Math.round((265 * track.length) / 4300 / STEP)];
+  const s = S[iNovo4300(265) % S.length];
   const span = s.wallL + s.wallR + 10;
   const h = 6.8;
   const concrete = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.85 });
@@ -592,7 +598,7 @@ export function buildBridge(track: Track, group: THREE.Group, renderer: THREE.We
 /** Pórtico vermelho MOTUL sobre a Reta Oposta (s ≈ 1040 m), igual ao 04_reta_oposta_1 do LMU. */
 function buildMotulGantry(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
   const S = track.samples;
-  const s = S[Math.round((1040 * track.length) / 4300 / STEP)];
+  const s = S[iNovo4300(1040) % S.length];
   const span = s.wallL + s.wallR + 4;
   const h = 6.2;
   const steel = new THREE.MeshStandardMaterial({ color: 0x25282c, metalness: 0.5, roughness: 0.5 });
@@ -643,10 +649,9 @@ function buildOppositeRunoff(track: Track, group: THREE.Group, renderer: THREE.W
   };
   const S = track.samples;
   const N = S.length;
-  const k43 = track.length / 4300;
-  const i0 = Math.round((780 * k43) / STEP);
-  const i1 = Math.round((1150 * k43) / STEP);
-  const stripOff = (d0: number, d1: number, mat: THREE.Material, y0 = 0.015, y1 = 0.015, iStart = i0, iEnd = i1) => {
+  const i0 = iNovo4300(780);
+  const i1 = iNovo4300(1150);
+  const stripOff =(d0: number, d1: number, mat: THREE.Material, y0 = 0.015, y1 = 0.015, iStart = i0, iEnd = i1) => {
     const pos: number[] = [];
     const uv: number[] = [];
     const idx: number[] = [];
@@ -684,8 +689,8 @@ function buildOppositeRunoff(track: Track, group: THREE.Group, renderer: THREE.W
   stripOff(1.5, 4.5, paint(TINTA.vermelho, 'vermelha_oposta'));
   stripOff(4.5, 7.0, paint(TINTA.verdeAgua, 'verde_oposta'));
   // Paredão/talude verde escuro atrás do muro MOTUL (s = 820..1120 m)
-  const wi0 = Math.round((820 * k43) / STEP);
-  const wi1 = Math.round((1120 * k43) / STEP);
+  const wi0 = iNovo4300(820);
+  const wi1 = iNovo4300(1120);
   {
     const pos: number[] = [];
     const idx: number[] = [];
@@ -720,9 +725,8 @@ function buildOppositeRunoff(track: Track, group: THREE.Group, renderer: THREE.W
 function buildPitExit(track: Track, group: THREE.Group) {
   const S = track.samples;
   const N = S.length;
-  const k43 = track.length / 4300;
-  const i0 = Math.round((300 * k43) / STEP);
-  const i1 = Math.round((795 * k43) / STEP);
+  const i0 = iNovo4300(300);
+  const i1 = iNovo4300(795);
   const smooth = (a: number, b: number, x: number) => {
     const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
     return t * t * (3 - 2 * t);
@@ -736,7 +740,7 @@ function buildPitExit(track: Track, group: THREE.Group) {
     let prev = -1;
     for (let i = i0; i <= i1; i++) {
       const s = S[i % N];
-      const sm = s.s / k43;
+      const sm = s4300(s.s);
       const range = getRange(s, sm);
       if (!range || range[1] <= range[0]) {
         prev = -1;
@@ -774,8 +778,8 @@ function buildPitExit(track: Track, group: THREE.Group) {
   pitRibbon((s, sm) => { const [, dIn] = bounds(s, sm); return [dIn - 0.22, dIn]; }, 0.018, lineMat);
 
   // Guard-rail metálico duplo separador entre pista e saída dos boxes na Curva do Sol (s = 565..735 m)
-  const g0 = Math.round((565 * k43) / STEP);
-  const g1 = Math.round((735 * k43) / STEP);
+  const g0 = iNovo4300(565);
+  const g1 = iNovo4300(735);
   const railMat = new THREE.MeshStandardMaterial({ color: 0xc2c6ca, metalness: 0.35, roughness: 0.5, side: THREE.DoubleSide });
   for (const [h0, h1] of [[0.38, 0.68], [0.78, 1.08]] as const) {
     const pos: number[] = [];
@@ -896,7 +900,6 @@ function pitNoseBarrierTexture(renderer: THREE.WebGLRenderer): THREE.Texture {
 function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
   const S = track.samples;
   const N = S.length;
-  const k43 = track.length / 4300;
   const smooth = (a: number, b: number, x: number) => {
     const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
     return t * t * (3 - 2 * t);
@@ -913,8 +916,8 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
     sEnd: number,
     vScale = 0
   ) => {
-    const sA = Math.round((sStart * k43) / STEP);
-    const sB = Math.round((sEnd * k43) / STEP);
+    const sA = iNovo4300(sStart);
+    const sB = iNovo4300(sEnd);
     const pos: number[] = [];
     const uv: number[] = [];
     const idx: number[] = [];
@@ -922,7 +925,7 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
     let prev = -1;
     for (let i = sA; i <= sB; i++) {
       const s = S[i % N];
-      const sm = s.s / k43;
+      const sm = s4300(s.s);
       const r = fn(s, sm);
       if (!r || r[1] <= r[0]) {
         prev = -1;
@@ -956,7 +959,7 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
   }, 0.01, asphaltMat, 3505, 3535);
   const orangeMat = new THREE.MeshStandardMaterial({ color: 0xff6a00, roughness: 0.55 });
   const blackMat = new THREE.MeshStandardMaterial({ color: 0x1c1f24, roughness: 0.75 });
-  const sAt = S[Math.round((3535 * k43) / STEP) % N];
+  const sAt = S[iNovo4300(3535) % N];
   const atGrp = new THREE.Group();
   const nose = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.05, 3.6), orangeMat);
   nose.position.set(0, 0.525, 1.8);
@@ -990,7 +993,7 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
   }, 0.015, chevronMat, 3885, 4038, 14);
 
   // Barreira acolchoada amarela/preta com setas (<<<O>>>) na ponta do muro dos boxes (s = 4040 m)
-  const sNose = S[Math.round((4040 * k43) / STEP) % N];
+  const sNose = S[iNovo4300(4040) % N];
   const noseMat = new THREE.MeshStandardMaterial({ map: pitNoseBarrierTexture(renderer), roughness: 0.5 });
   const padDark = new THREE.MeshStandardMaterial({ color: 0x1c1f24, roughness: 0.75 });
   const nosePad = new THREE.Mesh(
@@ -1008,9 +1011,8 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
 function buildDescidaLagoGoodyear(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
   const S = track.samples;
   const N = S.length;
-  const k43 = track.length / 4300;
-  const i0 = Math.round((1390 * k43) / STEP);
-  const i1 = Math.round((1580 * k43) / STEP);
+  const i0 = iNovo4300(1390);
+  const i1 = iNovo4300(1580);
   const tecMat = new THREE.MeshStandardMaterial({ map: tecproTexture(renderer), roughness: 0.55, side: THREE.DoubleSide });
   const topMat = new THREE.MeshStandardMaterial({ color: 0x1d4a99, roughness: 0.55, side: THREE.DoubleSide });
 
@@ -1056,7 +1058,6 @@ function buildDescidaLagoGoodyear(track: Track, group: THREE.Group, renderer: TH
 /** Tendas/barracas de equipe à esquerda do S do Senna (02) e apoio atrás da grade direita na entrada do S (01). */
 function buildSennaTents(track: Track, group: THREE.Group, heightAt?: (x: number, z: number) => number) {
   const S = track.samples;
-  const k43 = track.length / 4300;
   const colors = [0xf2f2ee, 0xc81e24, 0x1b4d9e, 0xf2f2ee, 0xe86b1a];
   const dark = new THREE.MeshStandardMaterial({ color: 0x2a2d34, roughness: 0.85 });
   const tentSpecs = [
@@ -1070,8 +1071,9 @@ function buildSennaTents(track: Track, group: THREE.Group, heightAt?: (x: number
     { s: 278, d: 30, w: 12, l: 9, c: 1 }
   ];
   for (const t of tentSpecs) {
-    const s = S[Math.round((t.s * k43) / STEP)];
-    const pos = s.p.clone().addScaledVector(s.r, t.d);
+    const s = S[iNovo4300(t.s) % S.length];
+    // t.d era a lateral a partir do centro antigo: + dNovo para ficar no mesmo lugar em relação ao centro novo
+    const pos = s.p.clone().addScaledVector(s.r, t.d + dNovo4300(t.s));
     const gy = heightAt ? heightAt(pos.x, pos.z) : s.p.y;
     const grp = new THREE.Group();
     const body = new THREE.Mesh(new THREE.BoxGeometry(t.w, 2.8, t.l), dark);
@@ -1093,7 +1095,7 @@ function buildSennaTents(track: Track, group: THREE.Group, heightAt?: (x: number
 /** Edifício de operações/camarotes atrás dos boxes com mural artístico do Ayrton Senna (s = 4195 m, d = -32 m). */
 function buildSennaBuilding(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer, heightAt?: (x: number, z: number) => number) {
   const S = track.samples;
-  const s = S[Math.round((4195 * track.length) / 4300 / STEP)];
+  const s = S[iNovo4300(4195) % S.length];
   const c = document.createElement('canvas');
   c.width = 1024;
   c.height = 512;
@@ -1231,7 +1233,7 @@ function buildSennaBuilding(track: Track, group: THREE.Group, renderer: THREE.We
   const facadeMat = new THREE.MeshStandardMaterial({ map: tex(c, renderer, false), roughness: 0.62 });
   const sideMat = new THREE.MeshStandardMaterial({ color: 0x282d36, roughness: 0.82 });
   const roofMat = new THREE.MeshStandardMaterial({ color: 0x1e2228, metalness: 0.35, roughness: 0.65 });
-  const pos = s.p.clone().addScaledVector(s.r, -32);
+  const pos = s.p.clone().addScaledVector(s.r, -32 + dNovo4300(4195)); // −32 m do centro antigo
   const gy = heightAt ? heightAt(pos.x, pos.z) : s.p.y;
   const H = 20;
   const grp = new THREE.Group();
@@ -1255,9 +1257,8 @@ function buildSennaBuilding(track: Track, group: THREE.Group, renderer: THREE.We
 function buildFerraduraWall(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
   const S = track.samples;
   const N = S.length;
-  const k43 = track.length / 4300;
-  const i0 = Math.round((2005 * k43) / STEP);
-  const i1 = Math.round((2140 * k43) / STEP);
+  const i0 = iNovo4300(2005);
+  const i1 = iNovo4300(2140);
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x7b7e82, roughness: 0.9, side: THREE.DoubleSide });
   const bannerMat = new THREE.MeshStandardMaterial({
     map: tex(adCanvas('amarelo', 4, 256, 64), renderer),
@@ -1302,7 +1303,6 @@ function buildFerraduraWall(track: Track, group: THREE.Group, renderer: THREE.We
 function buildGrassSigns(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
   const S = track.samples;
   const N = S.length;
-  const k43 = track.length / 4300;
   const backMat = new THREE.MeshStandardMaterial({ color: 0x26292e, roughness: 0.8 });
   const specs: { s: number; side: -1 | 1; dist: number; ads: AdScheme }[] = [
     { s: 1880, side: -1, dist: 4.2, ads: 'azul' },
@@ -1322,7 +1322,7 @@ function buildGrassSigns(track: Track, group: THREE.Group, renderer: THREE.WebGL
     return mats.get(a)!;
   };
   for (const sp of specs) {
-    const s = S[Math.round((sp.s * k43) / STEP) % N];
+    const s = S[iNovo4300(sp.s) % N];
     const edge = sp.side < 0 ? s.wl : s.wr;
     const pos = s.p.clone().addScaledVector(s.r, sp.side * (edge + sp.dist));
     const m = new THREE.Mesh(boardGeo, boardMat(sp.ads));
@@ -1333,7 +1333,7 @@ function buildGrassSigns(track: Track, group: THREE.Group, renderer: THREE.WebGL
     group.add(m);
   }
   // Anel escuro de pneus na base da árvore no gramado direito após o Pinheirinho (s = 2585 m, frame 19)
-  const sTree = S[Math.round((2585 * k43) / STEP) % N];
+  const sTree = S[iNovo4300(2585) % N];
   const pTree = sTree.p.clone().addScaledVector(sTree.r, sTree.wr + 18.0);
   const ring = new THREE.Mesh(
     new THREE.CylinderGeometry(2.6, 2.8, 0.85, 18, 1, true),
@@ -1348,7 +1348,7 @@ function buildGrassSigns(track: Track, group: THREE.Group, renderer: THREE.WebGL
 /** Telão gigante atrás do guard-rail esquerdo na aproximação dos boxes (s = 3855 m, d = -(wl + 6.5)) + casinha de apoio (frame 28). */
 function buildBigScreen(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
   const S = track.samples;
-  const s = S[Math.round((3855 * track.length) / 4300 / STEP)];
+  const s = S[iNovo4300(3855) % S.length];
   const frameMat = new THREE.MeshStandardMaterial({ color: 0x16181c, roughness: 0.7 });
   const c = document.createElement('canvas');
   c.width = 256;
@@ -1394,7 +1394,7 @@ function buildBigScreen(track: Track, group: THREE.Group, renderer: THREE.WebGLR
 /** Varal de bandeiras internacionais sobre o pit lane na reta principal (s = 4215 m, frame 30). */
 function buildFlagGarland(track: Track, group: THREE.Group) {
   const S = track.samples;
-  const s = S[Math.round((4215 * track.length) / 4300 / STEP) % S.length];
+  const s = S[iNovo4300(4215) % S.length];
   const grp = new THREE.Group();
   const cableMat = new THREE.MeshStandardMaterial({ color: 0x22252a, roughness: 0.6 });
   const span = 16.0;
@@ -1453,8 +1453,10 @@ function overlay(track: Track, lift: number, vScale: number, include: (i: number
 
 /** Grid de largada: 24 posições em ziguezague (a cada 8 m) atrás da linha de chegada. */
 export function buildGrid(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
-  const L = track.length;
-  const c = document.createElement('canvas');
+  // de 200 a 12 m antes da linha na pista antiga (s real), levado para a nova
+  const gA = sNovo(L_ANTIGO - 200);
+  const gB = sNovo(L_ANTIGO - 12);
+  const c =document.createElement('canvas');
   c.width = 512;
   c.height = 512; // 16 m de pista: duas posições
   const g = c.getContext('2d')!;
@@ -1472,7 +1474,7 @@ export function buildGrid(track: Track, group: THREE.Group, renderer: THREE.WebG
   t.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const mat = new THREE.MeshStandardMaterial({ map: t, transparent: true, depthWrite: false, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -3 });
   const S = track.samples;
-  const mesh = overlay(track, 0.005, 16, i => S[i].s > L - 200 && S[i].s < L - 12, mat);
+  const mesh = overlay(track, 0.005, 16, i => S[i].s > gA && S[i].s < gB, mat);
   mesh.renderOrder = 3;
   group.add(mesh);
 }

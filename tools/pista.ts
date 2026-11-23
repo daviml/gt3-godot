@@ -1,41 +1,44 @@
-// Exporta para o Godot uma pista que NÃO vem do jogo web (Interlagos continua no prep.ts, sem mudança).
-// Fonte: tools/tracks/<id>/<id>.json (TrackData do web + sections), <id>-terrain.json e <id>-osm.json, gerados
-// pelos scripts da própria pasta (build_track.py, build_osm.py). Usa a mesma classe Track do web (zebras, muros e
-// escapes automáticos) e a mesma lógica de relevo do prep.ts.
+// Exporta para o Godot uma pista com fonte própria em tools/tracks/<id>/ (Laguna Seca, Imola e, desde a Fase 2B,
+// Interlagos). Fonte: <id>.json (TrackData do web + sections), <id>-terrain.json e <id>-osm.json, gerados pelos
+// scripts da própria pasta (build_track.py, build_osm.py). Usa a mesma classe Track do web (zebras, muros e
+// escapes automáticos), os ajustes de tools/tracks/fonte.ts e a mesma lógica de relevo do prep.ts.
 //
-//  data/tracks/<id>/track.json    amostras a cada 2 m (stride 16) + sections
-//  data/tracks/<id>/terrain.json  grade de relevo (LiDAR + altura da pista perto dela)
-//  data/tracks/<id>/osm.json      arredores do OpenStreetMap (só as ferramentas usam)
+//  <data_dir>/track.json    amostras a cada 2 m (stride 16) + sections (+ bank, se a fonte tiver)
+//  <data_dir>/terrain.json  grade de relevo (LiDAR + altura da pista perto dela)
+//  <data_dir>/osm.json      arredores do OpenStreetMap (só as ferramentas usam)
+//
+// <data_dir> = o `data_dir` da pista em data/tracks.json (Interlagos: data/track/; as outras: data/tracks/<id>/).
 //
 // uso (de REPOS/gt3-godot/tools): npx vite-node pista.ts -- laguna-seca
+//                                 npx vite-node pista.ts -- interlagos --saida=../build/tmp/x   (outra pasta)
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { Track } from '../../gt3-time-attack/src/track/track';
-import { applyBank, applyKerbs, applyWalls, clampRunoff } from './tracks/bank';
+import { resolve } from 'node:path';
+import { applyBank } from './tracks/bank';
+import { fonte, montaPista } from './tracks/fonte';
 
-const id = process.argv.slice(2).filter(a => a !== '--')[0];
-if (!id || id === 'interlagos') throw new Error('uso: npx vite-node pista.ts -- <id>  (Interlagos é pelo prep.ts)');
-const OUT = new URL('../', import.meta.url);
-const src = (f: string) => fileURLToPath(new URL(`tracks/${id}/${f}`, import.meta.url));
-const out = (p: string) => {
-  const f = fileURLToPath(new URL(p, OUT));
-  mkdirSync(fileURLToPath(new URL('.', new URL(p, OUT))), { recursive: true });
-  return f;
-};
-const json = (p: string, v: unknown) => writeFileSync(out(p), JSON.stringify(v));
+const args = process.argv.slice(2).filter(a => a !== '--');
+const id = args.find(a => !a.startsWith('--'));
+if (!id) throw new Error('uso: npx vite-node pista.ts -- <id> [--saida=<pasta>]');
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
+const tracks = JSON.parse(readFileSync(resolve(ROOT, 'data/tracks.json'), 'utf8')) as { id: string; data_dir: string }[];
+const info = tracks.find(t => t.id === id);
+const saida = args.find(a => a.startsWith('--saida='))?.slice(8);
+const dir = saida ? resolve(process.cwd(), saida)
+  : resolve(ROOT, (info?.data_dir ?? `res://data/tracks/${id}/`).replace('res://', ''));
+mkdirSync(dir, { recursive: true });
+const src = (f: string) => fonte(id, f);
+const out = (f: string) => resolve(dir, f);
+const json = (f: string, v: unknown) => writeFileSync(out(f), JSON.stringify(v));
 const r2 = (x: number) => Math.round(x * 100) / 100;
 const r4 = (x: number) => Math.round(x * 10000) / 10000;
 const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
-const dir = `data/tracks/${id}/`;
 
 // ---------- pista
 const data = JSON.parse(readFileSync(src(`${id}.json`), 'utf8'));
-const track = new Track(data);
+// zebras e muros reais medidos, escape asfaltado limitado (`maxRunoff`) e mínimo (`runLeft/Right`), cordas
+const track = montaPista(data);
 const S = track.samples;
-// zebras e muros reais medidos (opcionais, presentes em Imola) e escape asfaltado limitado (`maxRunoff`)
-applyKerbs(track, data.kerbLeft, data.kerbRight);
-applyWalls(track, data.wallLeft, data.wallRight);
-clampRunoff(track, data.maxRunoff);
 
 // trechos com nome: s da fonte (linha de 1 m) → s desta pista (Catmull-Rom a cada 2 m), na proporção do comprimento
 const k = track.length / (data.points.length * 4);
@@ -49,9 +52,15 @@ for (const s of S) {
 }
 // camber (opcional): grava r/n horizontais (acima) e o ângulo; o Godot gira igual ao applyBank
 const bank = applyBank(track, data.bank);
-json(dir + 'track.json', { n: S.length, step: 2, stride: 16, length: r2(track.length), s: flat, sections,
+json('track.json', { n: S.length, step: 2, stride: 16, length: r2(track.length), s: flat, sections,
   ...(bank ? { bank: bank.map(r6) } : {}) });
-console.log(id, S.length, 'amostras,', Math.round(track.length), 'm,', sections.length, 'trechos');
+let lo = Infinity, hi = 0;
+for (let i = 0; i < S.length; i++) {
+  const d = Math.hypot(S[(i + 1) % S.length].p.x - S[i].p.x, S[(i + 1) % S.length].p.z - S[i].p.z);
+  lo = Math.min(lo, d); hi = Math.max(hi, d);
+}
+console.log(id, S.length, 'amostras,', Math.round(track.length), 'm,', sections.length, 'trechos; espaçamento em planta',
+  lo.toFixed(3), '–', hi.toFixed(3), 'm →', dir);
 
 // ---------- relevo (igual ao prep.ts: grade suavizada, alinhada pela mediana; perto da pista, a altura dela)
 const T = JSON.parse(readFileSync(src(`${id}-terrain.json`), 'utf8'));
@@ -105,8 +114,8 @@ const heightAt = (x: number, z: number) => {
 const tnx = Math.ceil((maxX - minX) / CELL) + 1, tnz = Math.ceil((maxZ - minZ) / CELL) + 1;
 const th: number[] = [];
 for (let j = 0; j < tnz; j++) for (let i = 0; i < tnx; i++) th.push(r2(heightAt(minX + i * CELL, minZ + j * CELL)));
-json(dir + 'terrain.json', { x0: minX, z0: minZ, cell: CELL, nx: tnx, nz: tnz, h: th });
+json('terrain.json', { x0: minX, z0: minZ, cell: CELL, nx: tnx, nz: tnz, h: th });
 console.log('relevo', tnx, 'x', tnz);
 
-copyFileSync(src(`${id}-osm.json`), out(dir + 'osm.json'));
+copyFileSync(src(`${id}-osm.json`), out('osm.json'));
 console.log('osm ok');

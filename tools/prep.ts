@@ -1,11 +1,9 @@
 // Exporta do jogo web (REPOS/gt3-time-attack) tudo o que o Godot usa. O web continua sendo a fonte dos dados:
 // mudou pista, física ou carro lá → rodar isto de novo.
 //
-//  data/track/track.json     amostras da pista a cada 2 m (classe Track do jogo) + nomes das curvas (seções)
-//  data/track/terrain.json   grade de relevo (SRTM + altura da pista perto dela, igual ao trackView.ts)
-//  data/track/osm.json       arredores do OpenStreetMap (prédios, arquibancadas, lago, mata...)
 //  data/track/arvores.json   atlas das árvores impostoras (tamanhos por espécie)
-//  data/reference/*.json     voltas de referência do iRacing reamostradas na pista
+//  (pista, relevo, OSM e referências de Interlagos saem de tools/tracks/interlagos/ pelo tools/pista.ts e
+//   tools/referencia.ts desde a Fase 2B; antes saíam daqui, do web)
 //  data/cars.json            lista dos carros na ordem do menu
 //  data/cars/<id>.json       carro pronto: nome, cor, som, modelo (rodas, entre-eixos) e acerto FINAL da física
 //                            (GT3 base + acerto por posição do motor + data/cars/<id>.json, igual ao carParams())
@@ -16,11 +14,9 @@
 // uso (de REPOS/gt3-godot/tools): npx vite-node prep.ts            tudo
 //                                 npx vite-node prep.ts -- dados   só JSON (rápido, sem modelos/texturas/sons)
 //                                 npx vite-node prep.ts -- carros  JSON + os 13 GLB (sem texturas da pista/sons)
-import { readFileSync, writeFileSync, copyFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
+import { writeFileSync, copyFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { Track } from '../../gt3-time-attack/src/track/track';
 import { CARS, carParams, modelMeta } from '../../gt3-time-attack/src/cars';
-import { trackSections } from '../../gt3-time-attack/src/render/osmScenery';
 import { NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS, EXTMeshoptCompression, EXTTextureWebP, KHRMeshQuantization } from '@gltf-transform/extensions';
 import { compressTexture, dedup, dequantize, listTextureSlots, prune, weld } from '@gltf-transform/functions';
@@ -37,90 +33,16 @@ const out = (p: string) => {
   return f;
 };
 const json = (p: string, v: unknown) => writeFileSync(out(p), JSON.stringify(v));
-const r2 = (x: number) => Math.round(x * 100) / 100;
-const r4 = (x: number) => Math.round(x * 10000) / 10000;
-const r6 = (x: number) => Math.round(x * 1e6) / 1e6;
 const onlyData = process.argv.includes('dados');
 const onlyCars = process.argv.includes('carros'); // só os modelos (com as correções do car_fix.ts)
 
-// ---------- pista
-const data = JSON.parse(readFileSync(web('data/tracks/interlagos.json'), 'utf8'));
-const track = new Track(data);
-const osm = JSON.parse(readFileSync(web('data/tracks/interlagos-osm.json'), 'utf8'));
-track.sections = trackSections(osm, track); // como no buildOsmScenery: nomes das curvas a partir do OSM
-const S = track.samples;
-const flat: number[] = [];
-for (const s of S) {
-  // posição em 0,1 mm: arredondar em cm deixava degraus de até 5 mm a cada 2 m, que faziam o carro quicar
-  flat.push(r4(s.p.x), r4(s.p.y), r4(s.p.z), r6(s.t.x), r6(s.t.y), r6(s.t.z), r6(s.r.x), r6(s.r.z),
-    r2(s.wl), r2(s.wr), r2(s.kerbL), r2(s.kerbR), r2(s.runL), r2(s.runR), r2(s.wallL), r2(s.wallR));
-}
-json('data/track/track.json', {
-  n: S.length, step: 2, stride: 16, length: r2(track.length), s: flat,
-  sections: track.sections.map(c => ({ name: c.name, s0: r2(c.s0), s1: r2(c.s1) }))
-});
-console.log('pista', S.length, 'amostras,', Math.round(track.length), 'm,', track.sections.length, 'curvas com nome');
-
-// ---------- relevo (mesma lógica de buildTerrain/srtmGrid em src/render/trackView.ts)
-const T = JSON.parse(readFileSync(web('data/tracks/interlagos-terrain.json'), 'utf8'));
-const { x0, z0, step, nx, nz } = T;
-const at = (i: number, j: number) => T.h[Math.max(0, Math.min(nz - 1, j)) * nx + Math.max(0, Math.min(nx - 1, i))];
-const sm = new Float32Array(nx * nz);
-for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-  let a = 0;
-  for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) a += at(i + di, j + dj) * (di || dj ? 1 : 2);
-  sm[j * nx + i] = a / 10;
-}
-const raw = (x: number, z: number) => {
-  const fx = Math.max(0, Math.min(nx - 1.001, (x - x0) / step));
-  const fz = Math.max(0, Math.min(nz - 1.001, (z - z0) / step));
-  const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
-  const g = (a: number, b: number) => sm[b * nx + a];
-  return (g(i, j) * (1 - u) + g(i + 1, j) * u) * (1 - v) + (g(i, j + 1) * (1 - u) + g(i + 1, j + 1) * u) * v;
-};
-const diffs = S.filter((_, k) => k % 5 === 0).map(s => raw(s.p.x, s.p.z) - s.p.y).sort((a, b) => a - b);
-const offset = diffs[Math.floor(diffs.length / 2)];
-let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-for (const s of S) { minX = Math.min(minX, s.p.x); maxX = Math.max(maxX, s.p.x); minZ = Math.min(minZ, s.p.z); maxZ = Math.max(maxZ, s.p.z); }
-const PAD = 700, CELL = 8;
-minX -= PAD; minZ -= PAD; maxX += PAD; maxZ += PAD;
-const coarse = 40;
-const buckets = new Map<string, number[]>();
-S.forEach((s, i) => {
-  const k = `${Math.floor(s.p.x / coarse)},${Math.floor(s.p.z / coarse)}`;
-  if (!buckets.has(k)) buckets.set(k, []);
-  buckets.get(k)!.push(i);
-});
-const heightAt = (x: number, z: number) => {
-  const cx = Math.floor(x / coarse), cz = Math.floor(z / coarse);
-  let best = Infinity, h = 0, bi = -1;
-  for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) for (const k of buckets.get(`${cx + i},${cz + j}`) ?? []) {
-    const p = S[k].p;
-    const d2 = (p.x - x) ** 2 + (p.z - z) ** 2;
-    if (d2 < best) { best = d2; h = p.y; bi = k; }
-  }
-  const g = raw(x, z) - offset;
-  if (best === Infinity) return g - 0.6;
-  // dentro da área da pista (até o muro) o chão fica na altura dela; depois mistura com o relevo real
-  const s = S[bi];
-  const lat = (x - s.p.x) * s.r.x + (z - s.p.z) * s.r.z;
-  const wall = lat < 0 ? s.wallL : s.wallR;
-  const d = Math.max(0, Math.abs(lat) - wall);
-  const far = Math.max(0, Math.min(1, (d - 10) / 90));
-  return h * (1 - far) + g * far - 0.35 - Math.min(1.5, d * 0.01);
-};
-const tnx = Math.ceil((maxX - minX) / CELL) + 1, tnz = Math.ceil((maxZ - minZ) / CELL) + 1;
-const th: number[] = [];
-for (let j = 0; j < tnz; j++) for (let i = 0; i < tnx; i++) th.push(r2(heightAt(minX + i * CELL, minZ + j * CELL)));
-json('data/track/terrain.json', { x0: minX, z0: minZ, cell: CELL, nx: tnx, nz: tnz, h: th });
-console.log('relevo', tnx, 'x', tnz);
-
-// ---------- arredores, árvores e referências (cópia direta; o formato é documentado no web)
-copyFileSync(web('data/tracks/interlagos-osm.json'), out('data/track/osm.json'));
+// ---------- pista de Interlagos: NÃO sai mais daqui (Fase 2B do PLANO-INTERLAGOS-DETALHES.md). A fonte é
+// tools/tracks/interlagos/ (build_track.py) e o export é o tools/pista.ts -- interlagos (track.json, terrain.json,
+// osm.json em data/track/); as referências do Garage 61 são as do tools/referencia.ts. As do web
+// (data/reference/interlagos-*.json) são da pista antiga do web e não são mais copiadas.
+// Daqui só sai o atlas das árvores (tamanhos por espécie), que não depende da geometria.
 copyFileSync(web('data/arvores.json'), out('data/track/arvores.json'));
-const refs = readdirSync(web('data/reference')).filter(f => f.endsWith('.json'));
-for (const f of refs) copyFileSync(web(`data/reference/${f}`), out(`data/reference/${f}`));
-console.log('osm, árvores e', refs.length, 'referências:', refs.join(', '));
+console.log('árvores ok (pista, relevo, osm e referências de Interlagos: tools/pista.ts e tools/referencia.ts)');
 
 // ---------- carros: acerto final (o mesmo objeto que o web entrega à física) + modelo
 const index: Record<string, unknown>[] = [];

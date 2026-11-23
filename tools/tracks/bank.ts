@@ -41,9 +41,10 @@ export function clampRunoff(track: Track, max: number | undefined) {
 
 /**
  * Distância real dos muros (wallLeft/wallRight em m a partir do centro), medida do OSM + satélite.
- * Sem `wallLeft`/`wallRight` na fonte (Interlagos, Laguna Seca), não mexe em nada.
+ * Sem `wallLeft`/`wallRight` na fonte (Laguna Seca), não mexe em nada. `minGap` = distância mínima do muro à
+ * borda (padrão 2,5 m, o mesmo do Track; Interlagos usa menos: muro dos boxes e outros colados na pista).
  */
-export function applyWalls(track: Track, wallLeft: number[] | undefined, wallRight: number[] | undefined) {
+export function applyWalls(track: Track, wallLeft: number[] | undefined, wallRight: number[] | undefined, minGap = 2.5) {
   if (!wallLeft?.length || !wallRight?.length) return;
   const S = track.samples;
   const N = S.length;
@@ -54,16 +55,38 @@ export function applyWalls(track: Track, wallLeft: number[] | undefined, wallRig
     const b = (a + 1) % M;
     const f = x - Math.floor(x);
     const s = S[i];
-    s.wallL = Math.max(s.wl + 2.5, wallLeft[a] + (wallLeft[b] - wallLeft[a]) * f);
-    s.wallR = Math.max(s.wr + 2.5, wallRight[a] + (wallRight[b] - wallRight[a]) * f);
+    s.wallL = Math.max(s.wl + minGap, wallLeft[a] + (wallLeft[b] - wallLeft[a]) * f);
+    s.wallR = Math.max(s.wr + minGap, wallRight[a] + (wallRight[b] - wallRight[a]) * f);
     s.runL = Math.min(s.runL, Math.max(0, s.wallL - s.wl - s.kerbL - 1.0));
     s.runR = Math.min(s.runR, Math.max(0, s.wallR - s.wr - s.kerbR - 1.0));
   }
 }
 
 /**
+ * Escape asfaltado mínimo (runLeft/runRight em m depois da borda + zebra), ex.: a faixa de aceleração da saída dos
+ * boxes de Interlagos, que é asfalto e não grama. Nunca passa do muro (0,5 m antes). Sem os campos, não mexe em nada.
+ */
+export function applyRunoffMin(track: Track, runLeft: number[] | undefined, runRight: number[] | undefined) {
+  if (!runLeft?.length || !runRight?.length) return;
+  const S = track.samples;
+  const N = S.length;
+  const M = runLeft.length;
+  for (let i = 0; i < N; i++) {
+    const x = (i / N) * M;
+    const a = Math.floor(x) % M;
+    const b = (a + 1) % M;
+    const f = x - Math.floor(x);
+    const s = S[i];
+    const rl = runLeft[a] + (runLeft[b] - runLeft[a]) * f;
+    const rr = runRight[a] + (runRight[b] - runRight[a]) * f;
+    if (rl > 0) s.runL = Math.max(s.runL, Math.min(rl, s.wallL - s.wl - s.kerbL - 0.5));
+    if (rr > 0) s.runR = Math.max(s.runR, Math.min(rr, s.wallR - s.wr - s.kerbR - 0.5));
+  }
+}
+
+/**
  * Zebras reais medidas no satélite + vídeo (kerbLeft/kerbRight em m a partir da borda da pista).
- * Sem `kerbLeft`/`kerbRight` na fonte (Interlagos, Laguna Seca), não mexe em nada.
+ * Sem `kerbLeft`/`kerbRight` na fonte (Laguna Seca), não mexe em nada.
  */
 export function applyKerbs(track: Track, kerbLeft: number[] | undefined, kerbRight: number[] | undefined) {
   if (!kerbLeft?.length || !kerbRight?.length) return;

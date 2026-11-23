@@ -1,10 +1,13 @@
 // Mais detalhes da beira da pista vistos no vídeo de referência (Le Mans Ultimate): arquibancadas com
 // torcida, pórticos de patrocinador sobre a pista e postos de fiscal.
+// Fase 2B etapa F: os metros continuam escritos para a pista antiga (s numa volta de 4.300 m, ou o s real antigo onde
+// indicado) e passam por ./sNovo.ts: arquibancada, boxes, pórtico, postos e resgate ficam no mesmo lugar físico.
 import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
 import { AdScheme, adCanvas, tex } from '@web/render/trackDetails';
 import { addProp } from '../propsRegistry';
+import { iNovo, iNovo4300, L_ANTIGO, sNovo, sNovo4300 } from './sNovo';
 
 /** Ponto p cai sobre (ou perto de) outro trecho da pista, longe da amostra i? */
 function overOther(track: Track, p: THREE.Vector3, i: number, margin: number): boolean {
@@ -184,9 +187,8 @@ interface StandMats {
 function buildStand(track: Track, group: THREE.Group, mats: StandMats, s0: number, s1: number, side: -1 | 1, depth: number, roof: boolean, fans: Fan[], rand: () => number) {
   const S = track.samples;
   const N = S.length;
-  const k = track.length / 4300;
-  const i0 = Math.round((s0 * k) / STEP);
-  const i1 = Math.round((s1 * k) / STEP);
+  const i0 = iNovo4300(s0);
+  const i1 = iNovo4300(s1);
   const at = (j: number) => S[((j % N) + N) % N];
   const rise = depth * 0.55;
   const front = 2.6; // primeira fileira acima do muro
@@ -351,12 +353,15 @@ const STANDS: { s0: number; s1: number; side: -1 | 1; depth: number; roof: boole
 /** Reta dos boxes: pit lane e garagens atrás do muro da esquerda (s em m numa volta de 4.300 m). */
 const PIT = { s0: 4040, s1: 4300 + 60, lane: 11, garageFrom: 12.5, garageDepth: 14.5, garageH: 7.2 };
 
-/** s (m) da volta está no trecho [a, b] (em metros de uma volta de 4.300 m; b pode passar da linha)? */
+/**
+ * s (m) da pista nova está no trecho [a, b] (em metros de uma volta de 4.300 m da pista antiga; b pode passar da
+ * linha)? As pontas vão para a pista nova pelo mapa de s (sNovo4300).
+ */
 function inRange(track: Track, s: number, a: number, b: number) {
   const L = track.length;
-  const k = L / 4300;
-  const x = (((s - a * k) % L) + L) % L;
-  return x <= (b - a) * k;
+  const a1 = sNovo4300(a);
+  const x = (((s - a1) % L) + L) % L;
+  return x <= sNovo4300(b) - a1;
 }
 
 /**
@@ -400,9 +405,8 @@ export function buildStands(track: Track, group: THREE.Group, renderer: THREE.We
 function wallBand(track: Track, group: THREE.Group, s0: number, s1: number, side: -1 | 1, a: [number, number], b: [number, number], mat: THREE.Material, uTile: number, shadow = false) {
   const S = track.samples;
   const N = S.length;
-  const k = track.length / 4300;
-  const i0 = Math.round((s0 * k) / STEP);
-  const i1 = Math.round((s1 * k) / STEP);
+  const i0 = iNovo4300(s0);
+  const i1 = iNovo4300(s1);
   const pos: number[] = [];
   const uv: number[] = [];
   const idx: number[] = [];
@@ -586,9 +590,8 @@ export function buildPits(track: Track, group: THREE.Group, renderer: THREE.WebG
   // fechamento das pontas do prédio com UVs corretas (sem esticar 1 pixel)
   const S = track.samples;
   const N = S.length;
-  const k = track.length / 4300;
   for (const sEnd of [gStart, PIT.s1]) {
-    const s = S[Math.round((sEnd * k) / STEP) % N];
+    const s = S[iNovo4300(sEnd) % N];
     const p0 = s.p.clone().addScaledVector(s.r, -(s.wallL + d0));
     const p1 = s.p.clone().addScaledVector(s.r, -(s.wallL + d1));
     const geo = new THREE.BufferGeometry();
@@ -608,7 +611,7 @@ export function buildPits(track: Track, group: THREE.Group, renderer: THREE.WebG
 /** Pórtico de patrocinador sobre a pista: dois postes, faixa de placas dos dois lados e treliça em cima. */
 function buildBanner(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer, sAt: number, ads: AdScheme) {
   const S = track.samples;
-  const s = S[Math.round((sAt * track.length) / 4300 / STEP) % S.length];
+  const s = S[iNovo4300(sAt) % S.length];
   const span = s.wl + s.wr + 6;
   const h = 6.2;
   const steel = new THREE.MeshStandardMaterial({ color: 0x9da2a7, metalness: 0.6, roughness: 0.45 });
@@ -653,10 +656,13 @@ export function buildMarshalPosts(track: Track, group: THREE.Group) {
   const gateMat = new THREE.MeshStandardMaterial({ color: 0xe8701a, roughness: 0.6 });
   const gateMesh = new THREE.MeshStandardMaterial({ color: 0xd8dadc, roughness: 0.5, metalness: 0.4, transparent: true, opacity: 0.55, side: THREE.DoubleSide });
   const tmp = new THREE.Vector3();
+  // a cada 330 m da pista antiga a partir de 400 m (fora dos últimos 560 m), cada posto levado pelo mapa de s
   const every = Math.round(330 / STEP);
-  for (let i = Math.round(400 / STEP); i < N; i += every) {
+  const NA = Math.round(L_ANTIGO / STEP);
+  for (let iA = Math.round(400 / STEP); iA < NA; iA += every) {
+    if (iA * STEP > L_ANTIGO - 560) continue;
+    const i = iNovo(iA * STEP) % N;
     const s = S[i];
-    if (s.s > L - 560) continue;
     let curv = 0;
     for (let k = -20; k <= 20; k++) curv += S[(i + k + N) % N].curv;
     const side: -1 | 1 = curv > 0 ? -1 : 1; // curva à direita: fora é a esquerda
@@ -688,7 +694,7 @@ export function buildMarshalPosts(track: Track, group: THREE.Group) {
     [3090, 1, 'ambulance'],
     [1340, 1, 'crane'],
   ] as [number, -1 | 1, string][]) {
-    const idx = Math.round(((sM * L) / 4300) / STEP) % N;
+    const idx = iNovo4300(sM) % N;
     const s = S[idx];
     const wall = side < 0 ? s.wallL : s.wallR;
     const p = s.p.clone().addScaledVector(s.r, side * (wall + 5.5));
@@ -716,9 +722,12 @@ export function buildCornerDetails(track: Track, group: THREE.Group) {
     for (let k = -7; k <= 7; k++) c += S[(i + k + N) % N].curv;
     return c / 15;
   };
+  // longe da reta dos boxes: de 150 m a 500 m antes da linha na pista antiga (s real), levados para a nova
+  const sIni = sNovo(150);
+  const sFim = sNovo(L_ANTIGO - 500);
   for (let i = 0; i < N; i++) {
     const c = Math.abs(avgCurv(i));
-    if (c < 0.012 || S[i].s > L - 500 || S[i].s < 150) continue;
+    if (c < 0.012 || S[i].s > sFim || S[i].s < sIni) continue;
     if (corners.length && i - corners[corners.length - 1] < 90 / STEP) {
       if (c > Math.abs(avgCurv(corners[corners.length - 1]))) corners[corners.length - 1] = i;
       continue;

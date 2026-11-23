@@ -2,8 +2,12 @@
  * Perfil lateral declarativo de Interlagos (PLANO-INTERLAGOS-DETALHES.md §3 e Fase 2): o que existe em cada lado
  * da pista, da linha branca para fora, lido de `data/track/visual_profile.json` em vez de `if` por metragem.
  *
- * Esquema (v1):
+ * Esquema (v1; a v2 é igual, só muda a pista):
  *   { versao, pista, passo (m entre amostras), comprimento (m), n (amostras), lados: { esq: Fatia[], dir: Fatia[] } }
+ *   v1 (Fase 2): pista antiga do web (4.294 m, 2.147 amostras). v2 (Fase 2B etapa F, hoje): pista nova = a da física
+ *   (data/track/track.json, 4.308 m, 2.154 amostras), gerada da v1 por ./migrarPerfil2B.ts pelo mapa de s; nela as
+ *   zebras são todas `larg: "fisica"` (a física já tem as zebras decididas na Fase 2) e as barreiras ficam no muro
+ *   da física (`dist: "fisica"`; ver o topo do migrarPerfil2B.ts). Editar à mão a partir daqui; não regenerar.
  *   Fatia = { s0, s1, faixas: Faixa[], barreira }  — s0/s1 em metros da pista (s das amostras, inclusive), as
  *   fatias de cada lado cobrem a volta inteira sem buraco nem sobreposição.
  *   Faixas, na ordem da linha branca para fora (a grama é o chão de baixo de tudo, até 1 m depois da barreira):
@@ -26,7 +30,8 @@
  *   Valor = número (constante na fatia) | "fisica" (o valor da física do Track nessa amostra) |
  *           número[] (um por amostra de s0 a s1; trechos de transição, valores exatos).
  *
- * Gerado de início por ./extrairPerfil.ts com o comportamento anterior do gerador (migração sem regressão).
+ * Gerado de início por ./extrairPerfil.ts com o comportamento anterior do gerador (migração sem regressão; obsoleto
+ * desde a etapa F da Fase 2B, que levou o perfil para a pista nova com ./migrarPerfil2B.ts).
  */
 import type { Track } from '@web/track/track';
 import perfilJson from '../../../data/track/visual_profile.json';

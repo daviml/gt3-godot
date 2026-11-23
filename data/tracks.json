@@ -11,12 +11,18 @@
     "sun_u": 0.2083,
     "sun_elev": 45.0,
     "records": {
-      "sim": "user://recordes-interlagos-v3.json",
-      "arcade": "user://recordes-interlagos-godot-arcade.json"
+      "sim": "user://recordes-interlagos-v4.json",
+      "arcade": "user://recordes-interlagos-arcade-v4.json"
     },
+    "ghost_key": "interlagos-v4",
     "remote_key": "",
     "refs": {
-      "audi-r8-lms-gt3": "interlagos-r8"
+      "acura-nsx-gt3": "interlagos-nsx",
+      "bmw-m4-gt3": "interlagos-m4",
+      "ferrari-488-gt3": "interlagos-ferrari",
+      "mclaren-720s-gt3": "interlagos-mclaren",
+      "corvette-c7-gr3": "interlagos-corvette",
+      "audi-r8-lms-gt3": "interlagos-nsx"
     },
     "min_lap": {
       "sim": 85.0,

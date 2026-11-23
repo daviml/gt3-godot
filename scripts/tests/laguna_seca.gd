@@ -184,8 +184,8 @@ func garage() -> void:
 	var lag := [Records.path_for("sim"), Records.path_for("arcade"), Records.remote_file("sim")]
 	var glb := Game.track_asset_path("cenario.glb")
 	Game.track_id = before
-	check(inter[0].ends_with("recordes-interlagos-v3.json") and inter[1].ends_with("recordes-interlagos-godot-arcade.json"),
-		"Interlagos com os arquivos de recorde de sempre")
+	check(inter[0].ends_with("recordes-interlagos-v4.json") and inter[1].ends_with("recordes-interlagos-arcade-v4.json"),
+		"Interlagos com os arquivos de recorde da v4 (geometria da Fase 2B)")
 	check(lag[0] != inter[0] and lag[1] != inter[1] and lag[2] != inter[2], "recordes da Laguna separados (%s, %s)" % [lag[0].get_file(), lag[2]])
 	var scene = load(glb)
 	check(scene is PackedScene, "cenário da Laguna carrega (%s)" % glb)

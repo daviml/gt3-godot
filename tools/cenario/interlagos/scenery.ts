@@ -1,9 +1,12 @@
 // Detalhes de pista: borracha e marcas de pneu no traçado, placas de frenagem e a torre de controle.
 // Prédios, arquibancadas, lago e mata reais vêm do OSM (osmScenery.ts).
+// Fase 2B etapa F: referência do Porsche reconvertida na pista nova (data/reference/); os metros escritos para a
+// pista antiga (janelas de freada/saída, placas, torre) passam por ./sNovo.ts e ficam no mesmo lugar físico.
 import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
-import porscheRef from '../../../../gt3-time-attack/data/reference/interlagos-porsche.json';
+import porscheRef from '../../../data/reference/interlagos-porsche.json';
+import { iNovo, L_ANTIGO, s4300 } from './sNovo';
 
 export function buildExtras(track: Track, group: THREE.Group, heightAt: (x: number, z: number) => number) {
   buildRubber(track, group);
@@ -153,9 +156,9 @@ function buildRubber(track: Track, group: THREE.Group) {
   const { d, curv, brake } = driveZones(track);
   const S = track.samples;
   const rand = mulberry32(23);
-  const kL = track.length / LAP;
   const inWin = (i: number, wins: [number, number][], ramp: number) => {
-    const s = S[i].s / kL;
+    // s da amostra nova na escala das janelas (volta antiga de LAP = 4.300 m), pelo mapa de s
+    const s = s4300(S[i].s);
     let w = 0;
     for (const [a, b] of wins) w = Math.max(w, Math.max(0, Math.min(1, (s - a) / ramp, (b - s) / ramp)));
     return w;
@@ -279,7 +282,7 @@ function buildBrakeBoards(track: Track, group: THREE.Group) {
   const STYLES = { branca: ['#f4f4f4', '#111111'], azul: ['#1d4fa3', '#ffffff'], amarela: ['#f2c500', '#111111'] } as const;
   type Style = keyof typeof STYLES;
   const styleAt = (s: number): Style => {
-    const m = s / (track.length / 4300);
+    const m = s4300(s);
     if (m < 500 || m > 4100) return 'branca';
     if (m > 1100 && m < 1600) return 'azul';
     return 'amarela';
@@ -324,9 +327,12 @@ function buildBrakeBoards(track: Track, group: THREE.Group) {
     [3226, 1, [100, 50]] // Junção (direita, amarelas)
   ];
   for (const [entry, outside, dists] of BRAKES) {
-    const i = Math.round((entry * track.length) / 4300 / STEP) % N;
+    // amostra da entrada na pista ANTIGA (como o código antigo: entry · 4294/4300) e a placa `dist` m antes dela,
+    // levadas para a nova pelo mapa (iNovo): cada placa fica no mesmo lugar físico
+    const iA = Math.round((entry * L_ANTIGO) / 4300 / STEP);
+    const i = iNovo(iA * STEP) % N;
     for (const dist of dists) {
-      const j = (i - Math.round(dist / STEP) + N) % N;
+      const j = iNovo((iA - Math.round(dist / STEP)) * STEP) % N;
       const s = S[j];
       // na grama, 2,5 m depois da borda, mas sempre antes do muro
       const off = outside * Math.min((outside < 0 ? s.wl : s.wr) + 2.5, (outside < 0 ? s.wallL : s.wallR) - 0.5);
@@ -349,7 +355,7 @@ function buildTower(track: Track, group: THREE.Group, heightAt: (x: number, z: n
   const plain = new THREE.MeshStandardMaterial({ color: 0xf0f1f2, roughness: 0.6 });
   const glass = new THREE.MeshStandardMaterial({ color: 0x1d3552, roughness: 0.15, metalness: 0.6 });
   const metal = new THREE.MeshStandardMaterial({ color: 0xb0b5ba, roughness: 0.4, metalness: 0.7 });
-  const s = S[N - Math.round(60 / STEP)];
+  const s = S[iNovo(L_ANTIGO - 60) % N]; // 60 m antes da linha na pista antiga
   const base = s.p.clone().addScaledVector(s.r, -(s.wl + 20));
   const y = Math.min(s.p.y, heightAt(base.x, base.z));
   const g = new THREE.Group();

@@ -11,7 +11,7 @@ câmera de perseguição (chase) e onboard (cockpit). Este script:
   2. integra v·dt para ter a distância percorrida em cada metade;
   3. alinha o perfil v(distância) com a telemetria de referência no s do jogo — padrão: a volta do Porsche
      911 GT3 R (992) do Garage 61 (mesmo carro do vídeo), convertida por `tools/ref/ref_garage61.py` para
-     `build/ref/interlagos/ref_porsche-911-gt3-r-992.json`; alternativa `--ref r8` (data/reference/interlagos-r8.json).
+     `build/ref/interlagos/ref_porsche-911-gt3-r-992.json`; alternativa `--ref r8` (build/interlagos/interlagos-r8_antigo.json).
      Deslocamento + escala global e depois âncoras locais (mínimas, fins de reta, inícios de freada, retomadas de
      acelerador), δ suavizado pela mediana das vizinhas, correção linear por trechos entre as âncoras;
   4. confere as duas metades entre si (é a mesma volta) e extrai 1 quadro a cada N metros por câmera.
@@ -46,8 +46,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 RAIZ = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 VIDEO = os.path.join(RAIZ, "INTERLAGOS-IN-LE-MANS-ULTIMATE-LMGT3-Track.mp4")
-REF = os.path.join(RAIZ, "data", "reference", "interlagos-r8.json")
-TRACK = os.path.join(RAIZ, "data", "track", "track.json")
+# Fase 2B (etapa E): o atlas da Fase 0 é no s da pista ANTIGA (4.294 m); a pista e a referência R8 antigas ficam
+# em build/interlagos/ (data/ passou a ter a pista nova). A etapa F remapeia pelo tools/tracks/interlagos/s_antigo_novo.json.
+REF = os.path.join(RAIZ, "build", "interlagos", "interlagos-r8_antigo.json")
+TRACK = os.path.join(RAIZ, "build", "interlagos", "track_antigo.json")
 SAIDA = os.path.join(RAIZ, "build", "ref", "interlagos")
 GAB_VEL = os.path.join(RAIZ, "tools", "ref", "gabaritos_velocimetro.png")
 GAB_MARCHA = os.path.join(RAIZ, "tools", "ref", "gabaritos_marcha.png")

@@ -25,7 +25,9 @@ import sys
 import numpy as np
 
 RAIZ = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-TRACK = os.path.join(RAIZ, "data", "track", "track.json")
+# Fase 2B (etapa E): estas voltas alimentam o atlas da Fase 0, no s da pista ANTIGA (cópia em build/interlagos/);
+# as referências do jogo na pista nova saem do tools/referencia.ts (data/reference/interlagos-*.json)
+TRACK = os.path.join(RAIZ, "build", "interlagos", "track_antigo.json")
 SAIDA = os.path.join(RAIZ, "build", "ref", "interlagos")
 ORIGEM = (-23.7036, -46.6997)  # data/tracks/interlagos.json (gt3-time-attack)
 HZ = 60.0

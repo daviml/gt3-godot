@@ -13,10 +13,13 @@
 #   raw/indice_2017.geojson, raw/laz/MDS_color_<folha>.laz     brutos (dados não confiáveis: só lidos como dados)
 #   blocos.json                                               extensão UTM e classes de cada folha
 #   mdt.npy/.json (0,5 m), mdt_preenchido.npy, mds.npy/.json (1 m), copa.npy/.json (1 m)
+#   piso.npy/.json (0,5 m)    chão perto da pista (classes 2 + 20), faixa de 40 m das linhas centrais nova e antiga,
+#                             já misturado ao MDT + offset na borda; piso_n.npy (pontos por célula), piso_peso.npy
 # Depois: python tools/tracks/interlagos/lidar.py --conferir   (conferências, gráfico e interlagos-terrain.json)
 #
 # Requer, para rasterizar: laspy + lazrs (pip install "laspy[lazrs]"). O download funciona sem eles.
-# uso (de REPOS/gt3-godot): python tools/tracks/interlagos/download_lidar.py [--so-baixar]
+# uso (de REPOS/gt3-godot): python tools/tracks/interlagos/download_lidar.py [--so-baixar | --piso]
+#   --piso  só refaz o piso (lê as folhas já baixadas; rodar de novo se a linha central nova mudar)
 import json
 import os
 import subprocess
@@ -83,6 +86,145 @@ for c in folhas:  # o código vira nome de arquivo e URL: aceita só o formato c
     if not (len(c) == 8 and c[4] == '-' and (c[:4] + c[5:]).isdigit()):
         raise SystemExit(f'código de folha inesperado: {c!r}')
 print(f'{len(folhas)} folhas: {" ".join(folhas)}')
+
+
+# ---- piso perto da pista (--piso): classes 2 + 20, média robusta, faixa de 40 m das linhas centrais nova e antiga
+# Nestas nuvens a classe 2 é só o envelope inferior do solo (~10% dos pontos, os mais baixos de cada vizinhança:
+# ~0,14 m abaixo do plano local, ruído do laser σ ≈ 9 cm) e a classe 20 é o resto do solo (0..0,4 m acima dela,
+# em toda a área: asfalto, grama, ruas). O chão real é a média das duas. Classe 19 = objetos 0,4..8 m (carros,
+# muros, alambrados, pessoas) e fica de fora, como 5/6 (vegetação alta, prédios/passarela).
+PISO_FAIXA, PISO_RAMPA = 40.0, 6.0   # peso 1 até 34 m da linha mais próxima, cai suave até 0 aos 40 m
+PISO_SIGMA = 0.75                    # suavização (m) da média; < 3 cm de "dente" entre células sob o asfalto
+PISO_REJ = 0.25                      # rejeita ponto a mais de 0,25 m da mediana local (5x5 m)
+
+
+def linhas_centrais():
+    """Linhas centrais antiga (lidar._linha_central: cópia congelada em build/interlagos/lidar/track_antigo.json)
+    e nova (interlagos.json) em UTM (com lidar.REGISTRO), densificadas a 0,5 m."""
+    a = lidar._linha_central()[0]
+    nova = np.array(json.load(open(os.path.join(lidar.HERE, 'interlagos.json')))['points'], np.float64)
+    out = []
+    for P in (a[:, [0, 2]], nova[:, [0, 2]]):
+        Q = np.roll(P, -1, 0)
+        k = np.maximum(1, np.ceil(np.linalg.norm(Q - P, axis=1) / 0.5)).astype(int)
+        D = np.concatenate([P[i] + np.outer(np.arange(k[i]) / k[i], Q[i] - P[i]) for i in range(len(P))])
+        out.append(np.stack(lidar.jogo_para_utm(D[:, 0], D[:, 1]), 1))
+    return out
+
+
+def piso():
+    import laspy
+    from scipy.ndimage import distance_transform_edt, gaussian_filter, median_filter
+    mm = json.load(open(os.path.join(OUT, 'mdt.json')))
+    px = mm['px']
+    mdt_a = np.load(os.path.join(OUT, 'mdt.npy'), mmap_mode='r')
+    linhas = linhas_centrais()
+    U = np.concatenate(linhas)
+    marg = PISO_FAIXA + 12
+    c0 = int(np.floor((U[:, 0].min() - marg - mm['E0']) / px)); c1 = int(np.ceil((U[:, 0].max() + marg - mm['E0']) / px))
+    r0 = int(np.floor((mm['N1'] - U[:, 1].max() - marg) / px)); r1 = int(np.ceil((mm['N1'] - U[:, 1].min() + marg) / px))
+    ny, nx = r1 - r0, c1 - c0
+    E0p, N1p = mm['E0'] + c0 * px, mm['N1'] - r0 * px
+    print(f'piso: grade {nx}x{ny} @ {px} m (recorte do MDT, E0 {E0p}, N1 {N1p})')
+    # distância (m) de cada célula à linha central mais próxima (nova ou antiga)
+    lin = np.ones((ny, nx), bool)
+    for L in linhas:
+        cc = np.floor((L[:, 0] - E0p) / px).astype(int); rr = np.floor((N1p - L[:, 1]) / px).astype(int)
+        lin[rr, cc] = False
+    dist = distance_transform_edt(lin) * px
+    t = np.clip((PISO_FAIXA - dist) / PISO_RAMPA, 0, 1)
+    peso = (t * t * (3 - 2 * t)).astype(np.float32)          # smoothstep: sem quina na transição
+    dentro = dist < PISO_FAIXA + 4
+    mdt_c = np.asarray(mdt_a[r0:r1, c0:c1], np.float64)
+
+    # pontos de solo (2, 20) das folhas que tocam o recorte; guarda também 19 só para estatística
+    E1p, N0p = E0p + nx * px, N1p - ny * px
+    blocos = json.load(open(os.path.join(OUT, 'blocos.json')))
+    cel, zs, cls, its = [], [], [], []
+    for b in blocos:
+        if b['maxx'] < E0p or b['minx'] > E1p or b['maxy'] < N0p or b['miny'] > N1p:
+            continue
+        f = laspy.read(os.path.join(LAZ, f'MDS_color_{b["cod"]}.laz'))
+        cl = np.asarray(f.classification)
+        g = (cl == 2) | (cl == 20) | (cl == 19)
+        x, y, zz = np.asarray(f.x)[g], np.asarray(f.y)[g], np.asarray(f.z)[g]
+        it = np.asarray(f.intensity)[g]
+        cl = cl[g]
+        col = np.floor((x - E0p) / px).astype(np.int64); row = np.floor((N1p - y) / px).astype(np.int64)
+        ok = (col >= 0) & (col < nx) & (row >= 0) & (row < ny)
+        ok[ok] = dentro[row[ok], col[ok]]
+        cel.append(row[ok] * nx + col[ok]); zs.append(zz[ok]); cls.append(cl[ok].astype(np.uint8)); its.append(it[ok].astype(np.float32))
+        print(f'  {b["cod"]}: {int(ok.sum())} pts na faixa', flush=True)
+        del f
+    cel, zs, cls, its = np.concatenate(cel), np.concatenate(zs), np.concatenate(cls), np.concatenate(its)
+    est = {'pts_classe': {int(k): int(v) for k, v in zip(*np.unique(cls, return_counts=True))}}
+    # 19 perto do piso: quanto acima do MDT (só para o relatório)
+    z19 = zs[cls == 19] - mdt_c.ravel()[cel[cls == 19]]
+    est['classe19_menos_mdt_p5_50_95'] = [round(float(v), 2) for v in np.percentile(z19, [5, 50, 95])]
+    g = cls != 19
+    cel, zs, cls, its = cel[g], zs[g], cls[g], its[g]
+    n = ny * nx
+    # intensidade média do solo por célula (asfalto escuro): usada por lidar.py --conferir para medir o registro
+    ci = np.bincount(cel, minlength=n)
+    inten = np.where(ci > 0, np.bincount(cel, its, minlength=n) / np.maximum(ci, 1), np.nan).reshape(ny, nx)
+
+    # 1) mediana por célula (ordenação por célula e z) -> referência robusta = mediana 11x11 células (5,5 m)
+    o = np.lexsort((zs, cel))
+    cs = cel[o]
+    cnt = np.bincount(cs, minlength=n)
+    ini = np.concatenate([[0], np.cumsum(cnt)[:-1]])
+    med = np.full(n, np.nan)
+    tem = cnt > 0
+    med[tem] = zs[o][ini[tem] + cnt[tem] // 2]
+    med = med.reshape(ny, nx)
+    off0 = float(np.nanmedian((med - mdt_c)[(dist < 30) & ~np.isnan(med)]))
+    ref = median_filter(np.where(np.isnan(med), mdt_c + off0, med), size=11)
+    rz = zs - ref.ravel()[cel]
+    kept = np.abs(rz) <= PISO_REJ
+    est['rejeitados_pct'] = round(100 * float(1 - kept.mean()), 3)
+    est['rejeitados_acima_pct'] = round(100 * float(np.mean(rz > PISO_REJ)), 3)
+    # 2) média normalizada por gaussiana (pesa pela contagem; buracos pequenos se fecham sozinhos)
+    soma = np.bincount(cel[kept], zs[kept] - ref.ravel()[cel[kept]], minlength=n).reshape(ny, nx)
+    k = np.bincount(cel[kept], minlength=n).reshape(ny, nx).astype(np.float64)
+    sg = PISO_SIGMA / px
+    S, K = gaussian_filter(soma, sg), gaussian_filter(k, sg)
+    # referência suavizada junto (a média é do resíduo z - ref; ref é contínua por partes, então suaviza-se igual)
+    refs = gaussian_filter(ref, sg)
+    pis = refs + S / np.maximum(K, 1e-9)
+    # 3) buracos (passarela, pórticos, sombras): cascata de gaussianas mais largas, depois MDT + offset
+    buraco = K < 1.0     # menos de ~1 ponto efetivo
+    for s2 in (2.0, 5.0, 12.0):
+        if not buraco.any():
+            break
+        S2, K2 = gaussian_filter(soma, s2 / px), gaussian_filter(k, s2 / px)
+        r2 = gaussian_filter(ref, s2 / px) + S2 / np.maximum(K2, 1e-9)
+        ok2 = buraco & (K2 >= 1.0)
+        pis = np.where(ok2, r2, pis)
+        buraco &= ~ok2
+    off = float(np.median((pis - mdt_c)[(dist < 30) & (k > 0)]))
+    pis = np.where(buraco, mdt_c + off, pis)
+    # 4) mistura com o MDT + offset fora da faixa (o MDT da classe 2 fica ~off abaixo do chão real)
+    final = (peso * pis + (1 - peso) * (mdt_c + off)).astype(np.float32)
+    est.update({'offset_piso_menos_mdt': round(off, 3), 'buraco_preenchido_pct_faixa': round(
+        100 * float(np.mean(buraco[dist < PISO_FAIXA])), 3), 'celulas_com_ponto_pct_faixa': round(
+        100 * float(np.mean(cnt.reshape(ny, nx)[dist < PISO_FAIXA] > 0)), 2)})
+    meta = {'proj': 'EPSG:31983', 'E0': float(E0p), 'N1': float(N1p), 'px': px, 'nx': nx, 'ny': ny,
+            'fonte': 'GeoSampa/PMSP LiDAR 2017, classes 2 + 20, média robusta (rejeição ±%.2f m da mediana 5,5 m), '
+                     'gaussiana σ %.2f m; peso 1 até %.0f m das linhas centrais (nova e antiga), 0 aos %.0f m; fora: '
+                     'MDT + offset' % (PISO_REJ, PISO_SIGMA, PISO_FAIXA - PISO_RAMPA, PISO_FAIXA),
+            'offset_mdt': round(off, 4), 'sigma': PISO_SIGMA, 'faixa': PISO_FAIXA, 'rampa': PISO_RAMPA,
+            'estatisticas': est}
+    np.save(os.path.join(OUT, 'piso.npy'), final)
+    np.save(os.path.join(OUT, 'piso_n.npy'), np.minimum(cnt, 255).astype(np.uint8).reshape(ny, nx))
+    np.save(os.path.join(OUT, 'piso_peso.npy'), peso)
+    np.save(os.path.join(OUT, 'piso_int.npy'), inten.astype(np.float32))
+    json.dump(meta, open(os.path.join(OUT, 'piso.json'), 'w', encoding='utf8'), indent=1, ensure_ascii=False)
+    print('piso:', json.dumps(est, ensure_ascii=False))
+
+
+if '--piso' in sys.argv:
+    piso()
+    raise SystemExit(0)
 
 # ---- 2) LAZ
 for c in folhas:

@@ -4,23 +4,22 @@
 //     de cada torre, que o Godot desenha num MultiMesh com shaders/torre.gdshader;
 //   - o horizonte (cilindro com a textura de morros e cidade desenhada em canvas): a textura em PNG e o tamanho e a
 //     posição do cilindro.
+//
+// A pista é a mesma do cenario.ts (a da física: fonte própria trocada no vite.config.ts → DATA e montada pelo
+// tools/tracks/montaPista.ts, com camber); Interlagos também, desde a Fase 2B etapa F.
 import * as THREE from 'three';
-import { Track, type TrackData } from '../../../gt3-time-attack/src/track/track';
 import { buildTrack } from '../../../gt3-time-attack/src/render/trackView';
 import { QUALITIES } from '../../../gt3-time-attack/src/render/quality';
 import interlagos from '../../../gt3-time-attack/data/tracks/interlagos.json';
-// camber opcional (só pistas com "bank"; Interlagos não tem e nada muda): a malha inclina igual à física
-import { applyBank, applyKerbs, applyWalls, clampRunoff } from '../tracks/bank';
+// camber opcional (só pistas com "bank"): a malha inclina igual à física
+import { applyBank } from '../tracks/bank';
+import { montaPista } from '../tracks/montaPista';
 
 async function run() {
   const renderer = new THREE.WebGLRenderer();
   const scene = new THREE.Scene();
-  const track = new Track(interlagos as unknown as TrackData);
-  const meta = interlagos as { maxRunoff?: number; bank?: number[]; wallLeft?: number[]; wallRight?: number[]; kerbLeft?: number[]; kerbRight?: number[] };
-  applyKerbs(track, meta.kerbLeft, meta.kerbRight);
-  applyWalls(track, meta.wallLeft, meta.wallRight);
-  clampRunoff(track, meta.maxRunoff);
-  applyBank(track, meta.bank);
+  const track = montaPista(interlagos);
+  applyBank(track, (interlagos as { bank?: number[] }).bank);
   buildTrack(track, scene, renderer, QUALITIES.extremo);
   scene.updateMatrixWorld(true);
 

@@ -4,16 +4,29 @@
 // O que o web faz em shader próprio (onBeforeCompile) não vai no GLB: o material sai só com um nome e o Godot
 // põe o shader equivalente (asfalto, grama, fachada) ou as texturas da Poly Haven (ph:<nome>).
 // Os anéis de prédios e o horizonte (surroundings.ts) ficam para a etapa 12.
+//
+// A pista é a MESMA da física do Godot: a fonte própria tools/tracks/<id>/<id>.json (o import do interlagos.json do
+// web abaixo é trocado por ela no vite.config.ts → DATA, inclusive para Interlagos desde a Fase 2B etapa F), montada
+// por tools/tracks/montaPista.ts (o mesmo do pista.ts: cordas, zebras, muros, escapes) e com o camber (`bank`) do
+// bank.ts. Antes da etapa F, Interlagos vinha do web (4.294 m, sem camber) e o cenário ficava no s antigo.
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Track, type TrackData } from '../../../gt3-time-attack/src/track/track';
+import type { Track } from '../../../gt3-time-attack/src/track/track';
 import { buildTrack } from '../../../gt3-time-attack/src/render/trackView';
 import { QUALITIES } from '../../../gt3-time-attack/src/render/quality';
 import interlagos from '../../../gt3-time-attack/data/tracks/interlagos.json';
-// camber/paredes/zebras opcionais (só pistas com os campos no JSON; Interlagos não tem e nada muda)
-import { applyBank, applyKerbs, applyWalls, clampRunoff } from '../tracks/bank';
+// camber opcional (só pistas com "bank" na fonte): a malha inclina igual à física
+import { applyBank } from '../tracks/bank';
+import { montaPista } from '../tracks/montaPista';
 import { clearProps, getProps } from './propsRegistry';
+
+/** a pista do Godot (track.json) com o camber aplicado; o export confere amostra a amostra (conferePista) */
+export function pistaDoJogo(): Track {
+  const track = montaPista(interlagos);
+  applyBank(track, (interlagos as { bank?: number[] }).bank);
+  return track;
+}
 
 // guarda a URL de cada textura carregada (o nome diz qual textura da Poly Haven é)
 const load0 = THREE.TextureLoader.prototype.load;
@@ -62,12 +75,10 @@ function bake(im: THREE.InstancedMesh): THREE.BufferGeometry | null {
 async function run() {
   const renderer = new THREE.WebGLRenderer();
   const scene = new THREE.Scene();
-  const track = new Track(interlagos as unknown as TrackData);
-  const trData = interlagos as { maxRunoff?: number; bank?: number[]; kerbLeft?: number[]; kerbRight?: number[]; wallLeft?: number[]; wallRight?: number[] };
-  applyKerbs(track, trData.kerbLeft, trData.kerbRight);
-  applyWalls(track, trData.wallLeft, trData.wallRight);
-  clampRunoff(track, trData.maxRunoff);
-  applyBank(track, trData.bank);
+  const track = pistaDoJogo();
+  // amostras da pista como o Godot as recebe (antes do perfil visual mexer em zebra/escape/muro): o cenario.mjs
+  // compara com o track.json da pista (posição, larguras, zebras, escapes, muros)
+  const amostras = track.samples.map(s => [s.p.x, s.p.y, s.p.z, s.r.x, s.r.y, s.r.z, s.wl, s.wr, s.kerbL, s.kerbR, s.runL, s.runR, s.wallL, s.wallR]);
   clearProps();
   buildTrack(track, scene, renderer, QUALITIES.extremo);
   scene.updateMatrixWorld(true);
@@ -254,7 +265,7 @@ async function run() {
   const bytes = new Uint8Array(glb);
   let bin = '';
   for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  return { glb: btoa(bin), trees, props: getProps(), stats, sections: track.sections.map(s => s.name) };
+  return { glb: btoa(bin), trees, props: getProps(), stats, sections: track.sections.map(s => s.name), amostras, length: track.length };
 }
 
 async function previewShots(): Promise<{ name: string; b64: string }[]> {
@@ -272,18 +283,13 @@ async function previewShots(): Promise<{ name: string; b64: string }[]> {
   sun.position.set(120, 220, 90);
   scene.add(sun);
 
-  const track = new Track(interlagos as unknown as TrackData);
-  const trData = interlagos as { maxRunoff?: number; bank?: number[]; kerbLeft?: number[]; kerbRight?: number[]; wallLeft?: number[]; wallRight?: number[] };
-  applyKerbs(track, trData.kerbLeft, trData.kerbRight);
-  applyWalls(track, trData.wallLeft, trData.wallRight);
-  clampRunoff(track, trData.maxRunoff);
-  applyBank(track, trData.bank);
+  const track = pistaDoJogo();
   clearProps();
   buildTrack(track, scene, renderer, QUALITIES.extremo);
   scene.updateMatrixWorld(true);
   await new Promise(r => setTimeout(r, 800));
 
-  const cam = new THREE.PerspectiveCamera(58, 960 / 540, 0.3, 6000);
+  const cam =new THREE.PerspectiveCamera(58, 960 / 540, 0.3, 6000);
   const S = track.samples;
   const N = S.length;
   const fracs = [
