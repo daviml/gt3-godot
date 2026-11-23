@@ -7,7 +7,8 @@
 #   data/track/arvores_pos.json   mata (impostores): [x, y, z, tamanho, espécie, giro, tom] por árvore
 # O que o web desenha com shader próprio chega só com o nome do material, e aqui vira o shader equivalente:
 #   asfalto → shaders/asfalto.gdshader, grama → shaders/grama.gdshader, fachada → shaders/fachada.gdshader,
-#   ph:<nome> → texturas da Poly Haven, pinta → tinta com o relevo e a rugosidade do asfalto por baixo.
+#   ph:<nome> → texturas da Poly Haven, pinta → tinta com o relevo e a rugosidade do asfalto por baixo
+#   ("pinta:<tinta>" em Interlagos: zebra, linha, escape_verde... — mesmo tratamento, o nome só identifica a tinta).
 # O nome de cada malha traz a ordem de desenho e se faz sombra (o_<ordem>_s<0|1>), que o glTF não guarda.
 class_name TrackView
 extends Node3D
@@ -36,6 +37,8 @@ const CHUNK := 250.0
 const CULL_SECONDARY_MIN := 300.0
 const CULL_SECONDARY_LEVE := 500.0
 const CULL_SHADOW_DEFAULT := 550.0
+## ordem de desenho → nome do decalque de pneu em data/tracks.json → visual.decalques
+const DECALQUES := {2: "borracha", 3: "freada", 4: "saida"}
 
 var meshes := 0
 var trees := 0
@@ -194,7 +197,7 @@ func _fix(n: Node) -> void:
 					gm.resource_name = "grama"
 					mat = gm
 					mat_name = "grama"
-				if mat_name in ["asfalto", "grama", "pinta", "torcida", "brita"]:
+				if mat_name in ["asfalto", "grama", "pinta", "torcida", "brita"] or mat_name.begins_with("pinta:"):
 					is_primary_surface = true
 				if mat_name == "fachada":
 					is_building_surface = true
@@ -252,10 +255,11 @@ func _material(src: Material, order: int) -> Material:
 	elif bm:
 		var d := bm.duplicate() as BaseMaterial3D
 		d.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
-		if order == 0 and nm != "pinta" and d.albedo_texture == null and d.albedo_color.get_luminance() > 0.55:
+		var tinta := nm == "pinta" or nm.begins_with("pinta:")
+		if order == 0 and not tinta and d.albedo_texture == null and d.albedo_color.get_luminance() > 0.55:
 			# Evita que paredes lisas claras (ex.: fundo dos boxes/paddock) estourem em branco puro sob sun.light_energy = 2.8
 			d.albedo_color = Color(d.albedo_color.r * 0.65, d.albedo_color.g * 0.65, d.albedo_color.b * 0.65, d.albedo_color.a)
-		if nm == "pinta":
+		if tinta:
 			d.normal_enabled = true
 			d.normal_texture = _tex("asphalt_track_nor_gl")
 			d.normal_scale = 0.6
@@ -270,6 +274,12 @@ func _material(src: Material, order: int) -> Material:
 			# Otimização crítica mobile: alpha-scissor (test) ou depth prepass evita overdraw
 			# desativando depth write com transparência simples reduz custo de GPU
 			d.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+			# força dos decalques de pneu por pista (data/tracks.json → visual.decalques): faixa de borracha (ordem 2),
+			# riscos de freada (3) e vírgulas de saída (4) são os que pintam por cor de vértice; as faixas brancas
+			# da pit lane (também ordem 2) não usam cor de vértice e ficam de fora. Ausente = 1 (como sempre).
+			if d.vertex_color_use_as_albedo and order in DECALQUES:
+				var dec: Dictionary = Game.get_track_info().get("visual", {}).get("decalques", {})
+				d.albedo_color.a *= float(dec.get(DECALQUES[order], 1.0))
 		out = d
 	if out is BaseMaterial3D:
 		var obm := out as BaseMaterial3D
@@ -285,7 +295,7 @@ func _shader(file: String, params: Dictionary) -> ShaderMaterial:
 	for k in params:
 		m.set_shader_parameter(k, params[k])
 	# cores por pista (data/tracks.json → "visual": {"asfalto": {...}, "grama": {...}}); listas viram Vector3.
-	# Interlagos não tem "visual": os shaders ficam com os valores padrão de sempre.
+	# Chave ausente: o shader fica com o valor padrão de sempre.
 	var vis: Dictionary = Game.get_track_info().get("visual", {})
 	var over: Dictionary = vis.get(file, {})
 	for k in over:

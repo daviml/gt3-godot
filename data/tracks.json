@@ -8,8 +8,8 @@
     "corners": 15,
     "data_dir": "res://data/track/",
     "assets_dir": "res://assets/track/",
-    "sun_u": 0.5947,
-    "sun_elev": 48.0,
+    "sun_u": 0.2083,
+    "sun_elev": 45.0,
     "records": {
       "sim": "user://recordes-interlagos-v3.json",
       "arcade": "user://recordes-interlagos-godot-arcade.json"
@@ -23,22 +23,55 @@
       "arcade": 60.0
     },
     "visual": {
+      "luz": {
+        "sol_cor": [1.0, 0.93, 0.82],
+        "sol_energia": 3.4,
+        "ambiente_energia": 0.6,
+        "ambiente_ceu": 0.8,
+        "ambiente_cor": [0.70, 0.62, 0.50],
+        "exposicao": 1.3,
+        "saturacao": 1.2,
+        "agx_contraste": 1.45,
+        "nevoa_cor": [0.70, 0.80, 0.95],
+        "nevoa_densidade": 0.0003,
+        "horizonte_mistura": 0.15
+      },
+      "ceu": {
+        "pano_sol_u": 0.5947,
+        "clear_amount": 1.0,
+        "clear_zenith": [0.12, 0.36, 1.30],
+        "clear_horizon": [0.80, 1.05, 1.60],
+        "clear_curve": 0.4,
+        "clear_ground": [0.30, 0.27, 0.20]
+      },
+      "decalques": {
+        "borracha": 0.3,
+        "freada": 0.45,
+        "saida": 0.6
+      },
       "asfalto": {
-        "color_mul": [0.96, 0.89, 0.76],
-        "color_add": [0.016, 0.014, 0.011],
-        "fast_mul": [0.92, 0.85, 0.73],
-        "fast_add": [0.014, 0.012, 0.010]
+        "rubber_amt": 0.35,
+        "spec_amt": 0.3,
+        "color_mul": [1.84, 1.98, 1.16],
+        "color_add": [0.020, 0.016, 0.010],
+        "fast_mul": [1.77, 1.90, 1.11],
+        "fast_add": [0.018, 0.014, 0.009]
       },
       "grama": {
-        "base_color": [0.16, 0.30, 0.06],
+        "base_color": [0.115, 0.19, 0.004],
         "dry_lo": 0.52,
         "dry_mix": 0.45,
-        "lush_amt": 0.65,
+        "lush_amt": 0.3,
+        "patch_amt": 0.45,
+        "patch_color": [0.40, 0.20, 0.06],
+        "patch_scale": 0.22,
+        "spec_amt": 0.1,
         "straw_tint": [0.75, 0.48, 0.12],
         "soil_color": [0.32, 0.18, 0.10],
         "fast_dry_lo": 0.52,
         "fast_dry_mix": 0.40,
-        "fast_straw_tint": [0.75, 0.48, 0.12]
+        "fast_straw_tint": [0.95, 0.60, 0.15],
+        "fast_olive_tint": [1.50, 1.32, 0.85]
       }
     },
     "location": "São Paulo, Brasil"

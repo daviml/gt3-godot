@@ -15,6 +15,50 @@ import { pbr, phTexture, setHiRes } from '@web/render/textures';
 import { buildHorizon, buildTowers, HAZE } from '@web/render/surroundings';
 import porscheRef from '../../../../gt3-time-attack/data/reference/interlagos-porsche.json';
 import { applyLiveAsphaltUV2 } from '../liveAsphalt';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { TINTA, tintaEscura } from './tintas';
+import { aplicarPerfil } from './perfil';
+
+/**
+ * Pintura da borda de Interlagos (PLANO-INTERLAGOS-DETALHES.md, Fase 1): uma tabela só com as medidas, em vez
+ * de números espalhados. Onde cada uma aparece (e com que largura de faixa verde) fica no perfil lateral,
+ * `data/track/visual_profile.json` (./perfil.ts, faixas "zebra", "pintura", "salsicha").
+ *
+ * Medidas e fonte (20/11/2026):
+ * - Satélite Esri World Imagery (tiles z19, 0,27 m/px, recortes em build/interlagos/sat_zebras/, alinhados à pista):
+ *   a modulação clara/escura das zebras se repete a cada 2,4–2,9 m (Curva do Sol interna 2,6 m, saída 2,4 m,
+ *   S do Senna 2,9 m) e tem largura FWHM de 1,1–1,6 m nas zebras normais (com ~0,4 m de desfoque do satélite).
+ *   O satélite mostra o padrão real antigo amarelo-verde-branco-verde (blocos de ~1,2 m); o LMU usa
+ *   amarelo-branco-verde de 3 blocos. Nos dois o bloco verde volta a cada ~2,4 m, então o ciclo fica 2,4 m.
+ * - Vídeo do LMU (quadros do atlas, projetados no chão com a câmera de comparação: 2,14 m de altura, 12° para
+ *   baixo, FOV vertical 50°, escala corrigida ×0,9 pela largura do carro): zebra normal 0,9–1,0 m (s 650),
+ *   zebra larga de saída 1,5–1,8 m (s 760, s 2480), bloco 0,7–0,8 m, linha branca 0,16–0,19 m (s 650, 2040,
+ *   3420), vão de asfalto entre linha e zebra ~0,1 m, faixa verde atrás 0,2 m (Curva do Sol) a 1,0 m
+ *   (Pinheirinho), salsicha amarela 0,4 m (Ferradura). Altura da salsicha: não dá para medir no vídeo; 6 cm.
+ * - Cores: albedos de ./tintas.ts (TINTA), calibrados para dar na tela as medianas do LMU sob a luz do jogo.
+ * Ordem dos blocos no sentido da volta (LMU): à esquerda amarelo → branco → verde (s 650), à direita
+ * amarelo → verde → branco (s 760). A textura é a mesma; a da esquerda é lida com v invertido.
+ */
+export const BORDA = {
+  linha: { larg: 0.18, vao: 0.1, lift: 0.008 },
+  zebra: {
+    larg: 1.0, // zebra normal (física 1,2 m)
+    largSaida: 1.6, // zebra larga do lado de fora na saída (física 2,2 m)
+    bloco: 0.8, // comprimento de cada bloco de cor
+    cores: [TINTA.amarelo, TINTA.verde, TINTA.branco], // amarelo, verde, branco (ordem no sentido da volta, lado direito)
+    lift: 0.015 // perfil baixo: só a tinta, sem degrau visível
+  },
+  faixaVerde: { cor: TINTA.verdeVivo, lift: 0.01 }, // pintura verde atrás da zebra (largura no perfil)
+  salsicha: { larg: 0.4, alt: 0.06, cor: TINTA.amarelo } // "salsicha" amarela elevada
+} as const;
+
+/** largura visual da zebra a partir da largura da física (1,2 → normal; 2,2 → larga de saída) */
+function kerbVisual(k: number): number {
+  if (k <= 0) return 0;
+  const z = BORDA.zebra;
+  const t = Math.max(0, Math.min(1, (k - 1.2) / (2.2 - 1.2)));
+  return z.larg + (z.largSaida - z.larg) * t;
+}
 
 /**
  * Terreno: grama verde-amarelada (leafy_grass) e palha seca alaranjada (sparse_grass) misturadas por um ruído em
@@ -117,23 +161,27 @@ function ribbon(
 /**
  * Desgaste de tinta sobre o canvas: grão fino (a tinta sobre o asfalto não é lisa), manchas de sujeira e
  * riscos de borracha no sentido da pista (eixo v = altura do canvas).
+ * Grão e sujeira são proporcionais à cor (multiplicam): as tintas são albedos escuros calibrados (./tintas.ts), e um
+ * grão somado de ±17 ou uma mancha marrom por cima mudariam o tom delas (um canal em 0 só pode subir).
  */
 function weather(g: CanvasRenderingContext2D, w: number, h: number, seed: number, rubber: number) {
   const rand = mulberry32(seed);
   const img = g.getImageData(0, 0, w, h);
   for (let i = 0; i < img.data.length; i += 4) {
-    const n = (rand() - 0.5) * 34 + (rand() < 0.04 ? -40 : 0); // grão + pontinhos de agregado
-    img.data[i] += n;
-    img.data[i + 1] += n;
-    img.data[i + 2] += n;
+    const f = 1 + ((rand() - 0.5) * 34 + (rand() < 0.04 ? -40 : 0)) / 230; // grão + pontinhos de agregado
+    img.data[i] *= f;
+    img.data[i + 1] *= f;
+    img.data[i + 2] *= f;
   }
   g.putImageData(img, 0, 0);
+  g.globalCompositeOperation = 'multiply';
   for (let i = 0; i < 90; i++) {
-    g.fillStyle = `rgba(70, 60, 45, ${0.03 + rand() * 0.06})`;
+    g.fillStyle = `rgba(175, 160, 135, ${0.08 + rand() * 0.16})`;
     g.beginPath();
     g.ellipse(rand() * w, rand() * h, 4 + rand() * w * 0.2, 6 + rand() * 30, 0, 0, Math.PI * 2);
     g.fill();
   }
+  g.globalCompositeOperation = 'source-over';
   for (let i = 0; i < rubber; i++) {
     const x = rand() * w;
     const y = rand() * h;
@@ -166,7 +214,7 @@ function runoffTexture(renderer: THREE.WebGLRenderer, base: string, band: string
   g.fillRect(0, 0, 80, 512);
   if (stripes) {
     // faixas brancas transversais a cada 4 m (textura de 8 m)
-    g.fillStyle = '#e8e6e0';
+    g.fillStyle = TINTA.branco;
     for (const y of [0, 256]) g.fillRect(0, y, 256, 26);
   }
   weather(g, 256, 512, 11, 30);
@@ -179,7 +227,7 @@ function lineTexture(renderer: THREE.WebGLRenderer): THREE.Texture {
   c.width = 32;
   c.height = 512;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#f4f4f0';
+  g.fillStyle = TINTA.linha;
   g.fillRect(0, 0, 32, 512);
   weather(g, 32, 512, 13, 2);
   const rand = mulberry32(17);
@@ -190,22 +238,85 @@ function lineTexture(renderer: THREE.WebGLRenderer): THREE.Texture {
   return canvasTexture(c, renderer);
 }
 
-/** Zebra: blocos de tinta (cores alternadas, 3 m cada) gastos e com borracha das rodas que sobem nela. */
-function kerbTexture(colors: string[], renderer: THREE.WebGLRenderer): THREE.Texture {
+/**
+ * Zebra: um ciclo de blocos de tinta (BORDA.zebra.cores, um bloco cada) gastos e com borracha das rodas que
+ * sobem nela. A textura repete a cada ciclo (vScale = blocos × BORDA.zebra.bloco). Com o flipY do canvas, v
+ * crescente percorre o canvas de baixo para cima: o primeiro da lista fica embaixo (primeiro no sentido da volta).
+ */
+function kerbTexture(colors: readonly string[], renderer: THREE.WebGLRenderer): THREE.Texture {
   const c = document.createElement('canvas');
   c.width = 64;
-  c.height = 512;
+  c.height = 384;
   const g = c.getContext('2d')!;
-  const h = 512 / colors.length;
+  const h = c.height / colors.length;
   colors.forEach((col, i) => {
+    const y = c.height - (i + 1) * h;
     g.fillStyle = col;
-    g.fillRect(0, i * h, 64, h);
+    g.fillRect(0, y, 64, h);
     // junta entre blocos
-    g.fillStyle = 'rgba(30, 30, 30, 0.5)';
-    g.fillRect(0, i * h, 64, 2);
+    g.fillStyle = 'rgba(30, 30, 30, 0.45)';
+    g.fillRect(0, y, 64, 2);
   });
-  weather(g, 64, 512, 19, 15);
+  weather(g, 64, c.height, 19, 5);
   return canvasTexture(c, renderer);
+}
+
+/** Tinta lisa de uma cor (faixa verde atrás da zebra, salsicha), com o mesmo desgaste das outras pinturas. */
+function solidPaintTexture(color: string, seed: number, renderer: THREE.WebGLRenderer): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = 32;
+  c.height = 256;
+  const g = c.getContext('2d')!;
+  g.fillStyle = color;
+  g.fillRect(0, 0, 32, 256);
+  weather(g, 32, 256, seed, 4);
+  return canvasTexture(c, renderer);
+}
+
+/**
+ * Salsicha: perfil trapezoidal baixo (sobe no primeiro quarto, plano, desce no último quarto) entre os
+ * deslocamentos a e b (a < b), em [i0, i1). 3 quadriláteros por amostra de 2 m.
+ */
+function sausage(
+  track: Track,
+  a: (i: number) => number,
+  b: (i: number) => number,
+  base: number,
+  height: number,
+  include: (i: number) => boolean
+): THREE.BufferGeometry {
+  const S = track.samples;
+  const N = S.length;
+  const pos: number[] = [];
+  const uv: number[] = [];
+  const idx: number[] = [];
+  const v = new THREE.Vector3();
+  const prof = [[0, 0], [0.25, 1], [0.75, 1], [1, 0]] as const;
+  let prev = -1;
+  for (let k = 0; k <= N; k++) {
+    const i = k % N;
+    if (!include(i)) {
+      prev = -1;
+      continue;
+    }
+    const s = S[i];
+    const first = pos.length / 3;
+    const a0 = a(i);
+    const w = b(i) - a0;
+    for (const [f, h] of prof) {
+      v.copy(s.p).addScaledVector(s.r, a0 + f * w).addScaledVector(s.n, base + h * height);
+      pos.push(v.x, v.y, v.z);
+      uv.push(f, (k * STEP) / 4);
+    }
+    if (prev >= 0) for (let q = 0; q < 3; q++) idx.push(prev + q, prev + q + 1, first + q, prev + q + 1, first + q + 1, first + q);
+    prev = first;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
 }
 
 /** Pórtico de largada sobre a linha de chegada, com o semáforo (5 luzes) e um painel. */
@@ -241,192 +352,9 @@ function buildStartGantry(track: Track, group: THREE.Group) {
 export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.WebGLRenderer, quality: Quality) {
   setHiRes(quality.extreme);
   const S = track.samples;
-  const k43track = track.length / 4300;
-  const smooth = (a: number, b: number, x: number) => {
-    const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
-    return t * t * (3 - 2 * t);
-  };
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-  // Ajusta larguras visuais de escape, zebras e barreiras quadro a quadro (01..30)
-  // mantendo a física intacta (Track.gd) e alinhando barreiras/escapes ao LMU.
-  for (let i = 0; i < S.length; i++) {
-    const sm = S[i].s / k43track;
-    const oKL = S[i].kerbL;
-    const oKR = S[i].kerbR;
-    const oRL = S[i].runL;
-    const oRR = S[i].runR;
-    const oWL = S[i].wallL;
-    const oWR = S[i].wallR;
-
-    // --- Zebras extras onde faltam ---
-    if (sm >= 580 && sm <= 785) S[i].kerbL = Math.max(oKL, 1.2);
-    if (sm >= 1385 && sm <= 1580) S[i].kerbL = Math.max(oKL, 1.2);
-    if (sm >= 1580 && sm <= 1760) S[i].kerbR = Math.max(oKR, 1.2);
-    if (sm >= 2510 && sm <= 2610) S[i].kerbL = Math.max(oKL, 1.6);
-    if (sm >= 2900 && sm < 2980) S[i].kerbR = Math.max(oKR, 1.4);
-    if (sm >= 2980 && sm <= 3235) S[i].kerbR = Math.max(oKR, 1.6);
-    if (sm >= 3235 && sm <= 3420) S[i].kerbR = Math.max(oKR, 2.0);
-    if (sm >= 3550 && sm <= 3650) S[i].kerbL = Math.max(oKL, 1.4);
-
-    // --- Lado Direito (runR e wallR) ---
-    let tRR = oRR;
-    let tWR = oWR;
-    if (sm < 155 || sm >= 3440) {
-      if (sm >= 3440 && sm < 3465) {
-        const k = smooth(3440, 3465, sm);
-        tRR = lerp(oRR, 1.4, k);
-        tWR = lerp(oWR, S[i].wr + 1.4, k);
-      } else {
-        tRR = 1.4;
-        tWR = S[i].wr + 1.4;
-      }
-    } else if (sm >= 155 && sm < 385) {
-      if (sm < 255) tRR = lerp(1.2, 4.8, smooth(170, 255, sm));
-      else if (sm < 305) tRR = lerp(4.8, 7.2, smooth(255, 305, sm));
-      else tRR = 7.2;
-      if (sm < 170) tRR = lerp(1.4, tRR, smooth(155, 170, sm));
-      const tight = S[i].wr + S[i].kerbR + tRR;
-      tWR = sm < 170 ? lerp(S[i].wr + 1.4, tight, smooth(155, 170, sm)) : tight;
-    } else if (sm >= 385 && sm < 545) {
-      tRR = sm < 530 ? lerp(7.2, 3.5, smooth(385, 530, sm)) : lerp(3.5, 0, smooth(530, 545, sm));
-      const extra = lerp(0, 3.0, smooth(375, 415, sm));
-      const base = S[i].wr + S[i].kerbR + tRR + extra;
-      tWR = sm < 525 ? base : lerp(base, S[i].wr + 6.2, smooth(525, 545, sm));
-    } else if (sm >= 545 && sm < 775) {
-      tRR = 0;
-      tWR = S[i].wr + 6.2;
-    } else if (sm >= 775 && sm < 1150) {
-      tRR = 0;
-      tWR = lerp(S[i].wr + 6.2, S[i].wr + 7.0, smooth(775, 795, sm));
-    } else if (sm >= 1150 && sm < 1385) {
-      tRR = sm < 1365 ? 0 : lerp(0, 7.5, smooth(1365, 1385, sm));
-      tWR = sm < 1365
-        ? lerp(S[i].wr + 7.0, S[i].wr + 7.5, smooth(1145, 1165, sm))
-        : lerp(S[i].wr + 7.5, S[i].wr + S[i].kerbR + 7.5, smooth(1365, 1385, sm));
-    } else if (sm >= 1385 && sm <= 1800) {
-      if (sm <= 1660) {
-        tRR = 7.5;
-        tWR = S[i].wr + S[i].kerbR + 7.5;
-      } else if (sm <= 1760) {
-        const k = smooth(1660, 1690, sm);
-        tRR = lerp(7.5, 5.5, k);
-        tWR = lerp(S[i].wr + S[i].kerbR + 7.5, oWR, k);
-      } else {
-        tRR = lerp(5.5, oRR, smooth(1760, 1800, sm));
-        tWR = oWR;
-      }
-    } else if (sm >= 1970 && sm <= 2245) {
-      const inK = smooth(1970, 1990, sm);
-      const out = smooth(2180, 2245, sm);
-      tRR = lerp(lerp(oRR, 1.0, inK), oRR, out);
-      tWR = lerp(lerp(oWR, S[i].wr + 9.0, inK), oWR, out);
-    } else if (sm >= 2255 && sm <= 2490) {
-      const k = smooth(2255, 2275, sm) * (1 - smooth(2470, 2490, sm));
-      tRR = lerp(oRR, 0, k);
-      tWR = lerp(oWR, S[i].wr + 5.5, k);
-    } else if (sm >= 2495 && sm <= 2625) {
-      const k = smooth(2495, 2515, sm) * (1 - smooth(2605, 2625, sm));
-      tRR = lerp(oRR, 0, k);
-      tWR = lerp(oWR, S[i].wr + 9.0, k);
-    } else if (sm >= 2665 && sm <= 2855) {
-      const k = smooth(2665, 2685, sm) * (1 - smooth(2835, 2855, sm));
-      tRR = lerp(oRR, 0.6, k);
-    } else if (sm >= 2890 && sm < 3235) {
-      const k = smooth(2890, 2915, sm);
-      tRR = lerp(oRR, 8.2, k);
-      tWR = lerp(oWR, S[i].wr + S[i].kerbR + 8.2, k);
-    } else if (sm >= 3235 && sm < 3440) {
-      const out = smooth(3415, 3440, sm);
-      const t1 = smooth(3235, 3255, sm);
-      const rrMid = lerp(8.2, 0, t1);
-      const wrMid = lerp(S[i].wr + S[i].kerbR + 8.2, S[i].wr + S[i].kerbR + 2.8, t1);
-      tRR = lerp(rrMid, 1.4, out);
-      tWR = lerp(wrMid, S[i].wr + 1.4, out);
-    }
-    S[i].runR = tRR;
-    S[i].wallR = tWR;
-
-    // --- Lado Esquerdo (runL e wallL) ---
-    let tRL = oRL;
-    let tWL = oWL;
-    if (sm < 155 || sm >= 4040) {
-      tRL = 1.4;
-      tWL = S[i].wl + 1.4;
-    } else if (sm >= 155 && sm < 385) {
-      tRL = sm < 285
-        ? Math.max(oRL, 0.85)
-        : sm < 305
-          ? Math.max(oRL, lerp(0.85, 2.6, smooth(285, 305, sm)))
-          : Math.max(oRL, 2.6);
-      if (sm < 170) tRL = lerp(1.4, tRL, smooth(155, 170, sm));
-      const tight = S[i].wl + S[i].kerbL + tRL;
-      tWL = sm < 170 ? lerp(S[i].wl + 1.4, tight, smooth(155, 170, sm)) : tight;
-    } else if (sm >= 385 && sm < 580) {
-      tRL = lerp(Math.max(oRL, 2.6), 3.0, smooth(380, 395, sm));
-      tWL = S[i].wl + S[i].kerbL + tRL;
-    } else if (sm >= 580 && sm < 785) {
-      const k = smooth(575, 595, sm);
-      tRL = lerp(3.0, 0.5, k);
-      tWL = lerp(S[i].wl + S[i].kerbL + 3.0, S[i].wl + 10.5, k);
-    } else if (sm >= 785 && sm <= 1375) {
-      const inK = smooth(780, 800, sm);
-      tRL = sm < 1355 ? lerp(0.5, 0, inK) : lerp(0, 0.4, smooth(1355, 1385, sm));
-      tWL = sm < 1355
-        ? lerp(S[i].wl + 10.5, S[i].wl + 3.2, inK)
-        : lerp(S[i].wl + 3.2, S[i].wl + 6.0, smooth(1355, 1385, sm));
-    } else if (sm > 1375 && sm <= 1580) {
-      tRL = 0.4;
-      tWL = S[i].wl + 6.0;
-    } else if (sm > 1580 && sm < 1800) {
-      const inK = smooth(1580, 1610, sm);
-      const outK = smooth(1775, 1800, sm);
-      tRL = lerp(lerp(0.4, 0, inK), 1.8, outK);
-      tWL = lerp(lerp(S[i].wl + 6.0, S[i].wl + 3.2, inK), S[i].wl + 6.5, outK);
-    } else if (sm >= 1800 && sm < 2010) {
-      tRL = sm < 1980 ? 1.8 : lerp(1.8, 2.2, smooth(1980, 2010, sm));
-      tWL = sm < 1980 ? S[i].wl + 6.5 : lerp(S[i].wl + 6.5, S[i].wl + 6.8, smooth(1980, 2010, sm));
-    } else if (sm >= 2010 && sm < 2130) {
-      const k = smooth(2005, 2025, sm);
-      tRL = lerp(2.2, 8.5, k);
-      tWL = lerp(S[i].wl + 6.8, S[i].wl + S[i].kerbL + 8.5, k);
-    } else if (sm >= 2130 && sm <= 2270) {
-      const inK = smooth(2125, 2145, sm);
-      const out = smooth(2245, 2270, sm);
-      tRL = lerp(lerp(8.5, 1.8, inK), oRL, out);
-      tWL = lerp(lerp(S[i].wl + S[i].kerbL + 8.5, S[i].wl + 6.5, inK), oWL, out);
-    } else if (sm >= 2480 && sm <= 2810) {
-      const k = smooth(2480, 2500, sm);
-      tRL = lerp(oRL, 0, k);
-      tWL = lerp(oWL, S[i].wl + S[i].kerbL + 4.5, k);
-    } else if (sm > 2810 && sm < 2900) {
-      const k = smooth(2810, 2830, sm) * (1 - smooth(2880, 2900, sm));
-      tRL = lerp(0, 4.0, k);
-      tWL = lerp(S[i].wl + S[i].kerbL + 4.5, S[i].wl + S[i].kerbL + 6.5, smooth(2810, 2830, sm));
-      if (sm >= 2880) tWL = lerp(S[i].wl + S[i].kerbL + 6.5, S[i].wl + 12.0, smooth(2880, 2900, sm));
-    } else if (sm >= 2900 && sm <= 3375) {
-      const midK = smooth(3205, 3235, sm);
-      const out = smooth(3345, 3375, sm);
-      tRL = lerp(lerp(0.5, 0, midK), oRL, out);
-      tWL = lerp(lerp(S[i].wl + 12.0, S[i].wl + 8.5, midK), oWL, out);
-    } else if (sm >= 3500 && sm < 3540) {
-      tWL = lerp(oWL, S[i].wl + 3.8, smooth(3500, 3525, sm));
-    } else if (sm >= 3540 && sm < 3680) {
-      const inK = smooth(3540, 3560, sm);
-      const outK = smooth(3665, 3680, sm);
-      tRL = lerp(0, 2.0, inK) * (1 - outK);
-      tWL = lerp(lerp(S[i].wl + 3.8, S[i].wl + S[i].kerbL + 2.0, inK), S[i].wl + 2.2, outK);
-    } else if (sm >= 3680 && sm < 3860) {
-      tRL = 0;
-      tWL = S[i].wl + 2.2;
-    } else if (sm >= 3860 && sm < 4040) {
-      tRL = 0;
-      const openK = smooth(3860, 3915, sm);
-      const joinK = smooth(4015, 4040, sm);
-      tWL = lerp(lerp(S[i].wl + 2.2, S[i].wl + 9.4, openK), S[i].wl + 11.7, joinK);
-    }
-    S[i].runL = tRL;
-    S[i].wallL = tWL;
-  }
+  // larguras visuais de zebra e escape e posição das barreiras: perfil lateral (data/track/visual_profile.json,
+  // ./perfil.ts). Grava kerbL/R, runL/R e wallL/R nas amostras; a física do jogo (Track.gd) não muda.
+  const perfil = aplicarPerfil(track);
   const group = new THREE.Group();
   const mesh = (g: THREE.BufferGeometry, m: THREE.Material, shadow = true) => {
     const o = new THREE.Mesh(g, m);
@@ -474,9 +402,13 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
       );
   };
   mesh(applyLiveAsphaltUV2(ribbon(track, i => -S[i].wl, i => S[i].wr, 0, 4, 4), track, porscheRef), asphalt);
-  /** tinta sobre o asfalto: a textura de cor pintada + o relevo e a rugosidade do asfalto por baixo */
-  const paintOn = (map: THREE.Texture, offset: number, roughness = 1) =>
+  /**
+   * tinta sobre o asfalto: a textura de cor pintada + o relevo e a rugosidade do asfalto por baixo. `nome` vira
+   * "pinta:<nome>" no GLB (cenario.ts), para o Godot e as ferramentas de medição saberem qual tinta é qual.
+   */
+  const paintOn = (map: THREE.Texture, offset: number, roughness = 1, nome = '') =>
     new THREE.MeshStandardMaterial({
+      name: nome,
       map,
       normalMap: asphaltNormal,
       normalScale: new THREE.Vector2(0.6, 0.6),
@@ -486,34 +418,65 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
       polygonOffsetFactor: offset
     });
 
-  // faixas brancas nas bordas
-  const white = paintOn(lineTexture(renderer), -2, 0.8);
-  // largas como no LMU (~35 cm), por dentro da borda do asfalto
-  mesh(ribbon(track, i => -S[i].wl, i => -S[i].wl + 0.35, 0.004, 0, 10), white);
-  mesh(ribbon(track, i => S[i].wr - 0.35, i => S[i].wr, 0.004, 0, 10), white);
+  // ---- borda pintada (medidas: tabela BORDA no topo do arquivo; onde há o quê: perfil lateral) ----
+  const PL = perfil.L;
+  const PR = perfil.R;
+  // largura visual da zebra listrada (0 onde o trecho não tem zebra listrada) e da borda pintada inteira
+  // (zebra + faixa verde + salsicha), que é onde começa o escape pintado
+  // (classe declarada no perfil, `visual`, vale mesmo onde a física não tem zebra)
+  const larguraZebra = (a: (typeof PL)[number], k: number) =>
+    !a.listrada ? 0 : a.zebraVisual === 'normal' ? BORDA.zebra.larg : a.zebraVisual === 'saida' ? BORDA.zebra.largSaida : kerbVisual(k);
+  const zebraL = S.map((s, i) => larguraZebra(PL[i], s.kerbL));
+  const zebraR = S.map((s, i) => larguraZebra(PR[i], s.kerbR));
+  const bordaL = S.map((_, i) => zebraL[i] + (PL[i].verde + PL[i].salsicha));
+  const bordaR = S.map((_, i) => zebraR[i] + (PR[i].verde + PR[i].salsicha));
 
-  // zebras de Interlagos nas cores do Brasil: amarelo vivo, verde escuro, branco (blocos de 1,5 m)
-  const kerbMat = paintOn(kerbTexture(['#ffd000', '#0d5e2e', '#f0f0ea', '#0d5e2e'], renderer), 0, 0.75);
-  // largura por lado: a de fora alarga na saída das curvas
-  mesh(ribbon(track, i => -S[i].wl - S[i].kerbL, i => -S[i].wl, 0.012, 0, 6, i => S[i].kerbL > 0), kerbMat);
-  mesh(ribbon(track, i => S[i].wr, i => S[i].wr + S[i].kerbR, 0.012, 0, 6, i => S[i].kerbR > 0), kerbMat);
+  // linha branca contínua nas duas bordas, por dentro do asfalto, com um vão de asfalto até a zebra (LMU)
+  const white = paintOn(lineTexture(renderer), -2, 0.8, 'linha');
+  const ln = BORDA.linha;
+  mesh(mergeGeometries([
+    ribbon(track, i => -S[i].wl + ln.vao, i => -S[i].wl + ln.vao + ln.larg, ln.lift, 0, 10),
+    ribbon(track, i => S[i].wr - ln.vao - ln.larg, i => S[i].wr - ln.vao, ln.lift, 0, 10)
+  ]), white);
 
-  // escapes asfaltados pintados: verde escuro rico (LMU), verde-água e vermelho com faixas brancas
+  // zebras: amarelo / verde / branco, blocos de BORDA.zebra.bloco; a da esquerda com v invertido (ordem do LMU)
+  const zb = BORDA.zebra;
+  const kerbMat = paintOn(kerbTexture(zb.cores, renderer), 0, 0.75, 'zebra');
+  const ciclo = zb.bloco * zb.cores.length;
+  mesh(mergeGeometries([
+    ribbon(track, i => -S[i].wl - zebraL[i], i => -S[i].wl, zb.lift, 0, -ciclo, i => zebraL[i] > 0),
+    ribbon(track, i => S[i].wr, i => S[i].wr + zebraR[i], zb.lift, 0, ciclo, i => zebraR[i] > 0)
+  ]), kerbMat);
+
+  // faixa verde pintada atrás da zebra e salsicha amarela (faixas "pintura" e "salsicha" do perfil)
+  const temL = (i: number) => PL[i].verde > 0;
+  const temR = (i: number) => PR[i].verde > 0;
+  const fv = BORDA.faixaVerde;
+  const greenMat = paintOn(solidPaintTexture(fv.cor, 23, renderer), -1, 0.8, 'faixa_verde');
+  mesh(mergeGeometries([
+    ribbon(track, i => -S[i].wl - zebraL[i] - PL[i].verde, i => -S[i].wl - zebraL[i], fv.lift, 0, 8, temL),
+    ribbon(track, i => S[i].wr + zebraR[i], i => S[i].wr + zebraR[i] + PR[i].verde, fv.lift, 0, 8, temR)
+  ]), greenMat);
+  const salL = (i: number) => PL[i].salsicha > 0;
+  const salR = (i: number) => PR[i].salsicha > 0;
+  const salMat = paintOn(solidPaintTexture(BORDA.salsicha.cor, 29, renderer), 0, 0.7, 'salsicha');
+  const salGeos = [
+    S.some((_, i) => salL(i)) && sausage(track, i => -S[i].wl - bordaL[i], i => -S[i].wl - bordaL[i] + PL[i].salsicha, zb.lift, BORDA.salsicha.alt, salL),
+    S.some((_, i) => salR(i)) && sausage(track, i => S[i].wr + bordaR[i] - PR[i].salsicha, i => S[i].wr + bordaR[i], zb.lift, BORDA.salsicha.alt, salR)
+  ].filter(Boolean) as THREE.BufferGeometry[];
+  if (salGeos.length) mesh(mergeGeometries(salGeos), salMat);
+
+  // escapes asfaltados pintados: verde vivo (LMU), verde-água e vermelho com faixas brancas (cores: ./tintas.ts)
   const runMats = {
-    verde: paintOn(runoffTexture(renderer, '#0b6b45', '#095c3b'), -1),
-    agua: paintOn(runoffTexture(renderer, '#0d685c', '#0a564c'), -1),
-    vermelho: paintOn(runoffTexture(renderer, '#cc1e24', '#b81a20', true), -1)
+    verde: paintOn(runoffTexture(renderer, TINTA.verdeVivo, tintaEscura(TINTA.verdeVivo)), -1, 1, 'escape_verde'),
+    agua: paintOn(runoffTexture(renderer, TINTA.verdeAgua, tintaEscura(TINTA.verdeAgua)), -1, 1, 'escape_agua'),
+    vermelho: paintOn(runoffTexture(renderer, TINTA.vermelho, tintaEscura(TINTA.vermelho), true), -1, 1, 'escape_vermelho')
   };
-  const k43 = track.length / 4300;
-  const runColor = (i: number, side: -1 | 1): keyof typeof runMats => {
-    const s = S[i].s / k43;
-    if (side > 0 && s > 700 && s < 900) return 'vermelho';
-    if ((s > 1950 && s < 2260) || (s > 3100 && s < 3450)) return 'verde';
-    return 'verde';
-  };
+  const runColor = (i: number, side: -1 | 1): keyof typeof runMats => (side < 0 ? PL : PR)[i].escapeCor;
   for (const c of Object.keys(runMats) as (keyof typeof runMats)[]) {
-    mesh(ribbon(track, i => -S[i].wl - S[i].kerbL - S[i].runL, i => -S[i].wl - S[i].kerbL, -0.008, 4, 8, i => S[i].runL > 0 && runColor(i, -1) === c), runMats[c]);
-    mesh(ribbon(track, i => S[i].wr + S[i].kerbR, i => S[i].wr + S[i].kerbR + S[i].runR, -0.008, 4, 8, i => S[i].runR > 0 && runColor(i, 1) === c), runMats[c]);
+    // o fim do escape segue a física (kerb + run); o começo encosta na borda pintada visual (mais estreita)
+    mesh(ribbon(track, i => -S[i].wl - S[i].kerbL - S[i].runL, i => -S[i].wl - Math.min(bordaL[i], S[i].kerbL), -0.008, 4, 8, i => S[i].runL > 0 && runColor(i, -1) === c), runMats[c]);
+    mesh(ribbon(track, i => S[i].wr + Math.min(bordaR[i], S[i].kerbR), i => S[i].wr + S[i].kerbR + S[i].runR, -0.008, 4, 8, i => S[i].runR > 0 && runColor(i, 1) === c), runMats[c]);
   }
 
   // grama da borda até o muro: verde e seca misturadas como nas fotos

@@ -94,7 +94,8 @@ async function run() {
       const c = sm.clone();
       c.normalMap = null;
       c.roughnessMap = null;
-      c.name = 'pinta';
+      // nome da tinta (paintOn de Interlagos) no sufixo: "pinta:zebra", "pinta:linha"...; sem nome fica "pinta"
+      c.name = sm.name ? `pinta:${sm.name}` : 'pinta';
       out = c;
     } else if (custom && sm.vertexColors && geo.getAttribute('aWin')) {
       const c = new THREE.MeshStandardMaterial({ name: 'fachada', vertexColors: true, roughness: sm.roughness, side: sm.side });

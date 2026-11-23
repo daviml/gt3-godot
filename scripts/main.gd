@@ -11,9 +11,13 @@
 # Cronometragem (etapa 4): R volta para o grid e zera a volta; N = nick (recordes por nick e carro).
 extends Node3D
 
-## sol da pista atual (data/tracks.json; Interlagos: 0,5947 e 48°)
+## sol da pista atual (data/tracks.json; Interlagos: 0,2083 e 45°, medidos pela sombra do carro no vídeo do LMU)
 var SUN_U := float(Game.get_track_info().get("sun_u", 0.5947))
 var SUN_ELEV := deg_to_rad(float(Game.get_track_info().get("sun_elev", 48.0)))
+## luz e céu do horário padrão por pista (data/tracks.json → visual.luz / visual.ceu); chave ausente = valor de
+## sempre (Laguna e Imola não definem e ficam iguais). Ver _luz() e _build_env().
+var LUZ: Dictionary = Game.get_track_info().get("visual", {}).get("luz", {})
+var CEU: Dictionary = Game.get_track_info().get("visual", {}).get("ceu", {})
 
 var track: Track
 var track_view: TrackView
@@ -210,6 +214,14 @@ func _build_env(sky_tex: Texture2D = null) -> void:
 	if sky_tex == null:
 		sky_tex = load("res://assets/sky/ceu_2k.hdr")
 	sky_mat.set_shader_parameter("pano", sky_tex)
+	# céu por pista: uniforms do shaders/sky.gdshader (clear_amount, clear_zenith...); listas viram Vector3.
+	# "pano_sol_u" = onde fica o sol na foto do HDRI: gira a foto para o sol dela cair no sol da pista.
+	for k in CEU:
+		var v = CEU[k]
+		if k == "pano_sol_u":
+			sky_mat.set_shader_parameter("pano_offset", float(v) - SUN_U)
+		else:
+			sky_mat.set_shader_parameter(k, Vector3(v[0], v[1], v[2]) if v is Array else v)
 	_sky_mat = sky_mat
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
@@ -222,7 +234,12 @@ func _build_env(sky_tex: Texture2D = null) -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 1.05
+	env.tonemap_exposure = _luz("exposicao", 1.05)
+	env.tonemap_agx_white = _luz("agx_branco", env.tonemap_agx_white)
+	env.tonemap_agx_contrast = _luz("agx_contraste", env.tonemap_agx_contrast)
+	# parte do céu na luz ambiente (1 = só o céu); o resto vem de ambient_light_color (preto = como antes)
+	env.ambient_light_sky_contribution = _luz("ambiente_ceu", 1.0)
+	env.ambient_light_color = _luz_cor("ambiente_cor", Color.BLACK)
 	if not Game.is_compatibility_renderer():
 		env.ssao_enabled = true
 		env.ssao_radius = 1.2
@@ -236,11 +253,11 @@ func _build_env(sky_tex: Texture2D = null) -> void:
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.72, 0.78, 0.85)
 	env.fog_density = 0.00035
-	env.fog_aerial_perspective = 0.6
-	env.fog_sky_affect = 0.0
+	env.fog_aerial_perspective = _luz("nevoa_aerea", 0.6)
+	env.fog_sky_affect = _luz("nevoa_ceu", 0.0)
 	env.adjustment_enabled = true
-	env.adjustment_saturation = 1.08
-	env.adjustment_contrast = 1.04
+	env.adjustment_saturation = _luz("saturacao", 1.08)
+	env.adjustment_contrast = _luz("contraste", 1.04)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	var attrs := CameraAttributesPractical.new()
@@ -268,16 +285,17 @@ func _build_env(sky_tex: Texture2D = null) -> void:
 func _apply_time_of_day(preset := "") -> void:
 	var resolved := Game.resolve_time_of_day() if (preset == "" or preset == "auto") else preset
 	_time_preset = resolved
+	# "tarde" = horário padrão da pista: valores de data/tracks.json → visual.luz (ou os de sempre)
 	var elev := SUN_ELEV
-	var sun_col := Color(1.0, 0.91, 0.78)
-	var sun_energy := 2.8
-	var amb_energy := 1.0
-	var fog_col := Color(0.72, 0.78, 0.85)
-	var fog_dens := 0.00035
-	var sky_tint := Color.WHITE
-	var sky_exp := 1.0
-	var hor_col := Color(0.04, 0.08, 0.16)
-	var hor_mix := 0.45
+	var sun_col := _luz_cor("sol_cor", Color(1.0, 0.91, 0.78))
+	var sun_energy := _luz("sol_energia", 2.8)
+	var amb_energy := _luz("ambiente_energia", 1.0)
+	var fog_col := _luz_cor("nevoa_cor", Color(0.72, 0.78, 0.85))
+	var fog_dens := _luz("nevoa_densidade", 0.00035)
+	var sky_tint := _luz_cor("ceu_tom", Color.WHITE)
+	var sky_exp := _luz("ceu_exposicao", 1.0)
+	var hor_col := _luz_cor("horizonte_cor", Color(0.04, 0.08, 0.16))
+	var hor_mix := _luz("horizonte_mistura", 0.45)
 	var sky_night := 0.0
 	var night_amt := 0.0
 	var hor_tint := Color.WHITE
@@ -328,6 +346,11 @@ func _apply_time_of_day(preset := "") -> void:
 			hor_tint = Color(0.28, 0.34, 0.52)
 			hor_bright = 0.18
 
+	if resolved in ["manha", "por_do_sol"]:
+		# a pista que recalibrou sol × ambiente no horário padrão leva a mesma proporção para manhã e pôr do sol
+		sun_energy *= _luz("sol_energia", 2.8) / 2.8
+		amb_energy *= _luz("ambiente_energia", 1.0)
+
 	if sun:
 		var phi := (SUN_U - 0.5) * TAU
 		var sun_dir := Vector3(cos(phi) * cos(elev), sin(elev), sin(phi) * cos(elev))
@@ -350,6 +373,17 @@ func _apply_time_of_day(preset := "") -> void:
 		_headlights_on = resolved in ["por_do_sol", "noite"]
 	if car_view:
 		car_view.headlights_on = _headlights_on
+
+
+## número de data/tracks.json → visual.luz (padrão = valor de sempre)
+func _luz(key: String, default: float) -> float:
+	return float(LUZ.get(key, default))
+
+
+## cor [r, g, b] de data/tracks.json → visual.luz
+func _luz_cor(key: String, default: Color) -> Color:
+	var v = LUZ.get(key, null)
+	return Color(float(v[0]), float(v[1]), float(v[2])) if v is Array and v.size() >= 3 else default
 
 
 # ------------------------------------------------------------------ carro

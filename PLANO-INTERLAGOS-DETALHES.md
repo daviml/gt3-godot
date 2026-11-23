@@ -4,7 +4,8 @@ Plano novo, só de Interlagos, focado em **comparar o vídeo do LMU com a nossa 
 corrigir os detalhes trecho a trecho. Substitui `PLANO-VISUAL-PISTA.md` como plano ativo de Interlagos e absorve a
 parte de Interlagos do `PLANO-ARVORES.md`.
 
-Status: **aprovado pelo Davi em 20/11/2026**, em execução por fases (decisões no §8). Fase 0 concluída; próxima: **1**.
+Status: **aprovado pelo Davi em 20/11/2026**, em execução por fases (decisões no §8). Fases 0 e 1 concluídas (folha da Fase 1
+aprovada); Fase 2 feita, aguardando o Davi olhar a folha; próxima: **2B**.
 
 ---
 
@@ -133,6 +134,32 @@ Corrigir antes dos setores, senão todo par "parece errado" pelo mesmo motivo.
   de sombra visível do Médio para cima, névoa de distância. Sem custo novo no Mínimo/Leve.
 - **Pronto quando:** 8 pares de trechos diferentes aprovados pelo Davi + metas de cor + `--bench` sem piora.
 
+**Resultado (20/11/2026) — feita, aguardando aprovação da folha pelo Davi:**
+- **Medição:** `tools/ref/cores.py` + `cores_interlagos.json` (13 pares, ΔE00 por material; `--godot <pasta>` para
+  remedir). Linha de base: os 10 materiais fora da meta. Final no Médio: asfalto 4,6 · sombra 4,3 · grama 3,6 ·
+  céu 2,9 · zebra amarela 4,6 · verde 0,9 · branca 0,7 · linha branca 0,9 · vermelho 1,6 · verde de escape 2,6 ·
+  verde atrás da zebra 3,3. Mínimo e Leve também ≤ 8 (exceto sombra no Mínimo, que não tem sombra do sol).
+- **Luz (só Interlagos, em `data/tracks.json → visual.luz|ceu|decalques`):** sol de azimute 124° → 345° e
+  elevação 48° → 45° (medido pela sombra da asa no vídeo); razão sombra/sol 0,26 → 0,06 (LMU 0,07); céu limpo em
+  degradê; grama dourada com manchas de terra; asfalto mais claro e quente, borracha mais discreta. Laguna e
+  Imola: diferença zero nos pixels.
+- **Zebra padrão / linha branca (`trackView.ts`, constante `BORDA`):** zebra 1,0 m (1,6 m nas saídas), blocos de
+  0,8 m amarelo/branco/verde; linha branca 0,18 m contínua com vão de 0,10 m; faixa verde atrás e salsicha como
+  tipos próprios (aplicadas em Curva do Sol, Ferradura e Pinheirinho). Blocos medidos no satélite Esri z19.
+- **Tintas (`tools/cenario/interlagos/tintas.ts`, tabela `TINTA`):** a cena multiplica o albedo por ~4 antes do
+  AgX, então a cor do LMU usada direto como albedo estoura e desbota. Os albedos foram calibrados pela inversa
+  (`scripts/tests/calib_tinta.gd` + `tools/ref/calib_tinta.py`). Banners compensados por `PLACA_GANHO`.
+- **Bench (30 pontos, `--disable-vsync --track=interlagos`), antes → depois:** Mínimo 5,25 → 5,16 ms (150 draw
+  calls); Leve 5,48 → 5,43 ms (295); Médio 14,13 → 14,39 ms (346 → 349 draw calls, 536k → 543k triângulos).
+- **Folha de aprovação:** `build/ref/interlagos/folhas/fase1_final/folha_01.jpg` e `folha_02.jpg` (8 pares).
+- **Pendências:**
+  - A calibração vale para o Forward+. No `gl_compatibility` (Web) as cores divergem (asfalto ΔE 12, grama 16,
+    céu 10); o renderizador `mobile` (Android) não foi medido. Calibrar por renderizador antes de publicar.
+  - Zebra visual 0,6 m mais estreita que a física em 14 saídas de curva → some na Fase 2B.
+  - Para os setores: escape verde-vivo onde o LMU tem verde-água ou grama (S do Senna, Pinheirinho, Mergulho),
+    zebra + vermelho na saída da Curva do Sol, muro DHL da Ferradura pálido, segunda linha branca na Reta Oposta.
+  - Emendas e remendos do asfalto não foram mexidos; manhã de Interlagos não calibrada; árvores acinzentadas (§5).
+
 ### Fase 2 — Perfil lateral a partir do satélite
 - Baixar satélite 0,25 m da área (em `build/interlagos/`, fora do git) e classificar asfalto/zebra/pintura/brita/
   grama por cor, perpendicular à pista a cada 1 m.
@@ -141,6 +168,48 @@ Corrigir antes dos setores, senão todo par "parece errado" pelo mesmo motivo.
 - Refatorar o gerador para ler o perfil (migração sem regressão, §3).
 - **Pronto quando:** imagem de cima (perfil desenhado sobre o satélite) bate em toda a volta; todas as zebras com
   início e fim a ≤ 3 m do satélite.
+
+**Resultado (20/11/2026) — feita, aguardando o Davi olhar a folha:**
+- **Satélite (`tools/tracks/interlagos/download.py`, `build_perfil.py` → `interlagos-perfil-sat.json`):** mosaico
+  Esri z19 de 184 tiles (volta + pit lane, 0,1% sem imagem), perfil por metro e por lado (borda, zebra, pintura,
+  escape, muro, confiança). Confiança baixa em ~14% da volta por lado (sombra, copa, escape da cor do asfalto).
+- **Achado principal: a linha central do `track.json` erra 2–5 m em várias curvas** (S do Senna, Descida do Lago,
+  Mergulho, Junção, Café, reta dos boxes; sinais alternados = curva "cortada") e o asfalto real é ~0,7 m mais
+  estreito por lado (12,8 × 13,55 m). O mosaico tem deslocamento global de ~3 m contra a pista (dx +2,32, dz −1,96;
+  corrigido na medição; não se sabe se o erro é da Esri ou do traçado). Tudo isso é entrada da Fase 2B.
+- **Perfil declarativo:** `data/track/visual_profile.json` lido por `tools/cenario/interlagos/perfil.ts` (esquema
+  no topo do arquivo). Migrados do código: zebra, pintura verde, salsicha, escape, tipo/distância de barreira,
+  banner e alambrado (`trackView.ts` 904 → ~700 linhas). A migração foi conferida com o GLB idêntico byte a byte
+  ao anterior (`tools/cenario/interlagos/impressao.mjs` compara malha a malha). Continuam em código: ponte,
+  pórticos, grid, entrada/saída dos boxes, faixas da Reta Oposta, barreira Goodyear do Lago, muro da Ferradura e
+  6 outdoors. **Não rodar `cenario.mjs --extrair-perfil`**: regenera a v1 do código antigo e apaga as edições.
+- **Zebras (`tools/tracks/interlagos/perfil_zebras.py`, tabelas de decisão):** 19 zebras no perfil; 15 a ≤ 3 m do
+  satélite e 4 decididas pelo vídeo do LMU (saída da Curva do Sol começa ~50 m antes; fim do Mergulho ~20 m
+  antes; Lago dir 1506–1534 e Ferradura esq 2176–2222 existem no LMU e o satélite não vê). Ferradura dir virou
+  faixa verde + salsicha até 2196. 24 segmentos curtos do satélite não aplicados (lista com motivo no
+  `diferencas.md`). Largura pelas classes da Fase 1 (`visual: normal|saida`), não pela largura do satélite.
+- **Picos de muro/escape** nas transições (defeito antigo): 7 corrigidos (esq 376–394, 580–594, 2242–2266,
+  4010–4034; dir 2178–2270, 2468–2510, 3428–3460). Efeito colateral: 280 das 7.052 árvores mudaram de lugar,
+  porque o sorteio usa a distância do muro (separar o sorteio por tentativa antes dos setores).
+- **Conferência:** `build/interlagos/overlay_perfil/` (perfil final sobre o satélite, desenrolado e de cima, por
+  setor) e `build/interlagos/perfil/diferencas.md` (zebra a zebra + o que não foi aplicado, por setor, para as
+  Fases 3–10). Folha: `build/ref/interlagos/folhas/fase2_final/folha_01..04.jpg` (16 pares).
+- **Bench (`--disable-vsync --track=interlagos`), Fase 1 → agora:** Mínimo 5,16 → 5,18 ms (150 draw calls);
+  Leve 5,43 → 5,40 ms (295); Médio 14,39 → 14,23 ms (349 draw calls, 543k → 540k triângulos).
+- **Testes:** 10 de 10 OK. O `arredores.gd` falhava em 4 itens porque o teste estava desatualizado em relação
+  à tabela `DETAIL` do `surroundings_view.gd` (Leve: torcida 260 m; Extremo igual ao Médio, 400 m / 2.400 m; a
+  torcida já vem em 10 blocos do gerador). Nada a ver com as Fases 1 e 2. As 4 expectativas do teste foram
+  atualizadas para os valores do código.
+- **Pendências:**
+  - Visual × física divergentes até a 2B: 12 trechos com zebra só no visual, 23 com zebra da física escondida.
+  - Muro medido no satélite não é confiável (só candidato); distâncias de muro e larguras de escape ficam para a
+    2B e os setores, já com a linha central corrigida.
+  - Âncoras medidas × cenário: passarela 292–297 × 264,6; pórtico da Reta Oposta 988–1001 × 1038,5; saída dos
+    boxes 830–895 × 734–794. Linha de chegada não é visível no satélite; a ressalva de `s` da Fase 0
+    (3276 → 186) continua aberta e fecha no remapeamento do atlas da 2B.
+  - Zebras só do satélite, sem conferência no vídeo: esq 2738, 3352–3412, 3660–3696; dir 2750–2810, 3240–3252,
+    3334–3364. Possível zebra não detectada em esq 3290–3352 (Fase 9).
+  - As listas de transição do perfil guardam valores da física antiga: refazer na 2B.
 
 ### Fase 2B — Geometria física refeita (aprovada: zera o placar)
 Mesmo processo de Laguna Seca (`GUIA-PISTAS.md` §1–4), antes dos setores para não refazer detalhe duas vezes.
@@ -152,6 +221,37 @@ Mesmo processo de Laguna Seca (`GUIA-PISTAS.md` §1–4), antes dos setores para
   de pista atualizados; o `atlas.json` é remapeado para o novo `s` pelas mesmas âncoras.
 - **Pronto quando:** comprimento a ≤ 0,5% do oficial (4.309 m), RefBot dá volta válida a ≤ 3% do tempo real,
   velocidade mínima por curva a ≤ 10 km/h do Garage 61, suíte de testes verde.
+
+**Andamento (20/11/2026) — pausada no início da etapa E; o jogo continua na pista antiga, consistente com o GLB:**
+- **Descoberta:** Interlagos vinha do jogo web (`../gt3-time-attack`, via `tools/prep.ts`: TUMFTM alisado, SRTM
+  30 m, sem camber). A 2B dá a ela fonte própria em `tools/tracks/interlagos/`, como Laguna e Imola. O repo
+  `gt3-time-attack` não é alterado (a pista do web diverge daqui em diante).
+- **D1, relevo — feito, falta um ajuste:** LiDAR GeoSampa/PMSP 2017 (36 folhas LAZ, bucket público
+  `laz-m3dc-pmsp`, em `build/interlagos/lidar/raw/laz/`), `download_lidar.py` e `lidar.py`
+  (`altura(x,z)`, `copa(x,z)`, `--conferir`). `laspy[lazrs]` instalado por pip. Rasterizado: MDT 0,5 m, MDS 1 m,
+  `copa.npy`; `interlagos-terrain.json` já é o do LiDAR. Conferência: desnível 43,4 m (oficial ~43), emendas
+  ≤ 9 cm, sem buracos, relevo atual erra 2,3 m rms (até ~6 m: S/Curva do Sol ~4 m altos, Mergulho e Café/Subida
+  ~4 m baixos), lado de fora mais alto em todas as curvas (S do Senna ~8°, Subida dos Boxes ~6°, Mergulho ~4,5°).
+  **Ajuste pendente:** o MDT usa só a classe 2 e só 36% da linha central tem ponto direto; sobre o asfalto 89%
+  dos pontos são classe 20, ao nível do chão (classe 2 fica ~0,15 m abaixo). Refazer o raster perto da pista
+  (~40 m) com classes 2 + 20 (mediana por célula) antes de calcular altitude e camber. LiDAR 2020 não baixado
+  (portal com proteção anti-robô).
+- **D2, traçado — feito:** `build_track.py` → `interlagos.json` (1.076 pontos a 4 m, larguras, zebras da Fase 2
+  em s novo, muros), `interlagos-osm.json`, `s_antigo_novo.json`, `LEIA-ME.md`; imagens em
+  `build/interlagos/tracado/`. Comprimento 4.303,7 m (−0,12%); borda × satélite mediana ~0,1–0,2 m, p95 ~1 m;
+  6 voltas do Garage 61 dentro da pista em 99,9–100% com meio carro de folga; linha de chegada no mesmo ponto;
+  referencial do mundo mantido (GPS e satélite ficam ~3 m deslocados do OSM, só anotado). Deslocamento lateral
+  da linha: mediana 0,9 m, máximo 4,5 m (Lago); `s` muda até 12 m.
+- **E, integração — interrompida logo no começo** (só mexeu em `build_track.py`/`interlagos.json`; nada em
+  `data/` mudou; conferir esses dois arquivos ao retomar, rodando `build_track.py` de novo). A fazer: exportar
+  para `data/track/` pelo `pista.ts` (e o `prep.ts` parar de sobrescrever Interlagos); resolver muro mínimo do
+  `applyWalls`, comprimento por 200 cordas da classe `Track`, `name` ≠ "Interlagos", larguras de 9–10,5 m (Reta
+  Oposta, subida do Lago, Junção), faixa de aceleração da saída dos boxes como asfalto, calombos da borda direita
+  em 1490–1510 e 3650–3668; mapa de `s` definitivo; 6 referências do Garage 61 + `refs`; recordes
+  `recordes-interlagos-v4`; paridade na pista nova; teste `scripts/tests/interlagos.gd`; suíte.
+- **Depois:** religar o LiDAR (`build_track.py --lidar`, altitude + `bank`) e repetir RefBot/testes; etapa F
+  (gerador lendo a pista nova, perfil/código/atlas remapeados pelo mapa de `s`, zebras do perfil voltando a
+  `"fisica"`, GLB, folha, bench com `--track=interlagos --disable-vsync`, suíte).
 
 ### Fases 3 a 10 — Setores, um por sessão
 

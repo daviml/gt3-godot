@@ -2,6 +2,9 @@
 //   assets/track/cenario.glb       malhas e texturas da pista e dos arredores
 //   data/track/arvores_pos.json    árvores: [x, y, z, tamanho, espécie, giro, tom] × n
 // uso (de REPOS/gt3-godot/tools): node cenario.mjs [--track=<id>]   (sem --track: Interlagos)
+//   --out=<pasta>       grava lá em vez do projeto
+//   --preview           só PNGs de conferência (build/compare/<pista>/preview)
+//   --extrair-perfil    Interlagos: refaz data/track/visual_profile.json pelo código antigo (ver interlagos/perfil.ts)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
@@ -39,8 +42,19 @@ try {
   page.on('console', m => console.log('  [página]', m.text()));
   page.on('pageerror', e => console.log('  [erro]', e.message));
   const isPreview = process.argv.includes('--preview');
-  await page.goto('http://localhost:5199/', { waitUntil: 'domcontentloaded' });
-  if (isPreview) {
+  // --extrair-perfil: refaz data/track/visual_profile.json (Interlagos) a partir do código antigo do gerador
+  // (tools/cenario/interlagos/extrairPerfil.ts) e confere amostra por amostra; não exporta o GLB
+  const isPerfil = process.argv.includes('--extrair-perfil');
+  if (isPerfil && other) throw new Error('--extrair-perfil só existe para Interlagos');
+  await page.goto(isPerfil ? 'http://localhost:5199/perfil.html' : 'http://localhost:5199/', { waitUntil: 'domcontentloaded' });
+  if (isPerfil) {
+    await page.waitForFunction(() => 'extrairPerfil' in window, null, { timeout: 120000 });
+    const r = await page.evaluate(() => window.extrairPerfil());
+    const f = out(dataDir + 'visual_profile.json');
+    writeFileSync(f, r.texto);
+    console.log(`visual_profile.json: ${(r.texto.length / 1024).toFixed(1)} KB, fatias esq ${r.fatias.esq} / dir ${r.fatias.dir} → ${f}`);
+    console.log('conferência (perfil × código antigo, por amostra):', JSON.stringify(r.conferencia));
+  } else if (isPreview) {
     await page.waitForFunction(() => 'preview' in window, null, { timeout: 120000 });
     const shots = await page.evaluate(() => window.preview());
     const prevDir = out(`build/compare/${trackArg}/preview`);

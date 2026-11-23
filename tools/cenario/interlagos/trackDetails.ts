@@ -6,40 +6,33 @@ import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
 import { addProp } from '../propsRegistry';
+import { phTexture } from '@web/render/textures';
+import { TINTA } from './tintas';
+import { perfilDe, type TipoBarreira } from './perfil';
 
 export type AdScheme = 'verde' | 'vermelho' | 'amarelo' | 'branco' | 'azul' | 'avis';
-type Kind = 'rail' | 'wall' | 'tecpro' | 'tecpro2' | 'rolex_pad';
+type Kind = TipoBarreira;
 
-interface Zone {
+/**
+ * Outdoors grandes atrás do muro, no meio de cada trecho [s0, s1] (s numa volta de 4.300 m). `variante` escolhe o
+ * texto do conjunto de placas (era o índice do trecho na antiga tabela ZONES; mantido para o resultado não mudar).
+ * O tipo de barreira, as placas do muro e o alambrado de cada trecho estão no perfil lateral
+ * (data/track/visual_profile.json, ./perfil.ts).
+ */
+interface Outdoor {
   s0: number;
   s1: number;
-  /** lado da barreira (+1 = direita de quem corre); sem lado = o de fora da curva */
-  side?: -1 | 1;
-  kind: Kind;
+  side: -1 | 1;
   ads: AdScheme;
-  fence?: boolean;
-  /** outdoor grande atrás do muro */
-  billboard?: boolean;
+  variante: number;
 }
-
-const ZONES: Zone[] = [
-  { s0: 165, s1: 390, side: 1, kind: 'rolex_pad', ads: 'verde', fence: true, billboard: true },
-  { s0: 165, s1: 395, side: -1, kind: 'rolex_pad', ads: 'verde', fence: true },
-  { s0: 395, s1: 565, side: -1, kind: 'rolex_pad', ads: 'verde', fence: false },
-  { s0: 540, s1: 1150, side: 1, kind: 'wall', ads: 'vermelho', billboard: true },
-  { s0: 800, s1: 1180, side: -1, kind: 'rail', ads: 'verde', fence: true },
-  { s0: 1150, s1: 1385, side: 1, kind: 'rolex_pad', ads: 'verde', fence: true },
-  { s0: 1385, s1: 1660, side: 1, kind: 'tecpro', ads: 'azul' },
-  { s0: 1580, s1: 1800, side: -1, kind: 'tecpro', ads: 'azul', billboard: true },
-  { s0: 1800, s1: 2005, side: -1, kind: 'rolex_pad', ads: 'verde', fence: true },
-  { s0: 2005, s1: 2140, side: -1, kind: 'wall', ads: 'amarelo', fence: true },
-  { s0: 2140, s1: 2335, side: -1, kind: 'wall', ads: 'branco', billboard: true },
-  { s0: 2310, s1: 2480, side: 1, kind: 'wall', ads: 'branco', billboard: true },
-  { s0: 2480, s1: 2830, side: -1, kind: 'wall', ads: 'branco', billboard: true },
-  { s0: 2890, s1: 3235, side: 1, kind: 'wall', ads: 'amarelo', fence: true },
-  { s0: 3235, s1: 3420, side: 1, kind: 'wall', ads: 'azul', fence: true },
-  { s0: 3420, s1: 4035, side: 1, kind: 'wall', ads: 'avis', fence: true },
-  { s0: 3540, s1: 3680, side: -1, kind: 'wall', ads: 'avis', fence: true }
+const OUTDOORS: Outdoor[] = [
+  { s0: 165, s1: 390, side: 1, ads: 'verde', variante: 0 },
+  { s0: 540, s1: 1150, side: 1, ads: 'vermelho', variante: 3 },
+  { s0: 1580, s1: 1800, side: -1, ads: 'azul', variante: 7 },
+  { s0: 2140, s1: 2335, side: -1, ads: 'branco', variante: 10 },
+  { s0: 2310, s1: 2480, side: 1, ads: 'branco', variante: 11 },
+  { s0: 2480, s1: 2830, side: -1, ads: 'branco', variante: 12 }
 ];
 
 const AD_SETS: Record<AdScheme, [string, string, string][]> = {
@@ -76,6 +69,34 @@ function topperCanvas(scheme: AdScheme): HTMLCanvasElement {
   g.fillText(text, 768, 34, 440);
   g.fillRect(0, 0, 1024, 3);
   g.fillRect(0, 61, 1024, 3);
+  return compensaLuz(c);
+}
+
+/**
+ * Placas e barreiras com marca (MOTUL, DHL, GOODYEAR, ROLEX, AVIS): as cores de marca são as "de catálogo", mas a luz
+ * de Interlagos no Godot (sol 3,4 × exposição 1,3 → AgX, ver ./tintas.ts) leva cor clara e saturada ao topo da curva:
+ * o vermelho MOTUL saía rosa-salmão (254/109/105) onde o LMU mostra 195/45/72. Mesma causa das tintas do chão, com
+ * correção global: a textura inteira é escurecida em luz linear por PLACA_GANHO (o tom de cada cor fica; só sai da
+ * região que desbota). Calibrado no MOTUL da Reta Oposta e conferido no GOODYEAR e no DHL (Fase 1, 20/11/2026).
+ */
+export const PLACA_GANHO = 0.32;
+
+/** Escurece o canvas em luz linear (× k), sem mudar o tom; devolve o mesmo canvas. */
+export function compensaLuz(c: HTMLCanvasElement, k = PLACA_GANHO): HTMLCanvasElement {
+  const g = c.getContext('2d')!;
+  const img = g.getImageData(0, 0, c.width, c.height);
+  const lut = new Uint8ClampedArray(256);
+  for (let v = 0; v < 256; v++) {
+    const x = v / 255;
+    const lin = (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4) * k;
+    lut[v] = Math.round(255 * (lin <= 0.0031308 ? lin * 12.92 : 1.055 * lin ** (1 / 2.4) - 0.055));
+  }
+  for (let i = 0; i < img.data.length; i += 4) {
+    img.data[i] = lut[img.data[i]];
+    img.data[i + 1] = lut[img.data[i + 1]];
+    img.data[i + 2] = lut[img.data[i + 2]];
+  }
+  g.putImageData(img, 0, 0);
   return c;
 }
 
@@ -103,7 +124,7 @@ export function adCanvas(scheme: AdScheme, panels: number, pw: number, ph: numbe
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(x, 0, 2, ph);
   }
-  return c;
+  return compensaLuz(c);
 }
 
 export function tex(c: HTMLCanvasElement, renderer: THREE.WebGLRenderer, wrap = true): THREE.Texture {
@@ -149,7 +170,7 @@ function tecproTexture(renderer: THREE.WebGLRenderer): THREE.Texture {
     g.fillStyle = `rgba(15,15,15,${0.1 + rand() * 0.25})`;
     g.fillRect(rand() * 512, 60 + rand() * 30, 20 + rand() * 80, 2 + rand() * 5);
   }
-  return tex(c, renderer);
+  return tex(compensaLuz(c), renderer);
 }
 
 /** Barreira acolchoada verde ROLEX (módulos de 1,5 m com coroa e logo ROLEX dourados). */
@@ -198,7 +219,7 @@ function rolexPadTexture(renderer: THREE.WebGLRenderer): THREE.Texture {
     g.fillStyle = `rgba(10,15,10,${0.12 + rand() * 0.22})`;
     g.fillRect(rand() * 512, 76 + rand() * 18, 18 + rand() * 64, 2 + rand() * 4);
   }
-  return tex(c, renderer);
+  return tex(compensaLuz(c), renderer);
 }
 
 function fenceTexture(): THREE.Texture {
@@ -243,44 +264,15 @@ function tyreStackTexture(): THREE.Texture {
   return t;
 }
 
-/** Tipo de barreira, placas e alambrado de cada lado em cada amostra. */
+/** Tipo de barreira, placas e alambrado de cada lado em cada amostra (do perfil lateral, ./perfil.ts). */
 export function barrierLayout(track: Track) {
-  const S = track.samples;
-  const N = S.length;
-  const L = track.length;
-  const k = L / 4300;
-  const mainRight = (i: number) => S[i].s > L - 520 || S[i].s < 252 * k;
-  const mainLeft = (i: number) => S[i].s > L - 251 || S[i].s < 252 * k;
-  const kind: Record<-1 | 1, Kind[]> = { [-1]: new Array(N).fill('rail'), [1]: new Array(N).fill('rail') };
-  const ads: Record<-1 | 1, (AdScheme | null)[]> = { [-1]: new Array(N).fill(null), [1]: new Array(N).fill(null) };
-  const fence: Record<-1 | 1, boolean[]> = { [-1]: new Array(N).fill(false), [1]: new Array(N).fill(false) };
-  for (let i = 0; i < N; i++) {
-    if (mainLeft(i)) {
-      kind[-1][i] = 'wall';
-      ads[-1][i] = 'verde'; // muro dos boxes verde ROLEX como no LMU
-      fence[-1][i] = true;
-    }
-    if (mainRight(i)) {
-      kind[1][i] = 'wall';
-      ads[1][i] = 'verde'; // muro da arquibancada
-      fence[1][i] = true;
-    }
-  }
-  const zones = ZONES.map(z => {
-    const i0 = Math.round((z.s0 * k) / STEP);
-    const i1 = Math.round((z.s1 * k) / STEP);
-    let curv = 0;
-    for (let i = i0; i < i1; i++) curv += S[i % N].curv;
-    const side: -1 | 1 = z.side ?? (curv > 0 ? -1 : 1); // curva à direita: fora é a esquerda
-    for (let i = i0; i < i1; i++) {
-      const j = i % N;
-      kind[side][j] = z.kind;
-      ads[side][j] = z.kind === 'wall' ? z.ads : null;
-      fence[side][j] = !!z.fence;
-    }
-    return { ...z, side, i0, i1 };
-  });
-  return { kind, ads, fence, zones };
+  const p = perfilDe(track);
+  const kind: Record<-1 | 1, Kind[]> = { [-1]: p.L.map(a => a.tipo), [1]: p.R.map(a => a.tipo) };
+  const ads: Record<-1 | 1, (AdScheme | null)[]> = { [-1]: p.L.map(a => a.banner as AdScheme | null), [1]: p.R.map(a => a.banner as AdScheme | null) };
+  const fence: Record<-1 | 1, boolean[]> = { [-1]: p.L.map(a => a.alambrado), [1]: p.R.map(a => a.alambrado) };
+  const k = track.length / 4300;
+  const outdoors = OUTDOORS.map(o => ({ ...o, i0: Math.round((o.s0 * k) / STEP), i1: Math.round((o.s1 * k) / STEP) }));
+  return { kind, ads, fence, outdoors };
 }
 
 /**
@@ -472,18 +464,18 @@ export function buildBarriers(track: Track, group: THREE.Group, renderer: THREE.
   // sem sombra própria: o InstancedMesh inteiro entraria no mapa de sombra a cada quadro
   group.add(tyres);
 
-  buildBillboards(track, group, renderer, lay.zones);
+  buildBillboards(track, group, renderer, lay.outdoors);
 }
 
 /** Outdoors de 14 × 3,5 m atrás do muro, no meio de cada curva com placas, virados para quem chega. */
-function buildBillboards(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer, zones: (Zone & { side: -1 | 1; i0: number; i1: number })[]) {
+function buildBillboards(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer, outdoors: (Outdoor & { i0: number; i1: number })[]) {
   const S = track.samples;
   const N = S.length;
   const legMat = new THREE.MeshStandardMaterial({ color: 0x5b6066, metalness: 0.5, roughness: 0.5 });
   const backMat = new THREE.MeshStandardMaterial({ color: 0x8a8d90, roughness: 0.8 });
   const tmp = new THREE.Vector3();
-  zones.forEach((z, k) => {
-    if (!z.billboard) return;
+  outdoors.forEach(z => {
+    const k = z.variante;
     const i = Math.round((z.i0 + z.i1) / 2) % N;
     const s = S[i];
     const wall = z.side < 0 ? s.wallL : s.wallR;
@@ -559,7 +551,7 @@ export function buildBridge(track: Track, group: THREE.Group, renderer: THREE.We
     cg.fill();
     cg.fillText('ROLEX', cx, 122);
   }
-  const t = tex(c, renderer, false);
+  const t = tex(compensaLuz(c), renderer, false);
   const ad = new THREE.MeshStandardMaterial({ map: t, roughness: 0.45 });
   const g = new THREE.Group();
   const deck = new THREE.Mesh(new THREE.BoxGeometry(span, 2.2, 2.4), [concrete, concrete, concrete, concrete, ad, ad]);
@@ -585,7 +577,7 @@ export function buildBridge(track: Track, group: THREE.Group, renderer: THREE.We
   group.add(g);
 
   buildMotulGantry(track, group, renderer);
-  buildOppositeRunoff(track, group);
+  buildOppositeRunoff(track, group, renderer);
   buildPitExit(track, group);
   buildPitEntry(track, group, renderer);
   buildDescidaLagoGoodyear(track, group, renderer);
@@ -615,7 +607,7 @@ function buildMotulGantry(track: Track, group: THREE.Group, renderer: THREE.WebG
   cg.textAlign = 'center';
   cg.textBaseline = 'middle';
   for (const x of [150, 390, 634, 874]) cg.fillText('MOTUL', x, 66, 200);
-  const ad = new THREE.MeshStandardMaterial({ map: tex(c, renderer, false), roughness: 0.45 });
+  const ad = new THREE.MeshStandardMaterial({ map: tex(compensaLuz(c), renderer, false), roughness: 0.45 });
   const g = new THREE.Group();
   const beam = new THREE.Mesh(new THREE.BoxGeometry(span, 1.5, 0.5), [steel, steel, steel, steel, ad, ad]);
   beam.position.set(0, h, 0);
@@ -634,15 +626,29 @@ function buildMotulGantry(track: Track, group: THREE.Group, renderer: THREE.WebG
   group.add(g);
 }
 
-/** Continuação das faixas vermelha/verde e paredão verde atrás do muro MOTUL na Reta Oposta (s = 780..1150 m). */
-function buildOppositeRunoff(track: Track, group: THREE.Group) {
+/**
+ * Continuação das faixas vermelha/verde e paredão verde atrás do muro MOTUL na Reta Oposta (s = 780..1150 m).
+ * As faixas são tinta sobre asfalto como as outras (textura lisa da cor + relevo do asfalto → "pinta:<nome>" no GLB),
+ * com as cores calibradas de ./tintas.ts.
+ */
+function buildOppositeRunoff(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
+  const asphaltNormal = phTexture('asphalt_track', 'nor_gl', renderer);
+  const paint = (cor: string, nome: string) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 4;
+    const g = c.getContext('2d')!;
+    g.fillStyle = cor;
+    g.fillRect(0, 0, 4, 4);
+    return new THREE.MeshStandardMaterial({ name: nome, map: tex(c, renderer), normalMap: asphaltNormal, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.9, side: THREE.DoubleSide });
+  };
   const S = track.samples;
   const N = S.length;
   const k43 = track.length / 4300;
   const i0 = Math.round((780 * k43) / STEP);
   const i1 = Math.round((1150 * k43) / STEP);
-  const stripOff = (d0: number, d1: number, color: number, y0 = 0.015, y1 = 0.015, iStart = i0, iEnd = i1) => {
+  const stripOff = (d0: number, d1: number, mat: THREE.Material, y0 = 0.015, y1 = 0.015, iStart = i0, iEnd = i1) => {
     const pos: number[] = [];
+    const uv: number[] = [];
     const idx: number[] = [];
     const v = new THREE.Vector3();
     let prev = -1;
@@ -655,9 +661,10 @@ function buildOppositeRunoff(track: Track, group: THREE.Group) {
         prev = -1;
         continue;
       }
-      for (const [off, y] of [[w0, y0], [w1, y1]] as const) {
+      for (const [off, y, u] of [[w0, y0, 0], [w1, y1, 1]] as const) {
         v.copy(s.p).addScaledVector(s.r, off).addScaledVector(s.n, y);
         pos.push(v.x, v.y, v.z);
+        uv.push(u, (i * STEP) / 8);
       }
       if (prev >= 0) idx.push(prev, prev + 1, base, prev + 1, base + 1, base);
       prev = base;
@@ -665,15 +672,17 @@ function buildOppositeRunoff(track: Track, group: THREE.Group) {
     if (!idx.length) return;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.9, side: THREE.DoubleSide }));
+    const m = new THREE.Mesh(geo, mat);
     m.receiveShadow = true;
     group.add(m);
   };
   // Deixa 0..1.5 m de grama junto à linha branca, depois faixa vermelha viva e verde externa até o muro MOTUL
-  stripOff(1.5, 4.5, 0xb81a20);
-  stripOff(4.5, 7.0, 0x0c8a46);
+  // nome = qual tinta é (o Godot e tools/ref/regioes_tinta.py acham a malha por ele: "pinta:<nome>")
+  stripOff(1.5, 4.5, paint(TINTA.vermelho, 'vermelha_oposta'));
+  stripOff(4.5, 7.0, paint(TINTA.verdeAgua, 'verde_oposta'));
   // Paredão/talude verde escuro atrás do muro MOTUL (s = 820..1120 m)
   const wi0 = Math.round((820 * k43) / STEP);
   const wi1 = Math.round((1120 * k43) / STEP);

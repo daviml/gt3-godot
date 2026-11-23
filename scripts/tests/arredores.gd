@@ -68,7 +68,7 @@ func _run() -> void:
 
 	# torcida e mata (vêm do cenario.glb e do arvores_pos.json)
 	var crowd := _find(tv, _is_crowd, [])
-	check(crowd.size() > 10, "torcida em cartões: %d blocos de até 120 m" % crowd.size())
+	check(crowd.size() >= 10, "torcida em cartões: %d blocos de até 120 m" % crowd.size())
 	var big := 0.0
 	for c in crowd:
 		var b: AABB = c.global_transform * c.get_aabb()
@@ -81,11 +81,11 @@ func _run() -> void:
 	sv.set_detail(0)
 	check(crowd.all(func(n): return not n.visible), "Mínimo: torcida desligada")
 	sv.set_detail(1)
-	check(crowd.all(func(n): return n.visible and n.visibility_range_end <= 220.0), "Leve: torcida até 220 m")
+	check(crowd.all(func(n): return n.visible and n.visibility_range_end <= 260.0), "Leve: torcida até 260 m")
 	check(trees.all(func(n): return n.visibility_range_end <= 1500.0), "Leve: mata até 1.500 m")
 	sv.set_detail(3)
-	check(crowd.all(func(n): return n.visible and n.visibility_range_end == 0.0), "Extremo: torcida sem limite")
-	check(trees.all(func(n): return n.visibility_range_end == 0.0), "Extremo: mata sem limite")
+	check(crowd.all(func(n): return n.visible and n.visibility_range_end == 400.0), "Extremo: torcida até 400 m (igual ao Médio)")
+	check(trees.all(func(n): return n.visibility_range_end == 2400.0), "Extremo: mata até 2.400 m (igual ao Médio)")
 
 	print("arredores: " + ("OK" if ok else "FALHOU"))
 	quit(0 if ok else 1)

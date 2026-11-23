@@ -12,6 +12,10 @@ uniform vec3 color_mul = vec3(1.24, 1.14, 0.96);
 uniform vec3 color_add = vec3(0.032, 0.028, 0.022);
 uniform vec3 fast_mul = vec3(1.16, 1.08, 0.93);
 uniform vec3 fast_add = vec3(0.022, 0.020, 0.016);
+// força da faixa emborrachada do traçado e das marcas de freada desenhadas aqui (1 = como sempre)
+uniform float rubber_amt = 1.0;
+// reflexo especular do céu (0,5 = padrão do Godot, como sempre; menor = superfície mais fosca de pó)
+uniform float spec_amt = 0.5;
 uniform sampler2D albedo_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D normal_tex : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D arm_tex : filter_linear_mipmap_anisotropic, repeat_enable;
@@ -37,10 +41,10 @@ void fragment() {
 	float lat = track_telem.x;
 	float brk = clamp(track_telem.y, 0.0, 1.0);
 	float wheel_grooves = exp(-pow((abs(lat) - 0.80) / 0.44, 2.0)) + exp(-pow(lat / 1.45, 2.0)) * 0.30;
-	float rubber = clamp(wheel_grooves, 0.0, 1.0) * (0.76 + 0.24 * a_noise(ground / 14.0));
+	float rubber = clamp(wheel_grooves, 0.0, 1.0) * (0.76 + 0.24 * a_noise(ground / 14.0)) * rubber_amt;
 	float brk_corridor = exp(-pow((abs(lat) - 0.80) / 0.72, 2.0));
 	float brk_streaks = smoothstep(0.32, 0.82, a_noise(vec2(lat * 3.8, ground.x * 0.13 + ground.y * 0.13)));
-	float brake_mark = brk * brk_corridor * (0.45 + 0.55 * brk_streaks);
+	float brake_mark = brk * brk_corridor * (0.45 + 0.55 * brk_streaks) * rubber_amt;
 
 	if (fast_mode) {
 		vec3 c = texture(albedo_tex, uv).rgb;
@@ -52,6 +56,7 @@ void fragment() {
 		c = mix(c, c * 1.15 + vec3(0.015, 0.017, 0.022), night_amount);
 		ALBEDO = c;
 		ROUGHNESS = 0.84;
+		SPECULAR = spec_amt;
 		METALLIC = 0.0;
 	} else {
 		vec3 c = texture(albedo_tex, uv).rgb;
@@ -78,6 +83,7 @@ void fragment() {
 		AO = arm.r;
 		AO_LIGHT_AFFECT = 0.3;
 		ROUGHNESS = mix(arm.g, max(0.42, arm.g * 0.82), rubber * 0.65);
+		SPECULAR = spec_amt;
 		METALLIC = 0.0;
 	}
 }

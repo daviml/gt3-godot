@@ -12,10 +12,14 @@
 # do vídeo (a câmera do jogo não muda):
 #   -- --atlas --s0=0 --s1=4290 --passo=50 --cam=0 --quality=2 --out=build/ref/interlagos/godot/chase [--regua]
 #   --s1 < --s0 cruza a linha de chegada (ex.: --s0=3884 --s1=250). Arquivos: <out>/sNNNN.png (1280x720, 16:9).
+#   --lista=600,750,1500 fotografa só esses metros (no lugar de --s0/--s1/--passo).
 #   --cam=0 perseguição do LMU, --cam=1 olho do piloto (modelo do carro escondido).
 #   --regua desenha na pista uma linha a cada 10 m de s (número a cada 50 m) e marcas a cada 2 m de d.
 #   O carro fica parado sobre a linha da referência do Garage 61 (RefBot); sem --car usa um carro com referência
 #   na pista; --car=<id> sem referência falha. Pista sem referência nenhuma: linha central.
+#   --ids: quadro de identificação das tintas (Fase 1, cor medida): cada tinta com nome no GLB vira uma cor-chave
+#   sem luz (IDS_TINTA; a zebra fica com a própria textura), todo o resto preto, sem tonemap nem névoa. Serve para
+#   tools/ref/regioes_tinta.py achar sozinho onde amostrar cada tinta (mesma câmera e mesmo s do --atlas).
 extends SceneTree
 
 # ---- câmera de comparação do modo --atlas ----
@@ -41,6 +45,18 @@ const ATLAS_ONB_PITCH := -2.0
 ## saída do atlas: mesma proporção e tamanho dos quadros do LMU em build/ref/interlagos/
 const ATLAS_W := 1280
 const ATLAS_H := 720
+## --ids: cor-chave de cada tinta (nome do material no GLB). "" = mantém a textura, sem luz (zebra: amarelo/verde/branco).
+const IDS_TINTA := {
+	"pinta:zebra": "",
+	"pinta:linha": Color(0, 1, 1),
+	"pinta:faixa_verde": Color(0, 0, 1),
+	"pinta:escape_verde": Color(1, 0.5, 0),
+	"pinta:escape_agua": Color(0.5, 0, 1),
+	"pinta:escape_vermelho": Color(1, 0, 0),
+	"pinta:salsicha": Color(1, 0, 0.5),
+	"pinta:vermelha_oposta": Color(1, 0, 0),
+	"pinta:verde_oposta": Color(1, 0, 1),
+}
 
 const CHECKPOINTS := [
 	["01_reta_freada_senna", 135.0, 4.2, 0.0],
@@ -293,6 +309,7 @@ func _run_atlas() -> void:
 	var passo := 25.0
 	var regua := false
 	var car_arg := ""
+	var lista_livre: Array[float] = []
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--out="):
 			out_dir = a.substr(6)
@@ -312,7 +329,10 @@ func _run_atlas() -> void:
 			regua = true
 		elif a.begins_with("--car="):
 			car_arg = a.substr(6)
-
+		elif a.begins_with("--lista="):
+			# lista livre de metros (ex.: --lista=600,750,1500): substitui --s0/--s1/--passo
+			for p in a.substr(8).split(",", false):
+				lista_livre.append(float(p))
 	# carro com referência do Garage 61 na pista (o RefBot dá a linha onde o carro fica)
 	var car_id: String = Game.car_id
 	var refs = Game.get_track_info().get("refs", {})
@@ -361,7 +381,7 @@ func _run_atlas() -> void:
 	var L := track.length
 	if s_to < 0.0:
 		s_to = s_from
-	var lista := _atlas_s_list(s_from, s_to, passo, L)
+	var lista := lista_livre if not lista_livre.is_empty() else _atlas_s_list(s_from, s_to, passo, L)
 	var shots := lista.size()
 
 	# câmera de comparação (a do jogo fica como está, só deixa de ser a atual)
@@ -388,6 +408,8 @@ func _run_atlas() -> void:
 
 	if regua:
 		main.add_child(_build_regua(track))
+	if "--ids" in OS.get_cmdline_user_args():
+		_ids_tinta(main)
 
 	# deixa o cenário terminar de carregar e os shaders compilarem (senão os prints repetem um quadro antigo)
 	for _f in 45:
@@ -414,6 +436,53 @@ func _run_atlas() -> void:
 	if not time_opt.is_empty():
 		Game.set_time_of_day(prev_time)
 	quit(0)
+
+
+## --ids: troca os materiais da cena pelas cores-chave das tintas (IDS_TINTA) e preto no resto, sem tonemap/névoa.
+func _ids_tinta(main: Node) -> void:
+	var preto := StandardMaterial3D.new()
+	preto.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	preto.albedo_color = Color.BLACK
+	var chave := {}
+	for nome in IDS_TINTA:
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+		if IDS_TINTA[nome] is Color:
+			m.albedo_color = IDS_TINTA[nome]
+		chave[nome] = m
+	var pilha: Array[Node] = [main]
+	while not pilha.is_empty():
+		var n: Node = pilha.pop_back()
+		pilha.append_array(n.get_children())
+		if n is MeshInstance3D and (n as MeshInstance3D).mesh:
+			var mi := n as MeshInstance3D
+			for i in mi.mesh.get_surface_count():
+				var am := mi.get_active_material(i)
+				var nome := String(am.resource_name) if am else ""
+				var m: Material = chave.get(nome, preto)
+				if nome == "pinta:zebra":
+					var z := (chave[nome] as StandardMaterial3D).duplicate() as StandardMaterial3D
+					z.albedo_texture = (am as BaseMaterial3D).albedo_texture
+					m = z
+				mi.set_surface_override_material(i, m)
+		elif n is GeometryInstance3D:
+			(n as GeometryInstance3D).material_override = preto
+	var env: Environment = main.cam.environment if main.cam.environment else main.get_viewport().world_3d.environment
+	for we in main.find_children("*", "WorldEnvironment", true, false):
+		env = (we as WorldEnvironment).environment
+	if env:
+		env.background_mode = Environment.BG_COLOR
+		env.background_color = Color.BLACK
+		env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+		env.tonemap_exposure = 1.0
+		env.adjustment_enabled = false
+		env.fog_enabled = false
+		env.glow_enabled = false
+		env.ssao_enabled = false
+		env.ssr_enabled = false
+		env.ssil_enabled = false
+		env.volumetric_fog_enabled = false
 
 
 ## Metros a fotografar de s0 a s1 a cada passo. Se s1 < s0 o trecho cruza a linha de chegada: depois dela a

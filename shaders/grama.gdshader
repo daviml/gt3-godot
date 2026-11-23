@@ -16,6 +16,14 @@ uniform vec3 soil_color = vec3(0.50, 0.30, 0.18);
 uniform float fast_dry_lo = 0.56;
 uniform float fast_dry_mix = 0.45;
 uniform vec3 fast_straw_tint = vec3(1.18, 0.92, 0.38);
+// tom do verde no fast_mode (o modo completo usa vec3(1.02, 1.0, 0.62)); a pista pode igualar a cor dos dois modos
+uniform vec3 fast_olive_tint = vec3(0.78, 1.08, 0.44);
+// manchas de terra alaranjada de poucos metros no meio da palha (por pista; 0 = sem manchas, como antes)
+uniform float patch_amt = 0.0;
+uniform vec3 patch_color = vec3(0.45, 0.24, 0.10);
+uniform float patch_scale = 0.22;
+// reflexo especular do céu (0,5 = padrão do Godot, como sempre; menor = superfície mais fosca de pó)
+uniform float spec_amt = 0.5;
 uniform sampler2D grass_tex : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D grass_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D grass_arm : filter_linear_mipmap_anisotropic, repeat_enable;
@@ -40,11 +48,15 @@ void fragment() {
 		vec3 green = texture(grass_tex, uv).rgb;
 		float n = vnoise(ground * 0.018) * 0.65 + vnoise(ground * 0.07) * 0.35;
 		float lg = dot(green, vec3(0.3, 0.59, 0.11));
-		vec3 olive = mix(vec3(lg), green, 1.30) * vec3(0.78, 1.08, 0.44);
+		vec3 olive = mix(vec3(lg), green, 1.30) * fast_olive_tint;
 		vec3 straw = vec3(lg) * fast_straw_tint;
 		float dry_k = smoothstep(fast_dry_lo, 0.86, n);
-		ALBEDO = base_color * mix(olive, straw, dry_k * fast_dry_mix) * (0.86 + 0.28 * vnoise(ground * 0.035 + 7.0));
+		vec3 c = base_color * mix(olive, straw, dry_k * fast_dry_mix) * (0.86 + 0.28 * vnoise(ground * 0.035 + 7.0));
+		// mesma mancha de terra do modo completo, com uma oitava só e mais fraca (sem a borda fina, de longe vira borrão)
+		float patch_k = smoothstep(0.52, 0.74, vnoise(ground * patch_scale + 17.0)) * patch_amt * 0.6;
+		ALBEDO = mix(c, patch_color * (0.8 + 0.4 * lg), patch_k);
 		ROUGHNESS = 0.92;
+		SPECULAR = spec_amt;
 		METALLIC = 0.0;
 	} else {
 		vec2 gp = ground;
@@ -66,7 +78,10 @@ void fragment() {
 		float bald = smoothstep(0.78, 0.86, vnoise(gp * 0.12 + 5.0) * 0.7 + vnoise(gp * 0.9) * 0.3);
 		float dirt = max(trail, bald * 0.7);
 		vec3 soil = soil_color * (0.75 + 0.5 * texture(dry_tex, uv * 1.7).r);
-		ALBEDO = mix(c, soil, dirt * 0.85);
+		c = mix(c, soil, dirt * 0.85);
+		// manchas de terra alaranjada de poucos metros (borda recortada pela oitava fina)
+		float patch_k = smoothstep(0.52, 0.74, vnoise(gp * patch_scale + 17.0) * 0.7 + vnoise(gp * patch_scale * 4.0) * 0.3) * patch_amt;
+		ALBEDO = mix(c, patch_color * (0.75 + 0.5 * texture(dry_tex, uv * 1.3).r), patch_k);
 		vec3 gn1 = texture(grass_n, uv).rgb * 2.0 - 1.0;
 		vec3 gn2 = texture(grass_n, uv * 2.8).rgb * 2.0 - 1.0;
 		NORMAL_MAP = normalize(vec3(gn1.xy + gn2.xy * 0.4, gn1.z)) * 0.5 + 0.5;
@@ -74,5 +89,6 @@ void fragment() {
 		AO = arm.r;
 		AO_LIGHT_AFFECT = 0.3;
 		ROUGHNESS = arm.g;
+		SPECULAR = spec_amt;
 	}
 }
