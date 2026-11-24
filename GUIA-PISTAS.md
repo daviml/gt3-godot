@@ -5,7 +5,7 @@ perto juntando dados públicos e **conferindo tudo contra a telemetria do iRacin
 processo que deu certo em Laguna Seca (13/11/2026), com o que ainda dá pra melhorar. Regra geral: **medir em vez de
 desenhar, e validar cada etapa com um número antes de seguir**.
 
-Exemplo completo: `tools/tracks/laguna-seca/` (scripts + `LEIA-ME.md`) e `PLANO-LAGUNA-SECA.md`.
+Exemplo completo: `tools/tracks/laguna-seca/` (scripts + `LEIA-ME.md`) e `docs/planos/PLANO-LAGUNA-SECA.md`.
 
 ---
 

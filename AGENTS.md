@@ -96,5 +96,5 @@ Para validar mudanças visuais em pista, shaders, iluminação ou carros (não u
 - **Tipagem GDScript:** Use tipagem explícita (`var x: float = ...`) ao ler de `Dictionary`/`Array`/JSON para não disparar erros de inferência `Variant` em execução.
 - **Idioma e Estilo:** Comentários, mensagens de UI e documentação do projeto são escritos em **português claro e direto**.
 - **Planos e Roteiros de Referência:**
-  - `PLANO-MELHORIA-GERAL.md`: plano ativo de evolução do jogo (Etapas 1–5: auditoria pós-Blender/mixer de áudio, HUD com Delta + Ghost Car, acabamento visual LMU, áudio CC0 real e IA/novas pistas).
-  - `PLANO-MELHORIAS-E-FERRAMENTAS.md`: histórico das Fases 1–4 concluídas (setup de MCPs, horário/faróis, áudio Fase 3 e polish dos 13 carros).
+  - `docs/planos/PLANO-MELHORIA-GERAL.md`: plano ativo de evolução do jogo (Etapas 1–5: auditoria pós-Blender/mixer de áudio, HUD com Delta + Ghost Car, acabamento visual LMU, áudio CC0 real e IA/novas pistas).
+  - `docs/planos/PLANO-MELHORIAS-E-FERRAMENTAS.md`: histórico das Fases 1–4 concluídas (setup de MCPs, horário/faróis, áudio Fase 3 e polish dos 13 carros).
