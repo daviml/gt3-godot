@@ -240,8 +240,9 @@ for tp, V in bar:
     wall = np.where(lado == 1, lerp(MR, i, u), lerp(ML, i, u))
     borda = np.where(lado == 1, lerp(WR, i, u), lerp(WL, i, u))
     ad = np.abs(d)
-    # só o que está ao lado desta amostra (descarta vértice que cai sobre outro trecho da pista) e até 1,5 m de altura
-    perto_pista = (ad < wall + 3) & (h > -1) & (h < 1.6)
+    # só o que está ao lado desta amostra (descarta vértice que cai sobre outro trecho da pista) e até 2,2 m de altura
+    # (Fase 6: até 1,6 m antes; a tampa da barreira azul dupla "tecpro2" fica a 2,02 m)
+    perto_pista = (ad < wall + 3) & (h > -1) & (h < 2.2)
     tipos[tp] = tipos.get(tp, 0) + int(len(V))
     # barreira entre a borda e o muro da física (o carro passaria através dela): > 10 cm para dentro do muro
     ruim = perto_pista & (ad > borda) & (ad < wall - 0.10)

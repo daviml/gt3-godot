@@ -278,8 +278,9 @@ export function barrierLayout(track: Track) {
   const kind: Record<-1 | 1, Kind[]> = { [-1]: p.L.map(a => a.tipo), [1]: p.R.map(a => a.tipo) };
   const ads: Record<-1 | 1, (AdScheme | null)[]> = { [-1]: p.L.map(a => a.banner as AdScheme | null), [1]: p.R.map(a => a.banner as AdScheme | null) };
   const fence: Record<-1 | 1, boolean[]> = { [-1]: p.L.map(a => a.alambrado), [1]: p.R.map(a => a.alambrado) };
+  const topo: Record<-1 | 1, boolean[]> = { [-1]: p.L.map(a => a.topo), [1]: p.R.map(a => a.topo) };
   const outdoors = OUTDOORS.map(o => ({ ...o, i0: iNovo4300(o.s0), i1: iNovo4300(o.s1) }));
-  return { kind, ads, fence, outdoors };
+  return { kind, ads, fence, topo, outdoors };
 }
 
 /**
@@ -330,6 +331,9 @@ export function buildBarriers(track: Track, group: THREE.Group, renderer: THREE.
     const m = new THREE.Mesh(g, mat);
     m.castShadow = shadow;
     m.receiveShadow = true;
+    // Fase 6: as barreiras azuis (só na Descida do Lago, trechos < 450 m) não são reconhecidas como barreira pelo
+    // track_view.gd (material com textura) e sumiam no Mínimo; `ess_` = referência de pilotagem, sempre visível
+    if (mat === tecMat || mat === tecTop) m.userData.essential = true;
     group.add(m);
   };
 
@@ -359,9 +363,9 @@ export function buildBarriers(track: Track, group: THREE.Group, renderer: THREE.
     if (!topMats.has(a)) topMats.set(a, new THREE.MeshStandardMaterial({ map: tex(topperCanvas(a), renderer), roughness: 0.45, side: THREE.DoubleSide }));
     return topMats.get(a)!;
   };
-  /** esquema da faixa de cima em cada amostra: o do trecho; nas barreiras azuis, a amarela */
+  /** esquema da faixa de cima em cada amostra: o do trecho; nas barreiras azuis, a amarela (sem ela onde topo: false) */
   const topperAt = (side: -1 | 1, i: number): AdScheme | null =>
-    lay.kind[side][i] === 'wall' ? lay.ads[side][i] ?? 'amarelo' : lay.kind[side][i] === 'tecpro' ? 'amarelo' : null;
+    lay.kind[side][i] === 'wall' ? lay.ads[side][i] ?? 'amarelo' : lay.kind[side][i] === 'tecpro' && lay.topo[side][i] ? 'amarelo' : null;
   const cableMat = new THREE.MeshStandardMaterial({ color: 0x3c4146, metalness: 0.6, roughness: 0.45, side: THREE.DoubleSide });
 
   for (const side of [-1, 1] as const) {
@@ -589,7 +593,8 @@ export function buildBridge(track: Track, group: THREE.Group, renderer: THREE.We
   buildOppositeRunoff(track, group, renderer);
   buildPitExit(track, group);
   buildPitEntry(track, group, renderer);
-  buildDescidaLagoGoodyear(track, group, renderer);
+  // (até a Fase 6 aqui havia buildDescidaLagoGoodyear: barreira dupla desenhada colada na zebra esquerda em s 1394–1582;
+  // agora é a barreira "tecpro2" do perfil lateral, no muro da física, de s ~1490 a 1658 — ver setor6_perfil.py)
   buildFerraduraWall(track, group, renderer);
   buildGrassSigns(track, group, renderer);
   buildSennaTents(track, group, heightAt);
@@ -1013,54 +1018,6 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
   nosePad.castShadow = true;
   nosePad.receiveShadow = true;
   group.add(nosePad);
-}
-
-/** Barreira dupla empilhada GOODYEAR colada atrás da zebra esquerda na Descida do Lago (s = 1390..1580 m). */
-function buildDescidaLagoGoodyear(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
-  const S = track.samples;
-  const N = S.length;
-  const i0 = iNovo4300(1390);
-  const i1 = iNovo4300(1580);
-  const tecMat = new THREE.MeshStandardMaterial({ map: tecproTexture(renderer), roughness: 0.55, side: THREE.DoubleSide });
-  const topMat = new THREE.MeshStandardMaterial({ color: 0x1d4a99, roughness: 0.55, side: THREE.DoubleSide });
-
-  const ribbon = (y0: number, y1: number, dOff0: number, dOff1: number, mat: THREE.Material, flip = false) => {
-    const pos: number[] = [];
-    const uv: number[] = [];
-    const idx: number[] = [];
-    const v = new THREE.Vector3();
-    let prev = -1;
-    for (let i = i0; i <= i1; i++) {
-      const s = S[i % N];
-      const base = pos.length / 3;
-      const dBase = -(s.wl + 1.35);
-      for (const [y, dOff, u] of [[y0, dOff0, 0], [y1, dOff1, 1]]) {
-        v.copy(s.p).addScaledVector(s.r, dBase + dOff);
-        v.y += y;
-        pos.push(v.x, v.y, v.z);
-        uv.push(((i - i0) * STEP) / 6.0, u);
-      }
-      if (prev >= 0) {
-        if (flip) idx.push(prev, base, prev + 1, prev + 1, base, base + 1);
-        else idx.push(prev, prev + 1, base, prev + 1, base + 1, base);
-      }
-      prev = base;
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geo.setIndex(idx);
-    geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, mat);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    group.add(m);
-  };
-  // camada inferior + camada superior empilhadas com normal voltada para +s.r (pista/sol) + tampo
-  ribbon(0.0, 1.05, 0.0, 0.0, tecMat, true);
-  ribbon(1.07, 2.12, 0.0, 0.0, tecMat, true);
-  ribbon(2.12, 2.12, 0.0, -0.65, topMat);
-  ribbon(0.0, 2.12, -0.65, -0.65, topMat);
 }
 
 /**

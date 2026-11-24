@@ -907,7 +907,8 @@ def spans(code_arr, names):
 # ---- etapa F (conferência do GLB, build/interlagos/perfil_2b/conferencia_glb.json): trechos em que o muro da
 # física não batia com a barreira real/desenhada. Janelas em s antigo (como as zebras), rampa nas pontas.
 #   1. separador da saída dos boxes (esq, s antigo 564–734; trackDetails.ts buildPitExit: guard-rail a borda + 4,4 m)
-#   2. barreira Goodyear do Lago (esq, 1385–1580, 3 m de folga nas pontas do desenho 1388–1578; buildDescidaLagoGoodyear: face a borda + 1,35 m, colada na zebra)
+#   2. (até a Fase 6) barreira Goodyear do Lago (esq, 1385–1580: borda + 1,35 m, colada na zebra). Substituída pelos
+#      muros da Fase 6 abaixo (MURO_F6): a Goodyear real começa em s novo ~1490, e antes dela há um guard-rail longe.
 #   3. S do Senna (esq, 333–428): o muro é o guard-rail ao longo da saída dos boxes, 13–27 m do centro, com grama
 #      larga antes (LMU folha_01 s=0382). A cerca do OSM (barrier=fence) bate com a faixa clara no satélite a ±1 m;
 #      não entrava porque passava 3 m do muro desenhado antes ("muro externo").
@@ -935,7 +936,6 @@ MURO_F = []
 for lado, a, b, rampa, alvo_fn, desc in [
         ('esq', 564.2, 734.0, 6.0, lambda: WLn + np.interp(np.asarray(s_old) % L0, *SEPARADOR_F4),
          'separador da saída dos boxes: fim da grama no satélite (Fase 4)'),
-        ('esq', 1385.0, 1580.0, 6.0, lambda: WLn + 1.35, 'Goodyear do Lago: borda + 1,35 m'),
         ('esq', 333.0, 428.0, 6.0, lambda: fill_circ(np.nan_to_num(_osm_esq), np.isfinite(_osm_esq)),
          'S do Senna: cerca do OSM (= guard-rail no satélite)'),
         ('dir', 2713.0, 2796.0, 10.0, lambda: np.minimum(WALL[:, 1], 14.0), 'Bico de Pato: no máx. 14 m'),
@@ -955,7 +955,45 @@ for lado, a, b, rampa, alvo_fn, desc in [
                    'gps_mais_1m_venceu': int(np.sum(dentro & (alvo_fn() < env[:, col] + 1.0)))})
     say(f'muro etapa F {lado} {a:.0f}–{b:.0f}: {desc}; antes {MURO_F[-1]["antes_m"]} → {MURO_F[-1]["depois_m"]} m '
         f'(GPS + 1 m venceu em {MURO_F[-1]["gps_mais_1m_venceu"]} amostras)')
-WALL_MIN_GAP_JSON = 1.3   # Goodyear do Lago a borda + 1,35 m; o resto continua ≥ 1,5 m pelo piso acima
+
+# Fase 6 (setor 6, Descida do Lago + subida; janelas em s NOVO, gap = m da borda do asfalto; rampa nas pontas).
+# Medido no satélite Esri z19 desenrolado (build/interlagos/fase6/sat_setor6.jpg, agua.py/azul.py: cor por faixa de
+# d a cada 10 m) e conferido nos quadros do LMU (build/ref/interlagos/folhas/fase6_ini_*):
+#   esq 1380–1446: guard-rail baixo a borda + ~9 m (linha clara no satélite a +8..9 m; LMU s 1410/1430: grama larga
+#                  e guard-rail longe, sem barreira azul). Depois de ~1450 o guard-rail se afasta (vai para o lago).
+#   esq 1490–1640: barreira azul dupla GOODYEAR (LMU chase s 1490–1640: começa ao lado do carro em s 1490, zebra +
+#                  ~1 m de verde antes dela; onboard s 1580); satélite: claro até borda + 2,5–3,5 m e copa escura
+#                  depois (s 1530–1610). Face a borda + 2,6 m. Antes: borda + 1,35 m de s 1394 a 1582.
+#   esq 1640–1665: volta ao muro de antes (barreira simples a borda + 3,4–4,4 m, LMU s 1670).
+#   dir 1446–1690: escape verde/verde-água largo até a barreira GOODYEAR de fora, na beira do lago (satélite: pintura
+#                  até borda + 19–33 m e água/sombra escura a +23–31 m; LMU s 1460–1640 com escape até o fundo).
+#                  Antes: borda + 5–13 m (perfil antigo, não medido).
+MURO_F6 = [
+    ('esq', 1382.0, 1666.0, 12.0, ([1380, 1446, 1478, 1490, 1640, 1652], [9.0, 9.0, 9.0, 2.6, 2.6, 3.4]),
+     'Fase 6: guard-rail do Lago a borda + 9 m e Goodyear dupla a borda + 2,6 m'),
+    ('dir', 1432.0, 1692.0, 14.0, ([1446, 1460, 1470, 1490, 1500, 1520, 1540, 1560, 1580, 1600, 1640, 1652, 1680],
+                                   [15.0, 22.0, 27.0, 27.0, 26.0, 23.0, 21.0, 21.0, 23.0, 25.0, 25.0, 20.0, 20.0]),
+     'Fase 6: barreira de fora da Descida do Lago (beira do lago)'),
+]
+S_NOVO = np.arange(len(P)) * step
+for lado, a, b, rampa, (xs, gs), desc in MURO_F6:
+    col = 0 if lado == 'esq' else 1
+    w = np.clip(np.minimum((S_NOVO - (a - rampa)) / rampa, ((b + rampa) - S_NOVO) / rampa), 0.0, 1.0)
+    m = w > 0
+    antes = WALL[m, col].copy()
+    Wn = WLn if col == 0 else WRn
+    alvo_sem = Wn + np.interp(S_NOVO, xs, gs)
+    alvo = np.maximum.reduce([alvo_sem, Wn + (KL if col == 0 else KR) + 0.5, env[:, col] + 1.0])
+    WALL[m, col] = WALL[m, col] * (1 - w[m]) + alvo[m] * w[m]
+    WSRC[m, col] = np.where(w[m] >= 1, 4, WSRC[m, col])
+    dentro = w >= 1
+    MURO_F.append({'lado': lado, 's_novo': [a, b], 'desc': desc,
+                   'antes_m': [round(float(antes.min()), 2), round(float(antes.max()), 2)],
+                   'depois_m': [round(float(WALL[dentro, col].min()), 2), round(float(WALL[dentro, col].max()), 2)],
+                   'gps_mais_1m_venceu': int(np.sum(dentro & (alvo_sem < env[:, col] + 1.0)))})
+    say(f'muro Fase 6 {lado} {a:.0f}–{b:.0f} (s novo): {desc}; antes {MURO_F[-1]["antes_m"]} → {MURO_F[-1]["depois_m"]} m '
+        f'(GPS + 1 m venceu em {MURO_F[-1]["gps_mais_1m_venceu"]} amostras)')
+WALL_MIN_GAP_JSON = 1.5   # (1,3 até a Fase 6, só pela Goodyear do Lago colada na zebra)
 
 ko = np.arange(0, len(P), K_OUT)
 ARC_DIV = 20000

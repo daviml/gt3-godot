@@ -8,11 +8,16 @@
  *     zonas: [{ lado: "esq" | "dir", s0, s1, d0, d1, dens, fonte }] }
  *       d0/d1 = metros ALÉM do muro da física; dens = fração que fica (0 = exclusão; 1 = mata como sempre).
  *       Fora das zonas, dentro de um setor: dens 1.
+ *     ancora?: { esq?: Ancora, dir?: Ancora }   (Fase 6) muro da física CONGELADO para a âncora do sorteio da mata
+ *       (buildScenery: cada tentativa cai a muro + 10..160 m de uma amostra). Onde um setor move o muro da física,
+ *       a âncora fica no muro de antes, senão os capões dessas tentativas andam junto com o muro e caem perto de
+ *       OUTRO trecho (Fase 6: muro dir do Lago +10–20 m moveu 115 árvores da Reta Oposta). Ancora = { s0, muro: m[] }
+ *       (uma por amostra a partir de s0).
  * Tudo decidido pela posição de cada árvore (./sorteio.ts): mexer num setor não muda as árvores dos outros.
  * O espaçamento é um desbaste "de vizinhança": cada árvore tem uma prioridade sorteada pela posição e fica se nenhuma
  * vizinha a menos de `espacamento` (já aprovada pelas zonas) tiver prioridade maior. Não depende da ordem da lista.
  */
-import type { Track } from '@web/track/track';
+import { STEP, type Track } from '@web/track/track';
 import perfilJson from '../../../data/track/visual_profile.json';
 import { randPosicao } from './sorteio';
 
@@ -24,12 +29,17 @@ interface Zona {
   d1: number;
   dens: number;
 }
+interface Ancora {
+  s0: number;
+  muro: number[];
+}
 interface ArvoresCfg {
   setores: { s0: number; s1: number }[];
   espacamento: number;
   escala: [number, number];
   base: number;
   zonas: Zona[];
+  ancora?: { esq?: Ancora; dir?: Ancora };
 }
 
 const CFG = (perfilJson as unknown as { arvores?: ArvoresCfg }).arvores;
@@ -40,6 +50,20 @@ export interface Arvore {
   z: number;
   scale: number;
   yaw: number;
+}
+
+/**
+ * muro usado como âncora do sorteio da mata na amostra i (lado -1 = esq): o congelado em `arvores.ancora` quando a
+ * amostra está nele, senão o muro atual
+ */
+export function muroAncora(track: Track, i: number, side: -1 | 1): number {
+  const s = track.samples[i];
+  const a = CFG?.ancora?.[side < 0 ? 'esq' : 'dir'];
+  if (a) {
+    const k = Math.round((s.s - a.s0) / STEP);
+    if (k >= 0 && k < a.muro.length) return a.muro[k];
+  }
+  return side < 0 ? s.wallL : s.wallR;
 }
 
 /** aplica as zonas, o espaçamento e a escala nas árvores que caem nos setores revisados; devolve a lista filtrada */

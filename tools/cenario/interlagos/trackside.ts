@@ -8,6 +8,7 @@ import { mulberry32 } from '@web/util/random';
 import { AdScheme, adCanvas, tex } from '@web/render/trackDetails';
 import { addProp } from '../propsRegistry';
 import { iNovo, iNovo4300, L_ANTIGO, sNovo, sNovo4300 } from './sNovo';
+import { randLocal } from './sorteio';
 
 /** Ponto p cai sobre (ou perto de) outro trecho da pista, longe da amostra i? */
 function overOther(track: Track, p: THREE.Vector3, i: number, margin: number): boolean {
@@ -713,7 +714,6 @@ export function buildCornerDetails(track: Track, group: THREE.Group) {
   const S = track.samples;
   const N = S.length;
   const L = track.length;
-  const rand = mulberry32(404);
   const tmp = new THREE.Vector3();
   // curvas: picos de curvatura (média de 30 m), longe da reta dos boxes
   const corners: number[] = [];
@@ -822,6 +822,10 @@ export function buildCornerDetails(track: Track, group: THREE.Group) {
     const run = sgn < 0 ? s.runL : s.runR;
     const edge = sgn < 0 ? s.wl : s.wr;
     if (run < 6) continue;
+    // Fase 6: sorteio por curva (./sorteio.ts), não mais um mulberry32(404) global para todas: com o global, mudar o
+    // escape de uma curva (Descida do Lago) movia as marcas de todas as curvas seguintes (mudança única: as marcas de
+    // pneu de todas as curvas trocaram de lugar uma vez)
+    const rand = randLocal(404, i);
     const n = 2 + Math.floor(rand() * 3);
     for (let t = 0; t < n && nm < markMesh.count; t++) {
       const len = 10 + rand() * 18;

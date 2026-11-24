@@ -24,7 +24,7 @@ import { TINTA, tintaEscura } from './tintas';
 import { aplicarPerfil } from './perfil';
 import { L_ANTIGO, sNovo } from './sNovo';
 import { randLocal, randPorArvore, randPosicao } from './sorteio';
-import { arvoresPorSetor } from './arvoresSetor';
+import { arvoresPorSetor, muroAncora } from './arvoresSetor';
 
 /**
  * Pintura da borda de Interlagos (PLANO-INTERLAGOS-DETALHES.md, Fase 1): uma tabela só com as medidas, em vez
@@ -695,11 +695,13 @@ function buildScenery(
   const TENTATIVAS = 1140;
   for (let tries = 0; tries < TENTATIVAS; tries++) {
     const rand = randLocal(7, tries);
-    const s = S[Math.floor(rand() * S.length)];
+    const iS = Math.floor(rand() * S.length);
+    const s = S[iS];
     // reta dos boxes: arquibancada e paddock, sem mata (s antigo 3734 e 120 → s novo)
     if (s.s > sNovo(L_ANTIGO - 560) || s.s < sNovo(120)) continue;
     const side = rand() < 0.5 ? -1 : 1;
-    const off = (side < 0 ? s.wallL : s.wallR) + 10 + Math.pow(rand(), 1.4) * 150;
+    // âncora no muro da física (congelado onde um setor o moveu: arvores.ancora, ./arvoresSetor.ts)
+    const off = muroAncora(track, iS, side) + 10 + Math.pow(rand(), 1.4) * 150;
     p.copy(s.p).addScaledVector(s.r, side * off);
     const infield = insidePoly(p.x, p.z, loop);
     if (!infield && rand() < 0.35) continue;

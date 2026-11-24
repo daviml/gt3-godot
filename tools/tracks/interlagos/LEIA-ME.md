@@ -67,7 +67,7 @@ Paridade: o `paridade.ts` aplica o `bank` na pista do web (`applyBank`), e o `pa
 - **Comprimento**: o Track do web mede a curva com 200 cordas (4.300 m, amostras de 2,00–2,07 m). A fonte traz
   `arcLengthDivisions: 20000`, que o `fonte.ts` aplica só durante a construção do Track (o web não muda; Laguna e
   Imola, sem o campo, ficam iguais): 4.308 m (oficial 4.309, −0,02%), amostras a 2,000 ± 0,001 m ao longo da curva.
-- **Muros**: `wallMinGap` 1,5 (1,3 desde a etapa F, só pela Goodyear do Lago) (o `applyWalls` padrão força 2,5 m, o que afastaria o muro dos boxes e outros colados
+- **Muros**: `wallMinGap` 1,5 (foi 1,3 da etapa F até a Fase 6, só pela Goodyear do Lago colada na zebra) (o `applyWalls` padrão força 2,5 m, o que afastaria o muro dos boxes e outros colados
   na pista em 18%/8% da volta). Na física o muro é só um limite lateral (`track.gd`), então muro próximo não quebra
   nada; o `build_track.py` garante ≥ borda + 1,5 m, ≥ borda + zebra + 0,5 m e ≥ GPS das 6 voltas + 1,5 m (meio
   carro + folga), para a linha real (RefBot) não encostar.
@@ -86,6 +86,13 @@ Paridade: o `paridade.ts` aplica o `bank` na pista do web (`applyBank`), e o `pa
   Curva do Sol (dir., s antigo 722–766, rampa 6 m) = borda + 15 m (muro MOTUL; antes 5,5–8 m). A pista no
   `track.json` mudou só em `wallL` (s novo 566–748), `wallR` (722–780) e `runR` (728–780, escape automático até o
   muro); o relevo (`terrain.json`) mudou em 181 células perto desses muros (até 0,43 m).
+- **Muros e zebra corrigidos na Fase 6** (setor 6, `MURO_F6` em `build_track.py`, janelas em s NOVO; ficha
+  `build/ref/interlagos/fichas/setor-6.md`): a Goodyear do Lago não fica colada na zebra em 1394–1582. Esq.: guard-rail a
+  borda + 9 m em 1380–1478 (satélite + LMU s 1410/1430), barreira azul dupla Goodyear a borda + 2,6 m em 1490–1640 (LMU
+  s 1490–1640; satélite claro até +2,5–3,5 m), rampa de volta ao muro de antes até 1666. Dir.: barreira de fora da Descida
+  do Lago na beira do lago, borda + 15 → 27 → 21–25 → 20 m em 1446–1690 (antes 5–13 m; satélite: pintura até +20–33 m).
+  Zebra dir. do Lago (`perfil_zebras.py`) s novo 1510–1540 → 1478–1527 (LMU chase s 1460/1490/1510/1530). O `track.json`
+  mudou só em s 1370–1708 (`wallL/R`, `kerbR`, `runL/R`); RefBot igual (+1,07–1,50%), paridade 0,00%.
 - **Saída dos boxes** (s antigo 800–1000, esq.): faixa de aceleração = escape asfaltado (`runLeft`, aplicado pelo
   `applyRunoffMin` do `bank.ts`) até 0,5 m do guard-rail, e muro ≥ borda + zebra + 5,5 m (vídeo s0860/s0940: ~4–5 m
   de asfalto antes do guard-rail). A borda esquerda ali (pulava 5,0 ↔ 8,2 m entre a linha branca e a faixa) foi

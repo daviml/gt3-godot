@@ -325,6 +325,31 @@ Desde a Fase 2B os setores usam o **s novo** (pista de 4.308 m); converter os li
   e o Le Mans Ultimate abertos e as rodadas iguais variaram 2–3× (Médio 26–64 ms no mesmo ponto). Draw calls e
   triângulos iguais aos do GLB anterior. O Davi decidiu pular a nova medição; repetir na próxima fase com a
   máquina parada.
+
+**Resultado da Fase 6 (23/11/2026) — feita, aguardando o Davi olhar a folha:**
+- Ficha `build/ref/interlagos/fichas/setor-6.md`; folhas `build/ref/interlagos/folhas/fase6_ini_*` e `fase6_fim_*`
+  (s novo 1369–1982). Perfil do setor por `tools/cenario/interlagos/setor6_perfil.py`; funções comuns dos setores
+  em `perfil_setor.py` (o setor 4 regenera byte a byte igual).
+- **Barreira Goodyear (pendência da 2B):** não fica colada na zebra em 1394–1488 — ali o LMU tem zebra, grama
+  larga e guard-rail baixo (muro da física a borda + 9 m). A barreira azul dupla vai de **s 1490 a 1658**, com a
+  face a borda + 2,6 m (vídeo + satélite; ±0,5 m), e segue simples, sem faixa DHL, até ~1802. Agora vem do
+  perfil (`tecpro2`); `buildDescidaLagoGoodyear` removida; `wallMinGap` voltou a 1,5 m. As barreiras azuis
+  passaram a `ess_` (sumiam no Mínimo).
+- **Física:** muro esq como acima; muro dir na beira do lago (borda + 15–27 m em 1446–1690); zebra dir do Lago
+  1478–1527 (vídeo). RefBot igual (+1,07–1,50%), paridade 0,00%.
+- **Escapes:** verde-água estreito atrás da zebra esq (1370–1488); verde até a Goodyear; verde / verde-água até a
+  margem do lago à direita; grama onde o LMU não pinta; verde-água largo na subida (1840–1900).
+- **Árvores:** 958 → 177 no setor (talude gramado no LMU e copa ≈ 0 no LiDAR); volta 6.197 → 5.416; as 5.239 de
+  fora do setor não mudaram (`arvores.ancora` congela o muro antigo como âncora do sorteio).
+- **Infraestrutura:** marcas de pneu com sorteio por curva (`trackside.ts`); as 15 da volta trocaram de lugar uma
+  vez, e daqui em diante mudar um setor não mexe nas outras.
+- **Conferências:** `conferir_glb.py` sem regressão (zebras visual = física; nada dentro do muro); Laguna e Imola
+  byte a byte iguais; 24 testes headless passam.
+- **Bench:** BlueStacks e LMU abertos de novo; draw calls e triângulos iguais ao GLB anterior, Mínimo 5,0 ms;
+  Leve/Médio sem conclusão.
+- **Pendências:** fim da zebra esq (~1630–1645); ponteira laranja (~1795); outdoor Goodyear ~25 m adiante; emenda
+  de grama de 2 m em 1528; texto Goodyear pequeno; cone em ~1960; faixa verde-água de 1370–1488 talvez larga; a
+  volta do M4 passa 1,14 m além da borda + zebra em s 1525 (fim da zebra no limite do vídeo).
 - **Pendências do setor:** muro esq 440–480 parece perto demais (conferir no satélite antes de mexer na
   física); emenda do vermelho com a Reta Oposta em 779–790 (Fase 5); logo ROLEX e faixas amarelas pintadas no
   ápice; muro de arrimo/estacionamento à direita (450–600) e torre de concreto (650–730); remendo escuro no

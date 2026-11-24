@@ -26,9 +26,11 @@
  *         asfalto pintado de escape. `fora` (Fase 4, saída da Curva do Sol: vermelho com uma faixa verde atrás) = uma
  *         segunda faixa pintada logo depois do escape, de outra cor; não muda o escape nem a barreira (só o desenho).
  *   barreira = { tipo: "rail" | "wall" | "tecpro" | "tecpro2" | "rolex_pad", dist: Valor, de?: "zebra" | "escape",
- *                banner?: AdScheme, alambrado?: true }
+ *                banner?: AdScheme, alambrado?: true, topo?: false }
  *     dist = distância lateral da barreira contada da linha branca (borda do asfalto); com `de`, contada da borda
  *     de fora da zebra física ("zebra") ou do fim do escape ("escape").
+    topo: false (Fase 6) = barreira azul simples ("tecpro") sem a faixa amarela de patrocinador em cima (a Goodyear do
+    Lago no LMU é azul lisa).
  *   Chave opcional `arvores` (Fase 4, Etapa A das árvores): zonas por s e lado, espaçamento e escala nos setores já
  *   revisados; lida por ./arvoresSetor.ts (não por este módulo).
  *   Valor = número (constante na fatia) | "fisica" (o valor da física do Track nessa amostra) |
@@ -54,6 +56,7 @@ export interface Barreira {
   de?: 'zebra' | 'escape';
   banner?: string;
   alambrado?: true;
+  topo?: false;
 }
 export interface Fatia {
   s0: number;
@@ -93,6 +96,8 @@ export interface AmostraLado {
   tipo: TipoBarreira;
   banner: string | null;
   alambrado: boolean;
+  /** faixa de patrocinador em cima da barreira azul simples (Barreira.topo; padrão true) */
+  topo: boolean;
 }
 
 const valor = (v: Valor, k: number, fisica: number) => (v === 'fisica' ? fisica : typeof v === 'number' ? v : v[k]);
@@ -131,7 +136,8 @@ function avaliarLado(fatias: Fatia[], n: number, passo: number, w: number[], ker
         wall,
         tipo: b.tipo,
         banner: b.banner ?? null,
-        alambrado: !!b.alambrado
+        alambrado: !!b.alambrado,
+        topo: b.topo !== false
       };
     }
   }

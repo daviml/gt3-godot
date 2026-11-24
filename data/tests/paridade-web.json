@@ -1,5 +1,5 @@
 {
- "gerado": "2026-11-23T23:54:10.006Z",
+ "gerado": "2026-11-24T00:56:38.115Z",
  "carros": {
   "gt3-generic": {
    "params": {
@@ -1446,7 +1446,7 @@
     "bot_saida_max": 0,
     "refbot_ref": "interlagos-nsx",
     "refbot_volta": 91.9299999999566,
-    "refbot_erro_max": 0.98858810945333,
+    "refbot_erro_max": 0.9901675068690929,
     "refbot_fora": 0,
     "refbot_maxima": 248.61332182900335
    }

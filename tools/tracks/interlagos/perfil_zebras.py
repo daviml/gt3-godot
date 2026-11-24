@@ -61,9 +61,11 @@ ZEBRAS = [
     dict(lado='dir', s0=745, s1=878, classe='saida', fonte='satelite+video', sat=[(796, 812), (818, 878)],
          nota='Curva do Sol, saída por fora (larga + vermelho): vídeo s750 já com zebra ao lado do carro e s720 sem; '
               'início pelo vídeo (~745, satélite 796, onde só vê a pintura verde-água), fim pelo satélite (s870 confirma)'),
-    dict(lado='dir', s0=1505, s1=1535, classe='saida', fonte='video', sat=[],
+    dict(lado='dir', s0=1473, s1=1522, classe='saida', fonte='video', sat=[],
          nota='Descida do Lago, saída por fora: vídeo s1520 com zebra ao lado do carro, s1400 e s1540 sem; '
-              'satélite só vê o escape verde-água (1473–1528). Início e fim estimados (±10 m)'),
+              'satélite só vê o escape verde-água (1473–1528). Início e fim estimados (±10 m). '
+              'Fase 6 (atlas v2, s novo): zebra à frente em chase s1460, ao lado do carro em s1490 e s1510, '
+              'já acabou em s1530 → s novo ~1478–1527 (antes 1510–1540; o fim fica no limite do vídeo para cobrir as voltas do Garage 61, que saem da borda até s 1526)'),
     dict(lado='dir', s0=1669, s1=1746, classe='normal', fonte='satelite+video', sat=[(1669, 1675), (1681, 1692), (1699, 1707), (1729, 1746)],
          nota='subida do Lago: vídeo s1660 mostra zebra contínua começando à frente; segmentos do satélite juntados'),
     dict(lado='dir', s0=2563, s1=2638, classe='saida', fonte='satelite+video', sat=[(2563, 2612), (2617, 2638)],
