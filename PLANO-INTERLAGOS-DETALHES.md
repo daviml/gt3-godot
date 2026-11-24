@@ -350,6 +350,36 @@ Desde a Fase 2B os setores usam o **s novo** (pista de 4.308 m); converter os li
 - **Pendências:** fim da zebra esq (~1630–1645); ponteira laranja (~1795); outdoor Goodyear ~25 m adiante; emenda
   de grama de 2 m em 1528; texto Goodyear pequeno; cone em ~1960; faixa verde-água de 1370–1488 talvez larga; a
   volta do M4 passa 1,14 m além da borda + zebra em s 1525 (fim da zebra no limite do vídeo).
+
+**Resultado da Fase 5 (24/11/2026) — feita, aguardando o Davi olhar a folha:**
+- Ficha `build/ref/interlagos/fichas/setor-5.md`; folhas `build/ref/interlagos/folhas/fase5_ini_*` e `fase5_fim_*`
+  (s novo 783–1369). Perfil por `tools/cenario/interlagos/setor5_perfil.py` (os scripts 4, 5 e 6 em qualquer
+  ordem dão o mesmo arquivo).
+- **Direita:** zebra + vermelho + faixa verde junto do muro MOTUL agora pelo perfil (saíram do `buildOppositeRunoff`),
+  com grama antes do vermelho em 890–948 (tipo novo `escape.grama`); verde-água até o fim do MOTUL (1002); depois
+  muro de concreto verde-escuro com alambrado; área de escape (grama + asfalto) em 1262–1368. Emenda do vermelho
+  com a Curva do Sol resolvida (pendência D8 do setor 4).
+- **Esquerda:** asfalto da pista dos boxes até a junção, hachurado verde 840–895 e segunda linha branca
+  (pendência da Fase 1); guard-rail sem alambrado em 1006–1368.
+- **Âncoras:** ponta do separador da saída dos boxes em s 829 (antes 741; satélite + OSM); pórtico MOTUL em s 990
+  (antes 1045,6; satélite + vídeo). Saíram o pórtico vermelho de ~866 e o guindaste de ~1346 (o LMU não tem);
+  placas azuis 150/100/50 trocadas por placas MOTUL sem número.
+- **Física:** muro MOTUL a borda + 15 m até 913; ilha do separador até 828 e abertura em 831–837. RefBot igual
+  (+1,07–1,50%), paridade 0,00%.
+- **Árvores:** 1.741 → 570 no setor; volta 5.416 → **4.243** (já dentro da meta 3.500–4.500 do §5, com 5 setores
+  por fazer: nos próximos, cortar só onde o LMU mostra campo aberto e plantar onde ele mostra mata, para não
+  ficar abaixo da meta).
+- **Testes:** 24 passam. Dois foram atualizados: `arredores.gd` (mínimo de árvores 5.000 → 3.000, coerente com a
+  meta) e `otimizacao_fase4.gd` (malhas `ess_` cortadas em 450 m no Mínimo, como o `track_view.gd` faz desde a
+  Fase 6).
+- **Conferências:** `conferir_glb.py` sem regressão; Laguna e Imola byte a byte iguais; fora do setor só a emenda
+  740–783 (D8 do setor 4) e 2 árvores longe da pista.
+- **Bench:** BlueStacks aberto (tempos inúteis: o mesmo GLB variou 5–13 ms no Mínimo); draw calls iguais ou
+  menores (Médio 470 → 460), triângulos iguais.
+- **Pendências:** área de escape e muro verde continuam no setor 6 até ~1420 (o LMU tem; o setor 6 começa com a
+  ROLEX); física da área de escape trata como grama; árvores atrás do guard-rail esq em 1020–1300 bloqueadas pela
+  regra `occupied` do `trackside.ts` (vale a volta toda); ondulação da borda dir em ~866–880; props pequenos
+  (pneus, fiscais, carros no morro); alambrado sobre o fim do MOTUL; cor do muro verde não remedida.
 - **Pendências do setor:** muro esq 440–480 parece perto demais (conferir no satélite antes de mexer na
   física); emenda do vermelho com a Reta Oposta em 779–790 (Fase 5); logo ROLEX e faixas amarelas pintadas no
   ápice; muro de arrimo/estacionamento à direita (450–600) e torre de concreto (650–730); remendo escuro no

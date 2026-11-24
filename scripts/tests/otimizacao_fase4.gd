@@ -80,9 +80,12 @@ func run_tests() -> void:
 		var mi: MeshInstance3D = entry.mi
 		if not bool(entry.shadow):
 			sec_nonshadow_count += 1
-		if not is_equal_approx(mi.visibility_range_end, 300.0):
+		# referências de pilotagem (`ess_`, ex.: barreiras azuis da Descida do Lago desde a Fase 6 de Interlagos) vão até
+		# 450 m no Mínimo (track_view.gd); o resto, 300 m
+		var alvo := 450.0 if bool(entry.get("essential", false)) else 300.0
+		if not is_equal_approx(mi.visibility_range_end, alvo):
 			sec_cull_ok = false
-	check(sec_nonshadow_count > 0 and sec_cull_ok, "Mínimo: malhas secundárias (inclusive %d sem sombra) cortadas em 300 m" % sec_nonshadow_count)
+	check(sec_nonshadow_count > 0 and sec_cull_ok, "Mínimo: malhas secundárias (inclusive %d sem sombra) cortadas em 300 m (ess_: 450 m)" % sec_nonshadow_count)
 
 	# Testa escala HiDPI/4K
 	var sub_vp := SubViewport.new()

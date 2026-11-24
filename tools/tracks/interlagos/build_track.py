@@ -820,9 +820,11 @@ for lado, sg, col in (('esq', -1, 0), ('dir', 1, 1)):
 WALL_MIN_GAP = 1.5    # m da borda (o applyWalls padrão força 2,5; aqui vai como `wallMinGap` no interlagos.json)
 PIT_EXIT_GAP = 5.5    # m da borda + zebra até o guard-rail na saída dos boxes
 # saída dos boxes: s antigo 800–1000 (do fim da mureta até a última faixa de convergência, vídeo s0860–s1000),
-# rampa de 20 m nas pontas
+# rampa de 20 m nas pontas. Fase 5: a ponta do separador (fim da ilha e começo do hachurado diagonal) fica em s novo
+# ~835–837 no satélite (build/interlagos/fase5/esq_par.jpg; OSM: ponta do muro em s antigo 825) e no LMU (chase
+# s 820/840): a rampa de abertura passou de s antigo 800–820 para 824–830 (s novo 831–837; a ponta é curta).
 _sa = np.asarray(s_old) % L0
-PIT_EXIT = np.clip(np.minimum((_sa - 800.0) / 20.0, (1000.0 - _sa) / 20.0), 0.0, 1.0)
+PIT_EXIT = np.clip(np.minimum((_sa - 824.0) / 6.0, (1000.0 - _sa) / 20.0), 0.0, 1.0)
 WALL = np.zeros((len(P), 2))
 EMPURRADO = {}
 WSRC = np.zeros((len(P), 2), int)    # 3 osm · 2 satélite (confirmado pelo perfil) · 1 perfil, sat. diverge · 0 perfil, não medido
@@ -929,6 +931,10 @@ def janela_antigo(a, b, rampa):
 # medido) e o LMU (s 750/780) mostra zebra + escape vermelho largo + faixa verde antes do muro MOTUL. No satélite
 # desenrolado a pintura vai até borda + ~10 m, segue uma faixa escura de ~3 m e há uma linha clara (topo do muro) a
 # borda + 15,5–17 m em s novo 730–770. Muro a borda + 15 m nessa janela (s antigo 722–766, rampa de 6 m).
+# Fase 5 (setor 5): a janela segue até s antigo 906 (s novo 913). Antes o muro voltava a borda + 5,6 m em s novo 780 e
+# o vermelho estreitava na emenda com a Reta Oposta (ficha setor-4 D8). Satélite (build/interlagos/fase5/c1.jpg,
+# c2.jpg) e Fase 2 (diferencas.md, setor 5: pintura 12–13,5 m em s antigo 798–906, escape 15,5 m em 867–911): a
+# pintura vai até borda + ~13–15 m; LMU chase s 790–870: zebra + vermelho largo + faixa verde até o muro MOTUL.
 SEPARADOR_F4 = (np.array([551.1, 580.8, 600.9, 621.2, 641.5, 661.9, 682.2, 702.5, 727.7, 734.7]),
                 np.array([9.0, 9.0, 8.6, 8.3, 7.6, 7.1, 6.7, 6.5, 7.3, 7.3]))
 _osm_esq = osm_wall['esq']
@@ -939,7 +945,9 @@ for lado, a, b, rampa, alvo_fn, desc in [
         ('esq', 333.0, 428.0, 6.0, lambda: fill_circ(np.nan_to_num(_osm_esq), np.isfinite(_osm_esq)),
          'S do Senna: cerca do OSM (= guard-rail no satélite)'),
         ('dir', 2713.0, 2796.0, 10.0, lambda: np.minimum(WALL[:, 1], 14.0), 'Bico de Pato: no máx. 14 m'),
-        ('dir', 722.0, 766.0, 6.0, lambda: WRn + 15.0, 'saída da Curva do Sol: muro MOTUL a borda + 15 m (Fase 4)'),
+        ('dir', 722.0, 906.0, 6.0, lambda: WRn + 15.0,
+         'saída da Curva do Sol e começo da Reta Oposta: muro MOTUL a borda + 15 m (Fase 4: s antigo 722–766; '
+         'Fase 5: até 906)'),
 ]:
     col = 0 if lado == 'esq' else 1
     w = janela_antigo(a, b, rampa)

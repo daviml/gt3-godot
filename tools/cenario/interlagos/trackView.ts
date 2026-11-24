@@ -478,13 +478,16 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
     verde: paintOn(runoffTexture(renderer, TINTA.verdeVivo, tintaEscura(TINTA.verdeVivo)), -1, 1, 'escape_verde'),
     agua: paintOn(runoffTexture(renderer, TINTA.verdeAgua, tintaEscura(TINTA.verdeAgua)), -1, 1, 'escape_agua'),
     // Fase 4: sem as faixas brancas (o único escape vermelho do perfil é a saída da Curva do Sol, liso no LMU s 750/780)
-    vermelho: paintOn(runoffTexture(renderer, TINTA.vermelho, tintaEscura(TINTA.vermelho), false), -1, 1, 'escape_vermelho')
+    vermelho: paintOn(runoffTexture(renderer, TINTA.vermelho, tintaEscura(TINTA.vermelho), false), -1, 1, 'escape_vermelho'),
+    // Fase 5: asfalto sem tinta (pista dos boxes depois da junção, escape road antes da Descida do Lago)
+    asfalto: paintOn(runoffTexture(renderer, TINTA.asfalto, tintaEscura(TINTA.asfalto, 0.94)), -1, 1, 'escape_asfalto')
   };
   const runColor = (i: number, side: -1 | 1): keyof typeof runMats => (side < 0 ? PL : PR)[i].escapeCor;
   for (const c of Object.keys(runMats) as (keyof typeof runMats)[]) {
     // o fim do escape segue a física (kerb + run); o começo encosta na borda pintada visual (mais estreita)
-    mesh(ribbon(track, i => -S[i].wl - S[i].kerbL - S[i].runL, i => -S[i].wl - Math.min(bordaL[i], S[i].kerbL), -0.008, 4, 8, i => S[i].runL > 0 && runColor(i, -1) === c), runMats[c]);
-    mesh(ribbon(track, i => S[i].wr + Math.min(bordaR[i], S[i].kerbR), i => S[i].wr + S[i].kerbR + S[i].runR, -0.008, 4, 8, i => S[i].runR > 0 && runColor(i, 1) === c), runMats[c]);
+    // (Fase 5: `grama` = grama entre a zebra e o começo do escape; 0 fora da Reta Oposta, mesma geometria de antes)
+    mesh(ribbon(track, i => -S[i].wl - S[i].kerbL - S[i].runL, i => -S[i].wl - Math.min(bordaL[i], S[i].kerbL) - PL[i].grama, -0.008, 4, 8, i => S[i].runL > PL[i].grama && runColor(i, -1) === c), runMats[c]);
+    mesh(ribbon(track, i => S[i].wr + Math.min(bordaR[i], S[i].kerbR) + PR[i].grama, i => S[i].wr + S[i].kerbR + S[i].runR, -0.008, 4, 8, i => S[i].runR > PR[i].grama && runColor(i, 1) === c), runMats[c]);
     // segunda faixa depois do escape (perfil: escape.fora; Fase 4, saída da Curva do Sol); só onde existe
     const foraL = (i: number) => PL[i].run2 > 0 && PL[i].escapeCor2 === c;
     const foraR = (i: number) => PR[i].run2 > 0 && PR[i].escapeCor2 === c;

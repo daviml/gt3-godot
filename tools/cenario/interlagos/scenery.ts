@@ -321,7 +321,8 @@ function buildBrakeBoards(track: Track, group: THREE.Group) {
   // freadas fortes (s da entrada da curva em m, numa volta de 4.300 m; lado explícito para bater com o LMU).
   const BRAKES: [number, -1 | 1, number[]][] = [
     [290, 1, [200, 150, 100, 50]], // S do Senna (direita, brancas)
-    [1376, 1, [150, 100, 50]], // Descida do Lago (direita, azuis)
+    // Descida do Lago: até a Fase 5 havia 150/100/50 azuis à direita; o LMU tem placas MOTUL sem número dos dois lados
+    // em s ~1100 e ~1195 (trackDetails.ts buildRetaOpostaPlacas)
     [2012, -1, [100, 50]], // Ferradura (esquerda, amarelas)
     [2650, -1, [100, 50]], // Bico de Pato (esquerda, amarelas)
     [3226, 1, [100, 50]] // Junção (direita, amarelas)

@@ -75,7 +75,9 @@ func _run() -> void:
 		big = maxf(big, maxf(b.size.x, b.size.z))
 	check(big < 200.0, "maior bloco da torcida: %.0f m" % big)
 	var trees := _find(tv, func(n): return n is MultiMeshInstance3D and SurroundingsView._is_tree(n), [])
-	check(tv.trees > 5000, "mata com %d árvores em %d blocos" % [tv.trees, trees.size()])
+	# PLANO-INTERLAGOS-DETALHES.md §5 (Etapa A): a volta desce de ~7.050 para a meta de ~3.500–4.500 árvores conforme os
+	# setores são revisados (Fase 5: 4.243); abaixo de 3.000 seria mata faltando
+	check(tv.trees > 3000, "mata com %d árvores em %d blocos" % [tv.trees, trees.size()])
 
 	# presets: 0 = Mínimo, 1 = Leve, 2 = Médio, 3 = Extremo
 	sv.set_detail(0)

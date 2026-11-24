@@ -18,7 +18,7 @@ import { TINTA } from './tintas';
 import { perfilDe, type TipoBarreira } from './perfil';
 import { dNovo4300, iNovo4300, L_ANTIGO, s4300, sNovo } from './sNovo';
 
-export type AdScheme = 'verde' | 'vermelho' | 'amarelo' | 'branco' | 'azul' | 'avis';
+export type AdScheme = 'verde' | 'vermelho' | 'amarelo' | 'branco' | 'azul' | 'avis' | 'muro_verde';
 type Kind = TipoBarreira;
 
 /**
@@ -49,7 +49,10 @@ const AD_SETS: Record<AdScheme, [string, string, string][]> = {
   avis: [['#c8102e', '#ffffff', 'AVIS'], ['#c8102e', '#ffffff', 'AVIS'], ['#c8102e', '#ffffff', 'AVIS'], ['#c8102e', '#ffffff', 'AVIS']],
   amarelo: [['#ffcc00', '#d40511', 'DHL'], ['#ffcc00', '#d40511', 'DHL'], ['#ffcc00', '#111111', 'DHL'], ['#ffcc00', '#d40511', 'DHL']],
   branco: [['#f4f4f2', '#006039', 'ROLEX'], ['#f4f4f2', '#d0101e', 'MOTUL'], ['#f4f4f2', '#0f3c96', 'GOODYEAR'], ['#f4f4f2', '#d40511', 'DHL']],
-  azul: [['#0f3c96', '#ffd200', 'GOODYEAR'], ['#0f3c96', '#ffd200', 'GOODYEAR'], ['#0f3c96', '#ffd200', 'GOODYEAR'], ['#0f3c96', '#ffffff', 'GOODYEAR']]
+  azul: [['#0f3c96', '#ffd200', 'GOODYEAR'], ['#0f3c96', '#ffd200', 'GOODYEAR'], ['#0f3c96', '#ffd200', 'GOODYEAR'], ['#0f3c96', '#ffffff', 'GOODYEAR']],
+  // Fase 5: muro de concreto pintado de verde-escuro, liso (Reta Oposta depois do MOTUL, LMU s 1000–1360); a "placa"
+  // cobre a face inteira (ver buildBarriers)
+  muro_verde: [['#104a14', '#104a14', '']]
 };
 
 const TOPPERS: Record<AdScheme, [string, string, string]> = {
@@ -58,7 +61,8 @@ const TOPPERS: Record<AdScheme, [string, string, string]> = {
   vermelho: ['#d0101e', '#ffffff', 'MOTUL'],
   avis: ['#c8102e', '#ffffff', 'AVIS'],
   branco: ['#ffffff', '#006039', 'ROLEX'],
-  verde: ['#006039', '#e8c44a', 'ROLEX']
+  verde: ['#006039', '#e8c44a', 'ROLEX'],
+  muro_verde: ['#104a14', '#104a14', '']
 };
 function topperCanvas(scheme: AdScheme): HTMLCanvasElement {
   const [bg, fg, text] = TOPPERS[scheme];
@@ -382,7 +386,9 @@ export function buildBarriers(track: Track, group: THREE.Group, renderer: THREE.
     strip(side, 0, 0, 1.15, 0, wall, concreteMat, 4);
     strip(side, 1.15, 0, 1.15, -0.25, wall, capMat, 4, false);
     for (const a of Object.keys(AD_SETS) as AdScheme[]) {
-      strip(side, 0.18, 0.02, 0.98, 0.02, i => wall(i) && lay.ads[side][i] === a, adMat(a), 16, false);
+      // muro_verde (Fase 5): pintura da face inteira, não placa
+      const [h0, h1] = a === 'muro_verde' ? [0.02, 1.13] : [0.18, 0.98];
+      strip(side, h0, 0.02, h1, 0.02, i => wall(i) && lay.ads[side][i] === a, adMat(a), 16, false);
     }
     // barreira azul simples: 1 m de altura, 60 cm de espessura
     strip(side, 0, 0, 1.0, 0, tec, tecMat, 6);
@@ -590,8 +596,9 @@ export function buildBridge(track: Track, group: THREE.Group, renderer: THREE.We
   group.add(g);
 
   buildMotulGantry(track, group, renderer);
-  buildOppositeRunoff(track, group, renderer);
-  buildPitExit(track, group);
+  buildOppositeRunoff(track, group);
+  buildRetaOpostaPlacas(track, group, renderer);
+  buildPitExit(track, group, renderer);
   buildPitEntry(track, group, renderer);
   // (até a Fase 6 aqui havia buildDescidaLagoGoodyear: barreira dupla desenhada colada na zebra esquerda em s 1394–1582;
   // agora é a barreira "tecpro2" do perfil lateral, no muro da física, de s ~1490 a 1658 — ver setor6_perfil.py)
@@ -603,10 +610,17 @@ export function buildBridge(track: Track, group: THREE.Group, renderer: THREE.We
   buildFlagGarland(track, group);
 }
 
-/** Pórtico vermelho MOTUL sobre a Reta Oposta (s ≈ 1040 m), igual ao 04_reta_oposta_1 do LMU. */
+/**
+ * Pórtico vermelho MOTUL sobre a Reta Oposta. Fase 5: no lugar medido. Satélite: sombra em s novo ~991 e a estrutura
+ * clara em 995–1009 (objeto alto, deslocado pela inclinação da foto). LMU: chase s 950 com o pórtico grande à frente e
+ * s 980 já sem ele no quadro (a câmera de comparação, 6,8 m atrás, perde de vista o que está a < ~15 m: pórtico antes de
+ * s ~988, ±5 m do atlas); na 1ª tentativa (s 1002) ele ainda aparecia no quadro de s 980. Fica em s 990.
+ * Antes ficava em s ≈ 1045,6 (iNovo4300(1040)), ~55 m adiante.
+ */
+const S_PORTICO_MOTUL = 990;
 function buildMotulGantry(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
   const S = track.samples;
-  const s = S[iNovo4300(1040) % S.length];
+  const s = S[Math.round(S_PORTICO_MOTUL / STEP) % S.length];
   const span = s.wallL + s.wallR + 4;
   const h = 6.2;
   const steel = new THREE.MeshStandardMaterial({ color: 0x25282c, metalness: 0.5, roughness: 0.5 });
@@ -641,64 +655,17 @@ function buildMotulGantry(track: Track, group: THREE.Group, renderer: THREE.WebG
 }
 
 /**
- * Continuação das faixas vermelha/verde e paredão verde atrás do muro MOTUL na Reta Oposta (s = 780..1150 m).
- * As faixas são tinta sobre asfalto como as outras (textura lisa da cor + relevo do asfalto → "pinta:<nome>" no GLB),
- * com as cores calibradas de ./tintas.ts.
+ * Reta Oposta (Fase 5): talude verde-escuro atrás do muro MOTUL (s novo 826–1002, onde o muro MOTUL acaba no LMU;
+ * antes ia até ~1125, atrás do muro verde com alambrado, que o LMU mostra com talude gramado claro) e a placa laranja
+ * no começo da área de escape antes da Descida do Lago (LMU chase s 1260, onboard s 1250).
+ * Até a Fase 5 aqui também saíam as faixas vermelha e verde da Reta Oposta (stripOff, s 786–1155): agora são o escape
+ * do perfil lateral (setor5_perfil.py), que emenda com o vermelho da saída da Curva do Sol.
  */
-function buildOppositeRunoff(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
-  const asphaltNormal = phTexture('asphalt_track', 'nor_gl', renderer);
-  const paint = (cor: string, nome: string) => {
-    const c = document.createElement('canvas');
-    c.width = c.height = 4;
-    const g = c.getContext('2d')!;
-    g.fillStyle = cor;
-    g.fillRect(0, 0, 4, 4);
-    return new THREE.MeshStandardMaterial({ name: nome, map: tex(c, renderer), normalMap: asphaltNormal, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.9, side: THREE.DoubleSide });
-  };
+function buildOppositeRunoff(track: Track, group: THREE.Group) {
   const S = track.samples;
   const N = S.length;
-  const i0 = iNovo4300(780);
-  const i1 = iNovo4300(1150);
-  const stripOff =(d0: number, d1: number, mat: THREE.Material, y0 = 0.015, y1 = 0.015, iStart = i0, iEnd = i1) => {
-    const pos: number[] = [];
-    const uv: number[] = [];
-    const idx: number[] = [];
-    const v = new THREE.Vector3();
-    let prev = -1;
-    for (let i = iStart; i <= iEnd; i++) {
-      const s = S[i % N];
-      const base = pos.length / 3;
-      const w0 = s.wr + d0;
-      const w1 = y0 === y1 ? Math.min(s.wallR - 0.05, s.wr + d1) : s.wr + d1;
-      if (y0 === y1 && w1 <= w0) {
-        prev = -1;
-        continue;
-      }
-      for (const [off, y, u] of [[w0, y0, 0], [w1, y1, 1]] as const) {
-        v.copy(s.p).addScaledVector(s.r, off).addScaledVector(s.n, y);
-        pos.push(v.x, v.y, v.z);
-        uv.push(u, (i * STEP) / 8);
-      }
-      if (prev >= 0) idx.push(prev, prev + 1, base, prev + 1, base + 1, base);
-      prev = base;
-    }
-    if (!idx.length) return;
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geo.setIndex(idx);
-    geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, mat);
-    m.receiveShadow = true;
-    group.add(m);
-  };
-  // Deixa 0..1.5 m de grama junto à linha branca, depois faixa vermelha viva e verde externa até o muro MOTUL
-  // nome = qual tinta é (o Godot e tools/ref/regioes_tinta.py acham a malha por ele: "pinta:<nome>")
-  stripOff(1.5, 4.5, paint(TINTA.vermelho, 'vermelha_oposta'));
-  stripOff(4.5, 7.0, paint(TINTA.verdeAgua, 'verde_oposta'));
-  // Paredão/talude verde escuro atrás do muro MOTUL (s = 820..1120 m)
   const wi0 = iNovo4300(820);
-  const wi1 = iNovo4300(1120);
+  const wi1 = Math.round(1002 / STEP);
   {
     const pos: number[] = [];
     const idx: number[] = [];
@@ -727,26 +694,96 @@ function buildOppositeRunoff(track: Track, group: THREE.Group, renderer: THREE.W
       group.add(wall);
     }
   }
+  // placa/atenuador laranja na ponta do muro verde, onde a área de escape (escape road) se abre (s ~1260, direita,
+  // encostada no muro da física, que ali dobra para fora; cor 0xff6a10: o track_view.gd a trata como barreira, visível
+  // no Mínimo)
+  const sP = S[Math.round(1260 / STEP) % N];
+  const placa = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 3.2), new THREE.MeshStandardMaterial({ color: 0xff6a10, roughness: 0.6 }));
+  placa.position.copy(sP.p).addScaledVector(sP.r, sP.wallR - 0.3);
+  placa.position.y += 0.75;
+  placa.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(sP.r, new THREE.Vector3(0, 1, 0), sP.t.clone().negate()));
+  placa.castShadow = true;
+  placa.receiveShadow = true;
+  group.add(placa);
 }
 
-/** Saída dos boxes e barreira divisória até a saída da Curva do Sol (s = 300..795 m, fotos 02 e 03). */
-function buildPitExit(track: Track, group: THREE.Group) {
+/**
+ * Placas MOTUL no gramado da Reta Oposta, dos dois lados, antes da freada da Descida do Lago (LMU chase s 1060/1080:
+ * par em ~1100; s 1170: par em ~1195; s 1250/1260: uma à esquerda em ~1290). Sem número, como no LMU; ficam no lugar
+ * das placas azuis 150/100/50 da Descida do Lago (scenery.ts), que o LMU não tem. Fase 5.
+ */
+function buildRetaOpostaPlacas(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
+  const S = track.samples;
+  const N = S.length;
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 96;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, 256, 96);
+  g.fillStyle = '#d0101e';
+  g.fillRect(8, 8, 240, 80);
+  g.fillStyle = '#ffffff';
+  g.font = '900 italic 52px Arial';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText('MOTUL', 128, 50, 220);
+  const face = new THREE.MeshStandardMaterial({ map: tex(compensaLuz(c), renderer, false), roughness: 0.55 });
+  const back = new THREE.MeshStandardMaterial({ color: 0x26292e, roughness: 0.8 });
+  const mats = [back, back, back, back, face, back];
+  const geo = new THREE.BoxGeometry(2.0, 0.85, 0.12);
+  for (const [sm, side] of [[1100, -1], [1100, 1], [1195, -1], [1195, 1], [1290, -1]] as [number, -1 | 1][]) {
+    const s = S[Math.round(sm / STEP) % N];
+    const edge = side < 0 ? s.wl : s.wr;
+    const wall = side < 0 ? s.wallL : s.wallR;
+    const pos = s.p.clone().addScaledVector(s.r, side * Math.min(edge + 2.2, wall - 0.6));
+    const m = new THREE.Mesh(geo, mats);
+    m.position.set(pos.x, s.p.y + 0.55, pos.z);
+    m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(s.r, new THREE.Vector3(0, 1, 0), s.t.clone().negate()));
+    m.castShadow = true;
+    m.receiveShadow = true;
+    group.add(m);
+  }
+}
+
+/**
+ * Saída dos boxes e barreira divisória até a saída da Curva do Sol (s = 300..795 m, fotos 02 e 03).
+ * Fase 5: até s novo 741 tudo como antes; depois a pista dos boxes segue ao lado da pista até a junção medida no
+ * satélite (build/interlagos/fase5/esq_par.jpg; registro +2,2/−2,1 m) e no LMU (chase s 790–870, onboard s 800–900):
+ *   - pista dos boxes: fora do separador, borda de fora (m além da borda da pista) 12,5 em s 760, 12,0 em 780, 9,5 em
+ *     800, 7,8 em 820, 5,9 em 830 e 5,5 em 838 (= o escape asfaltado da física, `runL`, que o perfil desenha com cor
+ *     "asfalto" de ~830 a ~1005);
+ *   - separador (guard-rail) no muro da física até a ponta da ilha em s 829 (física: borda + 1,6 m; satélite: ponta da
+ *     ilha a borda + ~1,5 m em s ~835; OSM: ponta do muro em s antigo 825), com a ponteira laranja/preta;
+ *   - hachurado diagonal verde (LMU s 820–870; branco no satélite) de s 840 a 895, entre a linha branca da borda e a
+ *     segunda linha branca;
+ *   - segunda linha branca (pendência da Fase 1): contínua, dentro do asfalto, a 2,2 m da borda em 838–900 e
+ *     convergindo até ~0,5 m do centro em s 950 (picos de brilho do satélite, build/interlagos/fase5/linha.py).
+ */
+function buildPitExit(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
   const S = track.samples;
   const N = S.length;
   const i0 = iNovo4300(300);
-  const i1 = iNovo4300(795);
+  const S_F5 = 741.3; // daqui em diante a geometria da Fase 5 (= o fim antigo do separador, sNovo4300(735))
+  const i1 = Math.max(iNovo4300(795), Math.round(840 / STEP));
   const smooth = (a: number, b: number, x: number) => {
     const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
     return t * t * (3 - 2 * t);
   };
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+  const interp = (x: number, xs: number[], ys: number[]) => {
+    if (x <= xs[0]) return ys[0];
+    for (let k = 1; k < xs.length; k++) if (x <= xs[k]) return lerp(ys[k - 1], ys[k], (x - xs[k - 1]) / (xs[k] - xs[k - 1]));
+    return ys[ys.length - 1];
+  };
 
-  const pitRibbon = (getRange: (s: (typeof S)[number], sm: number) => [number, number] | null, yLift: number, mat: THREE.Material) => {
+  const pitRibbon = (getRange: (s: (typeof S)[number], sm: number) => [number, number] | null, yLift: number, mat: THREE.Material, j0 = i0, j1 = i1) => {
     const pos: number[] = [];
+    const uv: number[] = [];
     const idx: number[] = [];
     const v = new THREE.Vector3();
     let prev = -1;
-    for (let i = i0; i <= i1; i++) {
+    for (let i = j0; i <= j1; i++) {
       const s = S[i % N];
       const sm = s4300(s.s);
       const range = getRange(s, sm);
@@ -759,6 +796,7 @@ function buildPitExit(track: Track, group: THREE.Group) {
         v.copy(s.p).addScaledVector(s.r, off);
         v.y += yLift;
         pos.push(v.x, v.y, v.z);
+        uv.push(0.5, 0.5);
       }
       if (prev >= 0) idx.push(prev, prev + 1, base, prev + 1, base + 1, base);
       prev = base;
@@ -766,6 +804,8 @@ function buildPitExit(track: Track, group: THREE.Group) {
     if (!idx.length) return;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    // uv só para as tintas da Fase 5 (textura lisa); as malhas antigas continuam sem uv
+    if ((mat as THREE.MeshStandardMaterial).map) geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const m = new THREE.Mesh(geo, mat);
@@ -777,22 +817,34 @@ function buildPitExit(track: Track, group: THREE.Group) {
   // 6,5–9 m, build_track.py SEPARADOR_F4); a pista dos boxes e o guard-rail andam junto com ele (extra = o que o muro
   // passou de 4,4 m; some na convergência do fim).
   const extra = (s: (typeof S)[number]) => Math.max(0, Math.min(6, s.wallL - s.wl - 4.4));
-  const bounds = (s: (typeof S)[number], sm: number): [number, number] => {
+  const boundsAntes = (s: (typeof S)[number], sm: number): [number, number] => {
     const t = smooth(720, 795, sm);
     const e = extra(s) * (1 - t);
     const dOut = -(s.wl + lerp(9.6, 0.25, smooth(735, 795, sm)) + e);
     const dIn = -(s.wl + lerp(4.8, 0.05, t) + e);
     return [dOut, dIn];
   };
+  // Fase 5: borda de fora da pista dos boxes medida no satélite (m além da borda da pista); a de dentro logo depois do
+  // separador (muro da física + 0,35 m). Na junção (s ≥ 830) o muro se abre até a borda de fora e a faixa acaba.
+  const sF5 = S[Math.round(S_F5 / STEP) % N];
+  const out741 = -boundsAntes(sF5, s4300(sF5.s))[0] - sF5.wl;
+  const FORA = { s: [S_F5, 760, 780, 800, 820, 830, 838], d: [out741, 12.5, 12.0, 9.5, 7.8, 5.9, 5.5] };
+  const bounds = (s: (typeof S)[number], sm: number): [number, number] => {
+    if (s.s <= S_F5 || s.s > 900) return boundsAntes(s, sm);
+    return [-(s.wl + interp(s.s, FORA.s, FORA.d)), -(s.wallL + 0.35)];
+  };
   const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x3e4044, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, side: THREE.DoubleSide });
   const lineMat = new THREE.MeshStandardMaterial({ color: 0xeeeee8, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
   pitRibbon((s, sm) => bounds(s, sm), 0.012, asphaltMat);
   pitRibbon((s, sm) => { const [dOut] = bounds(s, sm); return [dOut, dOut + 0.22]; }, 0.018, lineMat);
-  pitRibbon((s, sm) => { const [, dIn] = bounds(s, sm); return [dIn - 0.22, dIn]; }, 0.018, lineMat);
+  // a linha de dentro da pista dos boxes acaba na ponta do separador (Fase 5)
+  pitRibbon((s, sm) => { if (s.s > 829) return null; const [, dIn] = bounds(s, sm); return [dIn - 0.22, dIn]; }, 0.018, lineMat);
 
-  // Guard-rail metálico duplo separador entre pista e saída dos boxes na Curva do Sol (s = 565..735 m)
+  // Guard-rail metálico duplo separador entre pista e saída dos boxes na Curva do Sol (s = 565..735 m da volta de
+  // 4.300 m) e, da Fase 5 em diante, no muro da física até a ponta da ilha (s novo 829)
   const g0 = iNovo4300(565);
-  const g1 = iNovo4300(735);
+  const g1 = Math.round(829 / STEP);
+  const railD = (s: (typeof S)[number], dx = 0) => (s.s <= S_F5 ? -(s.wl + 4.4 + dx + extra(s)) : -(s.wallL + dx));
   const railMat = new THREE.MeshStandardMaterial({ color: 0xc2c6ca, metalness: 0.35, roughness: 0.5, side: THREE.DoubleSide });
   for (const [h0, h1] of [[0.38, 0.68], [0.78, 1.08]] as const) {
     const pos: number[] = [];
@@ -802,7 +854,7 @@ function buildPitExit(track: Track, group: THREE.Group) {
     for (let i = g0; i <= g1; i++) {
       const s = S[i % N];
       const base = pos.length / 3;
-      const d = -(s.wl + 4.4 + extra(s));
+      const d = railD(s);
       for (const h of [h0, h1]) {
         v.copy(s.p).addScaledVector(s.r, d);
         v.y += h;
@@ -824,15 +876,15 @@ function buildPitExit(track: Track, group: THREE.Group) {
   const postGeo = new THREE.BoxGeometry(0.12, 1.12, 0.12);
   for (let i = g0; i <= g1; i += 2) {
     const s = S[i % N];
-    const p = s.p.clone().addScaledVector(s.r, -(s.wl + 4.45 + extra(s)));
+    const p = s.p.clone().addScaledVector(s.r, railD(s, 0.05));
     const post = new THREE.Mesh(postGeo, postMat);
     post.position.set(p.x, p.y + 0.56, p.z);
     post.castShadow = true;
     group.add(post);
   }
-  // Ponteira laranja/preta no fim do separador (s = 735 m)
+  // Ponteira laranja/preta no fim do separador (Fase 5: ponta da ilha, s novo 829; antes s 741)
   const sEnd = S[g1 % N];
-  const tipPos = sEnd.p.clone().addScaledVector(sEnd.r, -(sEnd.wl + 4.4 + extra(sEnd)));
+  const tipPos = sEnd.p.clone().addScaledVector(sEnd.r, railD(sEnd));
   const tip = new THREE.Group();
   const blackBlk = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.0, 1.4), new THREE.MeshStandardMaterial({ color: 0x1c1f24, roughness: 0.75 }));
   blackBlk.position.set(0, 0.5, -0.7);
@@ -843,6 +895,49 @@ function buildPitExit(track: Track, group: THREE.Group) {
   tip.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(sEnd.r, new THREE.Vector3(0, 1, 0), sEnd.t.clone()));
   tip.traverse(o => { o.castShadow = true; o.receiveShadow = true; });
   group.add(tip);
+
+  // ---- Fase 5: segunda linha branca e hachurado da junção (tinta sobre o asfalto: "pinta:<nome>" no GLB) ----
+  const asphaltNormal = phTexture('asphalt_track', 'nor_gl', renderer);
+  const paint = (cor: string, nome: string, offset: number) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 4;
+    const g = c.getContext('2d')!;
+    g.fillStyle = cor;
+    g.fillRect(0, 0, 4, 4);
+    return new THREE.MeshStandardMaterial({ name: nome, map: tex(c, renderer), normalMap: asphaltNormal, normalScale: new THREE.Vector2(0.6, 0.6), roughness: 0.85, polygonOffset: true, polygonOffsetFactor: offset, side: THREE.DoubleSide });
+  };
+  // segunda linha: distância da borda esquerda (m, para dentro) por s novo
+  const LINHA2 = { s: [838, 900, 912, 924, 936, 950], d: [2.2, 2.2, 2.75, 3.6, 4.4, 4.7] };
+  const l2 = (s: (typeof S)[number]) => -s.wl + interp(s.s, LINHA2.s, LINHA2.d);
+  pitRibbon(s => (s.s < 838 || s.s > 950 ? null : [l2(s), l2(s) + 0.2]), 0.02, paint(TINTA.linha, 'linha_boxes', -3), Math.round(836 / STEP), Math.round(952 / STEP));
+  // hachurado: barras verdes de 0,6 m inclinadas (a ponta de dentro 2,4 m adiante da de fora), a cada 3 m
+  const pos: number[] = [];
+  const idx: number[] = [];
+  const at = (sm: number, dIn: number) => {
+    const k = sm / STEP;
+    const a = S[Math.floor(k) % N];
+    const b = S[(Math.floor(k) + 1) % N];
+    const u = k - Math.floor(k);
+    const p = a.p.clone().lerp(b.p, u);
+    const r = a.r.clone().lerp(b.r, u).normalize();
+    return p.addScaledVector(r, -lerp(a.wl, b.wl, u) + dIn).add(new THREE.Vector3(0, 0.02, 0));
+  };
+  for (let sm = 840; sm <= 892; sm += 3) {
+    const dEdge = 0.4; // logo depois da linha branca da borda
+    const dLine = interp(sm, LINHA2.s, LINHA2.d) - 0.1;
+    const q = [at(sm, dEdge), at(sm + 0.6, dEdge), at(sm + 3.0, dLine), at(sm + 2.4, dLine)];
+    const base = pos.length / 3;
+    for (const v of q) pos.push(v.x, v.y, v.z);
+    idx.push(base, base + 2, base + 1, base, base + 3, base + 2);
+  }
+  const hg = new THREE.BufferGeometry();
+  hg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  hg.setAttribute('uv', new THREE.Float32BufferAttribute(new Array((pos.length / 3) * 2).fill(0.5), 2));
+  hg.setIndex(idx);
+  hg.computeVertexNormals();
+  const hm = new THREE.Mesh(hg, paint(TINTA.verdeVivo, 'hachurado_boxes', -3));
+  hm.receiveShadow = true;
+  group.add(hm);
 }
 
 /** Ilha verde com divisas brancas (>>>) da entrada dos boxes (frame 29 / s = 3885..4038 m). */

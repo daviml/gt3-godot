@@ -12,7 +12,8 @@
  *       (buildScenery: cada tentativa cai a muro + 10..160 m de uma amostra). Onde um setor move o muro da física,
  *       a âncora fica no muro de antes, senão os capões dessas tentativas andam junto com o muro e caem perto de
  *       OUTRO trecho (Fase 6: muro dir do Lago +10–20 m moveu 115 árvores da Reta Oposta). Ancora = { s0, muro: m[] }
- *       (uma por amostra a partir de s0).
+ *       (uma por amostra a partir de s0). Desde a Fase 5, cada lado é uma LISTA de trechos (Ancora[]; um objeto só
+ *       continua aceito), um por setor que moveu o muro.
  * Tudo decidido pela posição de cada árvore (./sorteio.ts): mexer num setor não muda as árvores dos outros.
  * O espaçamento é um desbaste "de vizinhança": cada árvore tem uma prioridade sorteada pela posição e fica se nenhuma
  * vizinha a menos de `espacamento` (já aprovada pelas zonas) tiver prioridade maior. Não depende da ordem da lista.
@@ -39,7 +40,7 @@ interface ArvoresCfg {
   escala: [number, number];
   base: number;
   zonas: Zona[];
-  ancora?: { esq?: Ancora; dir?: Ancora };
+  ancora?: { esq?: Ancora | Ancora[]; dir?: Ancora | Ancora[] };
 }
 
 const CFG = (perfilJson as unknown as { arvores?: ArvoresCfg }).arvores;
@@ -59,9 +60,9 @@ export interface Arvore {
 export function muroAncora(track: Track, i: number, side: -1 | 1): number {
   const s = track.samples[i];
   const a = CFG?.ancora?.[side < 0 ? 'esq' : 'dir'];
-  if (a) {
-    const k = Math.round((s.s - a.s0) / STEP);
-    if (k >= 0 && k < a.muro.length) return a.muro[k];
+  for (const t of Array.isArray(a) ? a : a ? [a] : []) {
+    const k = Math.round((s.s - t.s0) / STEP);
+    if (k >= 0 && k < t.muro.length) return t.muro[k];
   }
   return side < 0 ? s.wallL : s.wallR;
 }

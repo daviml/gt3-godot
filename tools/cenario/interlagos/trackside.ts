@@ -636,9 +636,13 @@ function buildBanner(track: Track, group: THREE.Group, renderer: THREE.WebGLRend
   group.add(g);
 }
 
-/** Pórtico vermelho como o do vídeo no começo da Reta Oposta (s = 860 m). */
-export function buildBanners(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
-  buildBanner(track, group, renderer, 860, 'vermelho');
+/**
+ * Pórticos de patrocinador além dos fixos (passarela, MOTUL). Até a Fase 5 havia um pórtico vermelho no começo da Reta
+ * Oposta (s ≈ 866, buildBanner(…, 860, 'vermelho')): o LMU não tem (chase s 820–870: só o pórtico MOTUL ao longe) e o
+ * satélite só mostra um pórtico no setor, o MOTUL em s ~1000 (trackDetails.ts). Ficou sem nenhum.
+ */
+export function buildBanners(_track: Track, _group: THREE.Group, _renderer: THREE.WebGLRenderer) {
+  void buildBanner;
 }
 
 /**
@@ -693,7 +697,7 @@ export function buildMarshalPosts(track: Track, group: THREE.Group) {
     [220, -1, 'ambulance'],
     [1920, -1, 'crane'],
     [3090, 1, 'ambulance'],
-    [1340, 1, 'crane'],
+    // (Fase 5: o guindaste em s 1340 da volta de 4.300 m, à direita da Reta Oposta, saiu: o LMU não tem, s 1290–1360)
   ] as [number, -1 | 1, string][]) {
     const idx = iNovo4300(sM) % N;
     const s = S[idx];

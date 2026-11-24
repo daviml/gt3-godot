@@ -93,6 +93,14 @@ Paridade: o `paridade.ts` aplica o `bank` na pista do web (`applyBank`), e o `pa
   do Lago na beira do lago, borda + 15 → 27 → 21–25 → 20 m em 1446–1690 (antes 5–13 m; satélite: pintura até +20–33 m).
   Zebra dir. do Lago (`perfil_zebras.py`) s novo 1510–1540 → 1478–1527 (LMU chase s 1460/1490/1510/1530). O `track.json`
   mudou só em s 1370–1708 (`wallL/R`, `kerbR`, `runL/R`); RefBot igual (+1,07–1,50%), paridade 0,00%.
+- **Muros corrigidos na Fase 5** (setor 5, Reta Oposta; ficha `build/ref/interlagos/fichas/setor-5.md`): a janela do muro
+  MOTUL da saída da Curva do Sol (`MURO_F`, dir., borda + 15 m) passou de s antigo 722–766 para 722–906 (s novo até 913;
+  satélite `build/interlagos/fase5/c1.jpg`/`c2.jpg`: pintura até borda + 13–15 m; antes o muro voltava a borda + 5,6 m em
+  s novo 780 e o vermelho estreitava na emenda). A abertura da saída dos boxes (`PIT_EXIT`) passou de s antigo 800–820 para
+  824–830 (s novo 831–837): o muro fica na ilha do separador até a ponta (borda + 1,6 m em s novo 828; satélite
+  `build/interlagos/fase5/esq_par.jpg`, OSM: ponta em s antigo 825). O `track.json` mudou só em s 770–920 (`wallL` 818–836,
+  `wallR` 770–920, `runL` 806–836, `runR` 776–798); terreno: 435 células perto desses muros (até 0,8 m). RefBot igual
+  (+1,07–1,50%), paridade 0,00%.
 - **Saída dos boxes** (s antigo 800–1000, esq.): faixa de aceleração = escape asfaltado (`runLeft`, aplicado pelo
   `applyRunoffMin` do `bank.ts`) até 0,5 m do guard-rail, e muro ≥ borda + zebra + 5,5 m (vídeo s0860/s0940: ~4–5 m
   de asfalto antes do guard-rail). A borda esquerda ali (pulava 5,0 ↔ 8,2 m entre a linha branca e a faixa) foi

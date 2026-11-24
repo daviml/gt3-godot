@@ -20,7 +20,8 @@ export const TINTA = {
   linha: '#8092a2', // linha branca da borda — LMU 194/202/210
   verdeVivo: '#006128', // escape verde e faixa verde logo atrás da zebra — LMU 48/172/100
   verdeAgua: '#173d2c', // escape verde-azulado (Reta Oposta) — LMU 55/126/102
-  vermelho: '#670007' // escape vermelho (Reta Oposta) — LMU 209/12/35
+  vermelho: '#670007', // escape vermelho (Reta Oposta) — LMU 209/12/35
+  asfalto: '#3e4044' // asfalto sem tinta (Fase 5): pista dos boxes e escape road; a mesma cor da pista dos boxes do buildPitExit (não calibrada)
 } as const;
 
 /** Cor um pouco mais escura da mesma tinta (faixa de tom diferente perto da pista, nos escapes). */

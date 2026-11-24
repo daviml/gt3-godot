@@ -109,10 +109,10 @@ arvores(1369, 1983, ZONAS6)
 # ancora_exata.json, gerado por build/interlagos/fase6/ancora.ts (montaPista no interlagos.json de antes da Fase 6).
 # Sem o arquivo, mantém a âncora que já está no perfil.
 ANC = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'build', 'interlagos', 'fase6', 'ancora_exata.json')
+# (Fase 5: arvores.ancora virou uma lista de trechos por lado; perfil_setor.ancora troca só o trecho deste setor)
 if os.path.exists(ANC):
     import json
 
-    from perfil_setor import p  # noqa: E402
-    p['arvores']['ancora'] = json.load(open(ANC, encoding='utf-8'))
-    print('âncora congelada:', {k: (v['s0'], v['s0'] + 2 * (len(v['muro']) - 1)) for k, v in p['arvores']['ancora'].items()})
+    from perfil_setor import ancora  # noqa: E402
+    ancora(json.load(open(ANC, encoding='utf-8')))
 gravar()

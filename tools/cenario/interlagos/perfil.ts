@@ -22,9 +22,14 @@
  *           Com `visual` onde a física tem zebra, a classe declarada também substitui a que viria do kerb.
  *     { tipo: "pintura", cor: "verde", larg: n }    faixa pintada atrás da zebra
  *     { tipo: "salsicha", larg: n }                  salsicha amarela elevada (depois da pintura)
- *     { tipo: "escape", cor: "verde" | "agua" | "vermelho", larg: Valor, fora?: { cor, larg: Valor } }
+ *     { tipo: "escape", cor: "verde" | "agua" | "vermelho" | "asfalto", larg: Valor, fora?: { cor, larg: Valor },
+ *       grama?: Valor }
  *         asfalto pintado de escape. `fora` (Fase 4, saída da Curva do Sol: vermelho com uma faixa verde atrás) = uma
  *         segunda faixa pintada logo depois do escape, de outra cor; não muda o escape nem a barreira (só o desenho).
+ *         `grama` (Fase 5, Reta Oposta) = faixa de grama entre a zebra (ou a borda) e o começo do escape, CONTADA
+ *         DENTRO de `larg` (o escape pintado vai de grama a larg; o fim do escape e a barreira não mudam).
+ *         cor "asfalto" (Fase 5) = asfalto cinza sem tinta: a pista dos boxes depois da junção e a área de escape
+ *         ("escape road") antes da Descida do Lago.
  *   barreira = { tipo: "rail" | "wall" | "tecpro" | "tecpro2" | "rolex_pad", dist: Valor, de?: "zebra" | "escape",
  *                banner?: AdScheme, alambrado?: true, topo?: false }
  *     dist = distância lateral da barreira contada da linha branca (borda do asfalto); com `de`, contada da borda
@@ -47,8 +52,8 @@ export type Faixa =
   | { tipo: 'zebra'; larg: 'fisica'; minimo?: number; listrada?: false; visual?: 'normal' | 'saida' }
   | { tipo: 'pintura'; cor: 'verde'; larg: number }
   | { tipo: 'salsicha'; larg: number }
-  | { tipo: 'escape'; cor: CorEscape; larg: Valor; fora?: { cor: CorEscape; larg: Valor } };
-export type CorEscape = 'verde' | 'agua' | 'vermelho';
+  | { tipo: 'escape'; cor: CorEscape; larg: Valor; fora?: { cor: CorEscape; larg: Valor }; grama?: Valor };
+export type CorEscape = 'verde' | 'agua' | 'vermelho' | 'asfalto';
 export type TipoBarreira = 'rail' | 'wall' | 'tecpro' | 'tecpro2' | 'rolex_pad';
 export interface Barreira {
   tipo: TipoBarreira;
@@ -88,6 +93,8 @@ export interface AmostraLado {
   /** largura do escape asfaltado (0 = sem) */
   run: number;
   escapeCor: CorEscape;
+  /** grama antes do escape pintado, dentro de `run` (Faixa escape.grama; 0 = sem) */
+  grama: number;
   /** largura da segunda faixa pintada depois do escape (0 = sem; Faixa escape.fora) */
   run2: number;
   escapeCor2: CorEscape;
@@ -131,6 +138,7 @@ function avaliarLado(fatias: Fatia[], n: number, passo: number, w: number[], ker
         salsicha: sal?.larg ?? 0,
         run,
         escapeCor: esc?.cor ?? 'verde',
+        grama: esc?.grama !== undefined ? Math.min(run, valor(esc.grama, k, 0)) : 0,
         run2: esc?.fora ? valor(esc.fora.larg, k, 0) : 0,
         escapeCor2: esc?.fora?.cor ?? 'verde',
         wall,
