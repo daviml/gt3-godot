@@ -20,7 +20,8 @@
  *           - mostrar zebra onde a física não tem (kerb 0): visual: "normal" | "saida" (largura visual fixa de
  *             BORDA.zebra.larg / largSaida, independente do kerb; o kerb, o escape e a barreira não mudam).
  *           Com `visual` onde a física tem zebra, a classe declarada também substitui a que viria do kerb.
- *     { tipo: "pintura", cor: "verde", larg: n }    faixa pintada atrás da zebra
+ *     { tipo: "pintura", cor: "verde" | "agua", larg: n }    faixa pintada atrás da zebra (cor "agua" = verde-água,
+ *         Fase 7: a faixa entre a linha branca e a salsicha nos dois ápices da Ferradura)
  *     { tipo: "salsicha", larg: n }                  salsicha amarela elevada (depois da pintura)
  *     { tipo: "escape", cor: "verde" | "agua" | "vermelho" | "asfalto", larg: Valor, fora?: { cor, larg: Valor },
  *       grama?: Valor }
@@ -36,6 +37,8 @@
  *     de fora da zebra física ("zebra") ou do fim do escape ("escape").
     topo: false (Fase 6) = barreira azul simples ("tecpro") sem a faixa amarela de patrocinador em cima (a Goodyear do
     Lago no LMU é azul lisa).
+    paredao: true (Fase 7) = paredão de concreto alto atrás da barreira, com a faixa grande DHL (Ferradura/Laranjinha;
+    antes um trecho fixo em código, buildFerraduraWall em ./trackDetails.ts, que agora desenha onde o perfil pede).
  *   Chave opcional `arvores` (Fase 4, Etapa A das árvores): zonas por s e lado, espaçamento e escala nos setores já
  *   revisados; lida por ./arvoresSetor.ts (não por este módulo).
  *   Valor = número (constante na fatia) | "fisica" (o valor da física do Track nessa amostra) |
@@ -50,7 +53,7 @@ import perfilJson from '../../../data/track/visual_profile.json';
 export type Valor = number | 'fisica' | number[];
 export type Faixa =
   | { tipo: 'zebra'; larg: 'fisica'; minimo?: number; listrada?: false; visual?: 'normal' | 'saida' }
-  | { tipo: 'pintura'; cor: 'verde'; larg: number }
+  | { tipo: 'pintura'; cor: 'verde' | 'agua'; larg: number }
   | { tipo: 'salsicha'; larg: number }
   | { tipo: 'escape'; cor: CorEscape; larg: Valor; fora?: { cor: CorEscape; larg: Valor }; grama?: Valor };
 export type CorEscape = 'verde' | 'agua' | 'vermelho' | 'asfalto';
@@ -62,6 +65,7 @@ export interface Barreira {
   banner?: string;
   alambrado?: true;
   topo?: false;
+  paredao?: true;
 }
 export interface Fatia {
   s0: number;
@@ -88,6 +92,8 @@ export interface AmostraLado {
   zebraVisual: 'normal' | 'saida' | null;
   /** largura da faixa verde atrás da zebra (0 = sem) */
   verde: number;
+  /** cor dessa faixa (Faixa pintura.cor; padrão verde) */
+  verdeCor: 'verde' | 'agua';
   /** largura da salsicha (0 = sem) */
   salsicha: number;
   /** largura do escape asfaltado (0 = sem) */
@@ -105,6 +111,8 @@ export interface AmostraLado {
   alambrado: boolean;
   /** faixa de patrocinador em cima da barreira azul simples (Barreira.topo; padrão true) */
   topo: boolean;
+  /** paredão de concreto com a faixa DHL atrás da barreira (Barreira.paredao; Fase 7) */
+  paredao: boolean;
 }
 
 const valor = (v: Valor, k: number, fisica: number) => (v === 'fisica' ? fisica : typeof v === 'number' ? v : v[k]);
@@ -135,6 +143,7 @@ function avaliarLado(fatias: Fatia[], n: number, passo: number, w: number[], ker
         listrada: zebra?.listrada !== false,
         zebraVisual: zebra?.visual ?? null,
         verde: pint?.larg ?? 0,
+        verdeCor: pint?.cor ?? 'verde',
         salsicha: sal?.larg ?? 0,
         run,
         escapeCor: esc?.cor ?? 'verde',
@@ -145,7 +154,8 @@ function avaliarLado(fatias: Fatia[], n: number, passo: number, w: number[], ker
         tipo: b.tipo,
         banner: b.banner ?? null,
         alambrado: !!b.alambrado,
-        topo: b.topo !== false
+        topo: b.topo !== false,
+        paredao: !!b.paredao
       };
     }
   }

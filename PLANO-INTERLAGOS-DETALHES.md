@@ -411,6 +411,26 @@ Desde a Fase 2B os setores usam o **s novo** (pista de 4.308 m); converter os li
   verde em 170–230; palmeiras e posto de fiscal; faixa esquerda de 0–248 (verde × cinza). Fora do setor: postes de
   guard-rail/alambrado na altura do centro em curvas com camber; placas de freada das outras curvas sem `ess_`.
 
+**Resultado da Fase 7 (24/11/2026) — feita, aguardando o Davi olhar a folha:**
+- Ficha `build/ref/interlagos/fichas/setor-7.md`; folhas `build/ref/interlagos/folhas/fase7_ini_*`, `fase7_fim_*`
+  e `fase7_minimo` (s novo 1982–2282). Perfil por `tools/cenario/interlagos/setor7_perfil.py`. Por decisão do
+  Davi, sem suíte de testes e sem bench no fechamento: só `interlagos.gd` e `paridade.gd` (a física mudou), os dois
+  passando, e as conferências do GLB.
+- **Esquerda:** escape verde de 10,7 → 5,8 m + faixa verde-água + grama (satélite 6,0 m), sem os cones; zebra da
+  Laranjinha contínua até 2280 (vídeo; física também); muro baixo DHL amarelo do começo ao fim (o "DHL pálido" da
+  Fase 1 resolvido por placa com cor e ganho próprios); paredão cinza-escuro com a faixa DHL de ~2086 a ~2276,
+  agora pelo perfil (campo novo); outdoor GOODYEAR removido.
+- **Direita:** faixa verde-água estreita + salsicha nos dois ápices (campo novo no perfil), verde-água largo entre
+  eles, grama depois de 2166; placa amarela DHL da freada da Esse (~2260, visível no Mínimo).
+- **Física:** só a zebra esq 2228–2280 (e o escape automático ao lado). RefBot igual (+1,07–1,50%), paridade ok.
+- **Árvores:** 234 → 20 no setor (miolo da Ferradura é campo seco); volta 4.051 → **3.837**; fora do setor nada
+  mudou.
+- **Conferências:** `conferir_glb.py` sem regressão; Laguna e Imola byte a byte iguais.
+- **Pendências:** arquibancada pequena virada para a Ferradura (~2040–2085; o sorteio da torcida é global); o fundo
+  é dominado pela caixa escura da traseira da arquibancada da reta (peça do setor 3); mata no alto do morro bloqueada
+  por uma regra geral que corta árvores a menos de 42 m na Ferradura; zebra esq continua na Esse (Fase 8); mancha de
+  terra em ~2170.
+
 ### Fase 11 — Passada final da volta inteira
 - Volta completa em movimento (`--mover`) nas duas câmeras, folha a cada 50 m, nos 4 presets.
 - Vídeo curto lado a lado (ffmpeg) LMU × jogo, sincronizado por `s`, para o Davi assistir.

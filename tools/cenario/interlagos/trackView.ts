@@ -480,14 +480,23 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
   ]), kerbMat);
 
   // faixa verde pintada atrás da zebra e salsicha amarela (faixas "pintura" e "salsicha" do perfil)
-  const temL = (i: number) => PL[i].verde > 0;
-  const temR = (i: number) => PR[i].verde > 0;
+  // (Fase 7: cor "agua" = verde-água, só onde o perfil pede; sem nenhuma, a malha verde sai igual a antes)
+  const temL = (i: number) => PL[i].verde > 0 && PL[i].verdeCor === 'verde';
+  const temR = (i: number) => PR[i].verde > 0 && PR[i].verdeCor === 'verde';
   const fv = BORDA.faixaVerde;
   const greenMat = paintOn(solidPaintTexture(fv.cor, 23, renderer), -1, 0.8, 'faixa_verde');
   mesh(mergeGeometries([
     ribbon(track, i => -S[i].wl - zebraL[i] - PL[i].verde, i => -S[i].wl - zebraL[i], fv.lift, 0, 8, temL),
     ribbon(track, i => S[i].wr + zebraR[i], i => S[i].wr + zebraR[i] + PR[i].verde, fv.lift, 0, 8, temR)
   ]), greenMat);
+  const aguaL = (i: number) => PL[i].verde > 0 && PL[i].verdeCor === 'agua';
+  const aguaR = (i: number) => PR[i].verde > 0 && PR[i].verdeCor === 'agua';
+  const faixaAgua = [
+    S.some((_, i) => aguaL(i)) && ribbon(track, i => -S[i].wl - zebraL[i] - PL[i].verde, i => -S[i].wl - zebraL[i], fv.lift, 0, 8, aguaL),
+    S.some((_, i) => aguaR(i)) && ribbon(track, i => S[i].wr + zebraR[i], i => S[i].wr + zebraR[i] + PR[i].verde, fv.lift, 0, 8, aguaR)
+  ].filter(Boolean) as THREE.BufferGeometry[];
+  if (faixaAgua.length)
+    mesh(faixaAgua.length > 1 ? mergeGeometries(faixaAgua) : faixaAgua[0], paintOn(solidPaintTexture(TINTA.verdeAgua, 23, renderer), -1, 0.8, 'faixa_agua'));
   const salL = (i: number) => PL[i].salsicha > 0;
   const salR = (i: number) => PR[i].salsicha > 0;
   const salMat = paintOn(solidPaintTexture(BORDA.salsicha.cor, 29, renderer), 0, 0.7, 'salsicha');

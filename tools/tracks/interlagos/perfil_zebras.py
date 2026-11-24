@@ -41,8 +41,10 @@ ZEBRAS = [
          nota='Descida do Lago (ápice): vídeo s1400 contínua; buracos do satélite sem listras visíveis (desbotada)'),
     dict(lado='esq', s0=1529, s1=1639, classe='fisica', fonte='satelite+video', sat=[(1529, 1639)],
          nota='Lago, saída junto ao muro Goodyear: listras nítidas no satélite (conf 0 só pela sombra); vídeo s1540 confirma; s1660 já sem zebra'),
-    dict(lado='esq', s0=2176, s1=2222, classe='fisica', fonte='video', sat=[],
-         nota='Ferradura, saída por fora: satélite sem zebra (sombra das arquibancadas); vídeo s2160 sem, s2190 com zebra ao lado do carro; fim = fim da física'),
+    dict(lado='esq', s0=2176, s1=2277, classe='fisica', fonte='video', sat=[],
+         nota='Ferradura, saída por fora: satélite sem zebra (sombra das arquibancadas); vídeo s2160 sem, s2190 com zebra ao lado do carro; '
+              'Fase 7 (atlas v2, s novo): a zebra continua até a Esse (chase s 2190–2270 e onboard s 2230/2270 contínua) → fim de '
+              's antigo 2222 (s novo 2226) para 2277 (s novo 2280, e a rampa do Track em 2282 = fim do setor 7; a continuação na Esse fica para a Fase 8)'),
     dict(lado='esq', s0=2405, s1=2552, classe='fisica', fonte='satelite+video', sat=[(2405, 2552)],
          nota='Pinheirinho: vídeo s2390 (começa logo à frente) e s2560 (já acabou)'),
     dict(lado='esq', s0=2738, s1=2762, classe='fisica', fonte='satelite', sat=[(2738, 2762)],

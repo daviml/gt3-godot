@@ -109,6 +109,11 @@ Paridade: o `paridade.ts` aplica o `bank` na pista do web (`applyBank`), e o `pa
   sai igual; terreno: 180 células (até 0,58 m). RefBot igual (+1,07–1,50%), paridade 0,00%. O muro de fora da pista dos
   boxes em 4024–4100 fica a ~24 m da linha da Laranjinha (s ~2260) e a 37 m da reta: a conferência do GLB atribui essas
   barreiras à Laranjinha e acusa "sem barreira" em 4024–4100 na reta (falso: a barreira está no muro da física).
+- **Zebra corrigida na Fase 7** (setor 7, Ferradura + Laranjinha; ficha `build/ref/interlagos/fichas/setor-7.md`): a zebra
+  esq. da saída da Laranjinha (`perfil_zebras.py`) vai até s antigo 2277 (antes 2222) = s novo 2280, com a rampa do Track em
+  2282 (fim do setor; LMU chase s 2190–2270 e onboard s 2230/2270: contínua até a Esse, cuja continuação fica para a Fase 8).
+  O `track.json` mudou só em `kerbL` (s 2228–2280) e `runL` (2228–2254); muros, centro, camber, `terrain.json` e
+  `s_antigo_novo.json` iguais. RefBot igual (+1,07–1,50%).
 - **Saída dos boxes** (s antigo 800–1000, esq.): faixa de aceleração = escape asfaltado (`runLeft`, aplicado pelo
   `applyRunoffMin` do `bank.ts`) até 0,5 m do guard-rail, e muro ≥ borda + zebra + 5,5 m (vídeo s0860/s0940: ~4–5 m
   de asfalto antes do guard-rail). A borda esquerda ali (pulava 5,0 ↔ 8,2 m entre a linha branca e a faixa) foi

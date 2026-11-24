@@ -163,7 +163,7 @@ def tipo_barreira(mi):
         return 'barreira ROLEX (tampa)'
     if c == [0.012, 0.068, 0.319]:
         return 'Goodyear do Lago (tampa)'
-    if c == [0.198, 0.209, 0.223] and abs(rou - 0.9) < 1e-3:
+    if c in ([0.198, 0.209, 0.223], [0.042, 0.047, 0.054]) and abs(rou - 0.9) < 1e-3:  # (Fase 7: 0x3a3d42)
         return 'paredão da Ferradura'
     if c == [0.509, 0.503, 0.468]:
         return 'cabeceira do muro'

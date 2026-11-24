@@ -19,7 +19,7 @@ import { perfilDe, type TipoBarreira } from './perfil';
 import { dNovo4300, iNovo4300, s4300 } from './sNovo';
 import { ajusteLateral, comAjuste } from './ajusteLateral';
 
-export type AdScheme = 'verde' | 'vermelho' | 'amarelo' | 'branco' | 'azul' | 'avis' | 'muro_verde';
+export type AdScheme = 'verde' | 'vermelho' | 'amarelo' | 'branco' | 'azul' | 'avis' | 'muro_verde' | 'dhl';
 type Kind = TipoBarreira;
 
 /**
@@ -39,7 +39,8 @@ const OUTDOORS: Outdoor[] = [
   { s0: 165, s1: 390, side: 1, ads: 'verde', variante: 0 },
   { s0: 540, s1: 1150, side: 1, ads: 'vermelho', variante: 3 },
   { s0: 1580, s1: 1800, side: -1, ads: 'azul', variante: 7 },
-  { s0: 2140, s1: 2335, side: -1, ads: 'branco', variante: 10 },
+  // (Fase 7: saiu o outdoor branco de s antigo-4300 2140–2335, no meio em s novo ~2240 à esquerda: ali o LMU, chase
+  // s 2190–2250, tem o paredão com a faixa DHL e nenhum outdoor)
   { s0: 2310, s1: 2480, side: 1, ads: 'branco', variante: 11 },
   { s0: 2480, s1: 2830, side: -1, ads: 'branco', variante: 12 }
 ];
@@ -53,7 +54,9 @@ const AD_SETS: Record<AdScheme, [string, string, string][]> = {
   azul: [['#0f3c96', '#ffd200', 'GOODYEAR'], ['#0f3c96', '#ffd200', 'GOODYEAR'], ['#0f3c96', '#ffd200', 'GOODYEAR'], ['#0f3c96', '#ffffff', 'GOODYEAR']],
   // Fase 5: muro de concreto pintado de verde-escuro, liso (Reta Oposta depois do MOTUL, LMU s 1000–1360); a "placa"
   // cobre a face inteira (ver buildBarriers)
-  muro_verde: [['#104a14', '#104a14', '']]
+  muro_verde: [['#104a14', '#104a14', '']],
+  // Fase 7: placa DHL da Ferradura/Laranjinha (LMU s 1990–2270): face inteira amarela com DHL vermelho (dhlCanvas)
+  dhl: [['#ffcc00', '#d40511', 'DHL']]
 };
 
 const TOPPERS: Record<AdScheme, [string, string, string]> = {
@@ -63,7 +66,8 @@ const TOPPERS: Record<AdScheme, [string, string, string]> = {
   avis: ['#c8102e', '#ffffff', 'AVIS'],
   branco: ['#ffffff', '#006039', 'ROLEX'],
   verde: ['#006039', '#e8c44a', 'ROLEX'],
-  muro_verde: ['#104a14', '#104a14', '']
+  muro_verde: ['#104a14', '#104a14', ''],
+  dhl: ['#ffcc00', '#d40511', 'DHL'] // (sem uso: o muro DHL não tem faixa em cima; ver topperAt)
 };
 function topperCanvas(scheme: AdScheme): HTMLCanvasElement {
   const [bg, fg, text] = TOPPERS[scheme];
@@ -138,6 +142,37 @@ export function adCanvas(scheme: AdScheme, panels: number, pw: number, ph: numbe
     g.fillRect(x, 0, 2, ph);
   }
   return compensaLuz(c);
+}
+
+/**
+ * Fase 7: ganho da placa DHL da Ferradura (pendência da Fase 1: "muro DHL pálido"). Com o PLACA_GANHO comum o amarelo
+ * saía creme na tela (228/193/106 contra 171–204/136–161/45–63 no LMU, chase s 2030/2110/2150, mediana dos pixels
+ * amarelos); calibrado nas capturas do setor (build/interlagos/fase7/dhl_*.txt). Só vale para o esquema 'dhl'.
+ */
+export const DHL_GANHO = 0.16;
+export const DHL_COR = '#ffc400';
+
+/**
+ * Placa DHL do LMU: fundo amarelo liso, "DHL" vermelho em itálico grosso com três filetes de velocidade à esquerda;
+ * `panels` logos por textura (pw × ph cada).
+ */
+export function dhlCanvas(panels: number, pw: number, ph: number): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = pw * panels;
+  c.height = ph;
+  const g = c.getContext('2d')!;
+  g.fillStyle = DHL_COR;
+  g.fillRect(0, 0, c.width, ph);
+  g.fillStyle = '#d40511';
+  for (let k = 0; k < panels; k++) {
+    const x = k * pw;
+    g.font = `900 italic ${Math.round(ph * 0.62)}px Arial`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('DHL', x + pw * 0.56, ph * 0.52, pw * 0.6);
+    for (let j = 0; j < 3; j++) g.fillRect(x + pw * 0.06 + j * pw * 0.02, ph * (0.36 + j * 0.12), pw * 0.16, ph * 0.06);
+  }
+  return compensaLuz(c, DHL_GANHO);
 }
 
 export function tex(c: HTMLCanvasElement, renderer: THREE.WebGLRenderer, wrap = true): THREE.Texture {
@@ -359,7 +394,7 @@ export function buildBarriers(track: Track, group: THREE.Group, renderer: THREE.
   const adMats = new Map<AdScheme, THREE.Material>();
   const adMat = (a: AdScheme) => {
     if (!adMats.has(a))
-      adMats.set(a, new THREE.MeshStandardMaterial({ map: tex(adCanvas(a, 4, 256, 64), renderer), roughness: 0.55, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 }));
+      adMats.set(a, new THREE.MeshStandardMaterial({ map: tex(a === 'dhl' ? dhlCanvas(4, 256, 64) : adCanvas(a, 4, 256, 64), renderer), roughness: 0.55, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 }));
     return adMats.get(a)!;
   };
 
@@ -370,7 +405,13 @@ export function buildBarriers(track: Track, group: THREE.Group, renderer: THREE.
   };
   /** esquema da faixa de cima em cada amostra: o do trecho; nas barreiras azuis, a amarela (sem ela onde topo: false) */
   const topperAt = (side: -1 | 1, i: number): AdScheme | null =>
-    lay.kind[side][i] === 'wall' ? lay.ads[side][i] ?? 'amarelo' : lay.kind[side][i] === 'tecpro' && lay.topo[side][i] ? 'amarelo' : null;
+    lay.kind[side][i] === 'wall'
+      ? lay.ads[side][i] === 'dhl' // Fase 7: o muro DHL do LMU é só a placa, sem faixa em cima
+        ? null
+        : lay.ads[side][i] ?? 'amarelo'
+      : lay.kind[side][i] === 'tecpro' && lay.topo[side][i]
+        ? 'amarelo'
+        : null;
   const cableMat = new THREE.MeshStandardMaterial({ color: 0x3c4146, metalness: 0.6, roughness: 0.45, side: THREE.DoubleSide });
 
   for (const side of [-1, 1] as const) {
@@ -388,7 +429,8 @@ export function buildBarriers(track: Track, group: THREE.Group, renderer: THREE.
     strip(side, 1.15, 0, 1.15, -0.25, wall, capMat, 4, false);
     for (const a of Object.keys(AD_SETS) as AdScheme[]) {
       // muro_verde (Fase 5): pintura da face inteira, não placa
-      const [h0, h1] = a === 'muro_verde' ? [0.02, 1.13] : [0.18, 0.98];
+      // dhl (Fase 7): a placa amarela cobre quase a face inteira (LMU s 2030/2150)
+      const [h0, h1] = a === 'muro_verde' ? [0.02, 1.13] : a === 'dhl' ? [0.05, 1.1] : [0.18, 0.98];
       strip(side, h0, 0.02, h1, 0.02, i => wall(i) && lay.ads[side][i] === a, adMat(a), 16, false);
     }
     // barreira azul simples: 1 m de altura, 60 cm de espessura
@@ -607,6 +649,7 @@ export function buildBridge(track: Track, group: THREE.Group, renderer: THREE.We
   // (até a Fase 6 aqui havia buildDescidaLagoGoodyear: barreira dupla desenhada colada na zebra esquerda em s 1394–1582;
   // agora é a barreira "tecpro2" do perfil lateral, no muro da física, de s ~1490 a 1658 — ver setor6_perfil.py)
   buildFerraduraWall(track, group, renderer);
+  buildPlacaAmarelaEsse(track, group, renderer);
   buildGrassSigns(track, group, renderer);
   buildSennaTents(track, group, heightAt);
   buildSennaBuilding(track, group, renderer, heightAt);
@@ -1368,20 +1411,28 @@ function buildSennaBuilding(track: Track, group: THREE.Group, renderer: THREE.We
   group.add(grp);
 }
 
-/** Paredão de concreto atrás da barreira amarela DHL na Ferradura com faixa DHL (s = 2005..2140 m, frame 15). */
+/**
+ * Paredão de concreto atrás da barreira DHL na Ferradura/Laranjinha, com a faixa grande DHL. Fase 7: desenhado onde o
+ * perfil lateral pede (`barreira.paredao`, ./perfil.ts) em vez do trecho fixo s antigo-4300 2005–2140; LMU (chase s
+ * 2070–2270): começa logo depois da arquibancada virada para a Ferradura (~2086) e vai até o fim da Laranjinha (~2276),
+ * pedra cinza com a faixa DHL na parte de baixo (~1,3–2,9 m), o topo a ~5,5 m. Antes: faixa de 2,5 a 5,0 m e muro até
+ * 6,2 m, pálida (amarelo do adCanvas comum).
+ */
 function buildFerraduraWall(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
   const S = track.samples;
   const N = S.length;
-  const i0 = iNovo4300(2005);
-  const i1 = iNovo4300(2140);
-  const wallMat = new THREE.MeshStandardMaterial({ color: 0x7b7e82, roughness: 0.9, side: THREE.DoubleSide });
+  const p = perfilDe(track);
+  // Fase 7: pedra cinza-escura (LMU chase s 2130/2150/2250: 64–66/68–71/83–84 na tela, face na sombra); antes 0x7b7e82,
+  // que saía 177–184 (quase branco) com o sol batendo de frente. conferir_glb.py reconhece as duas cores.
+  const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.9, side: THREE.DoubleSide });
   const bannerMat = new THREE.MeshStandardMaterial({
-    map: tex(adCanvas('amarelo', 4, 256, 64), renderer),
+    map: tex(dhlCanvas(4, 256, 64), renderer),
     roughness: 0.5,
     side: THREE.DoubleSide
   });
 
-  const makeWallBand = (h0: number, h1: number, offsetExtra: number, mat: THREE.Material, vScale: number) => {
+  /** faixa de h0 a h1; com `fim`, o topo desce para h0 + fim nos últimos 12 m (o paredão morre no talude, LMU s 2270) */
+  const makeWallBand = (side: -1 | 1, i0: number, i1: number, h0: number, h1: number, offsetExtra: number, mat: THREE.Material, vScale: number, fim?: number) => {
     const pos: number[] = [];
     const uv: number[] = [];
     const idx: number[] = [];
@@ -1390,12 +1441,14 @@ function buildFerraduraWall(track: Track, group: THREE.Group, renderer: THREE.We
     for (let i = i0; i <= i1; i++) {
       const s = S[i % N];
       const base = pos.length / 3;
-      const d = -(s.wallL + offsetExtra);
-      for (const [h, u] of [[h0, 0], [h1, 1]] as const) {
+      const d = side * ((side < 0 ? s.wallL : s.wallR) + offsetExtra);
+      const resto = (i1 - i) * STEP;
+      const topo = fim !== undefined && resto < 12 ? h0 + fim + (h1 - h0 - fim) * (resto / 12) : h1;
+      for (const [h, u] of [[h0, 0], [topo, 1]] as const) {
         v.copy(s.p).addScaledVector(s.r, d);
         v.y += h;
         pos.push(v.x, v.y, v.z);
-        uv.push(((i - i0) * STEP) / vScale, u);
+        uv.push((side < 0 ? 1 : -1) * (((i - i0) * STEP) / vScale), u);
       }
       if (prev >= 0) idx.push(prev, base, prev + 1, prev + 1, base, base + 1);
       prev = base;
@@ -1410,8 +1463,38 @@ function buildFerraduraWall(track: Track, group: THREE.Group, renderer: THREE.We
     m.receiveShadow = true;
     group.add(m);
   };
-  makeWallBand(-2.0, 6.2, 1.5, wallMat, 8);
-  makeWallBand(2.5, 5.0, 1.38, bannerMat, 18);
+  for (const [side, A] of [[-1, p.L], [1, p.R]] as const) {
+    for (let i = 0; i < N; i++) {
+      if (!A[i].paredao || (i > 0 && A[i - 1].paredao)) continue;
+      let j = i;
+      while (j + 1 < N && A[j + 1].paredao) j++;
+      if (j <= i) continue;
+      makeWallBand(side, i, j, -2.0, 5.5, 1.5, wallMat, 8, 3.2);
+      makeWallBand(side, i, j, 1.3, 2.9, 1.38, bannerMat, 20, 0);
+    }
+  }
+}
+
+/**
+ * Fase 7: placa amarela DHL baixa na grama à direita antes da Esse (a "yellow board" da freada: LMU chase s 2230/2250 e
+ * onboard s 2230, ~10–15 m à frente do carro em s 2250 → s ~2260, na grama a ~3,5 m da borda). Referência de pilotagem: `ess_`
+ * (visível no Mínimo).
+ */
+function buildPlacaAmarelaEsse(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
+  const s = track.samples[Math.round(2260 / STEP) % track.samples.length];
+  const back = new THREE.MeshStandardMaterial({ color: 0x3c3f44, roughness: 0.8 });
+  const face = new THREE.MeshStandardMaterial({ map: tex(dhlCanvas(1, 256, 96), renderer, false), roughness: 0.55 });
+  const W = 2.4;
+  const H = 0.9;
+  const board = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.12), [back, back, back, back, face, back]);
+  // na grama, entre a borda e o guard-rail (aqui a borda + 5–6 m)
+  const base = s.p.clone().addScaledVector(s.r, s.wr + Math.min(3.5, s.wallR - s.wr - 1.2));
+  board.position.copy(base).add(new THREE.Vector3(0, 0.25 + H / 2, 0));
+  board.lookAt(base.clone().sub(s.t).setY(board.position.y));
+  board.castShadow = true;
+  board.receiveShadow = true;
+  board.userData.essential = true;
+  group.add(board);
 }
 
 /** Placas pequenas de patrocinador no gramado e anel de pneus em árvore isolada (frames 13, 19, 25). */
