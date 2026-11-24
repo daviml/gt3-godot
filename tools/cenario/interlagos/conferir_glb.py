@@ -66,6 +66,26 @@ def lerp(a, i, u):
     return a[i] * (1 - u) + a[(i + 1) % N] * u
 
 
+# Fase 3: o gerador sobe o que fica além da borda + 3 m no lado baixo de camber forte do setor 3 (s 3900–248, rampa de
+# 20 m nas pontas; tools/cenario/interlagos/ajusteLateral.ts): a altura das barreiras é medida contra esse chão
+AJ_TRECHOS, AJ_RAMPA, AJ_PEND, AJ_FOLGA = [(3900.0, 248.0)], 20.0, 0.04, 3.0
+L_PISTA = float(T['length'])
+
+
+def ajuste_lateral(i, d):
+    s = i * L_PISTA / N
+    w = np.zeros(len(i))
+    for a, b in AJ_TRECHOS:
+        ln = (b - a) % L_PISTA
+        x = (s - a) % L_PISTA
+        w = np.maximum(w, np.where(x <= ln, np.clip(np.minimum(x / AJ_RAMPA, (ln - x) / AJ_RAMPA), 0, 1), 0))
+    t = R[i, 1] / np.hypot(R[i, 0], R[i, 2])
+    borda = np.where(d < 0, WL[i], WR[i]) + AJ_FOLGA
+    alem = np.abs(d) - borda
+    ok = (d * t < 0) & (np.abs(t) > AJ_PEND) & (alem > 0)
+    return np.where(ok, w * alem * (np.abs(t) - AJ_PEND), 0.0)
+
+
 # ---------------------------------------------------------------- GLB
 def le_glb(path):
     b = open(path, 'rb').read()
@@ -235,6 +255,7 @@ dentro = {}
 perto = np.zeros((N, 2), bool)
 for tp, V in bar:
     i, u, d, h = localiza(V)
+    h = h - ajuste_lateral(i, d)  # Fase 3 (0 fora do setor 3)
     jj = np.where(u < 0.5, i, (i + 1) % N)
     lado = (d > 0).astype(int)
     wall = np.where(lado == 1, lerp(MR, i, u), lerp(ML, i, u))

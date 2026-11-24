@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { buildExtras } from '@web/render/scenery';
-import { buildBarriers, buildBridge, buildGrid, buildPatches } from '@web/render/trackDetails';
+import { adCanvas, buildBarriers, buildBridge, buildGrid, buildPatches, tex } from '@web/render/trackDetails';
 import { buildBanners, buildCornerDetails, buildMarshalPosts, buildPits, buildStands, occupied } from '@web/render/trackside';
 import { buildOsmScenery, OsmData } from '@web/render/osmScenery';
 import osm from '../../tracks/interlagos/interlagos-osm.json';
@@ -25,6 +25,7 @@ import { aplicarPerfil } from './perfil';
 import { L_ANTIGO, sNovo } from './sNovo';
 import { randLocal, randPorArvore, randPosicao } from './sorteio';
 import { arvoresPorSetor, muroAncora } from './arvoresSetor';
+import { ajusteLateral, alturaLateral, comAjuste, FOLGA } from './ajusteLateral';
 
 /**
  * Pintura da borda de Interlagos (PLANO-INTERLAGOS-DETALHES.md, Fase 1): uma tabela só com as medidas, em vez
@@ -151,6 +152,8 @@ function ribbon(
     const base = pos.length / 3;
     for (const [off, u] of [[a(i), 0], [b(i), 1]] as const) {
       v.copy(s.p).addScaledVector(s.r, off).addScaledVector(s.n, lift);
+      // Fase 3: além da borda do lado baixo de camber forte, o chão real quase não cai (./ajusteLateral.ts; 0 fora do setor 3)
+      v.y += ajusteLateral(track, i, off);
       pos.push(v.x, v.y, v.z);
       uv.push(uScale ? off / uScale : u, (k * STEP) / vScale);
     }
@@ -326,33 +329,54 @@ function sausage(
   return g;
 }
 
-/** Pórtico de largada sobre a linha de chegada, com o semáforo (5 luzes) e um painel. */
-function buildStartGantry(track: Track, group: THREE.Group) {
-  const s0 = track.samples[0];
-  const mat = new THREE.MeshStandardMaterial({ color: 0x2b2e33, metalness: 0.5, roughness: 0.5 });
+/**
+ * Pórtico de largada: verde ROLEX sobre a reta, com o semáforo (5 luzes) embaixo. Fase 3: em s 64,5 (estrutura fina
+ * sobre a reta no satélite, Fase 2; LMU chase s 20: pórtico verde com logos ROLEX à frente, fora do quadro em s 50); antes
+ * ficava em s 0, em cima da linha de chegada, cinza-escuro.
+ */
+const S_PORTICO = 64.5;
+function buildStartGantry(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
+  const S = track.samples;
+  const k = Math.floor(S_PORTICO / STEP);
+  const u = S_PORTICO / STEP - k;
+  const a = S[k];
+  const b = S[k + 1];
+  const p = a.p.clone().lerp(b.p, u);
+  const r = a.r.clone().lerp(b.r, u).setY(0).normalize();
+  const t = a.t.clone().lerp(b.t, u).setY(0).normalize();
+  const wl = a.wl + (b.wl - a.wl) * u;
+  const wr = a.wr + (b.wr - a.wr) * u;
+  const wallL = a.wallL + (b.wallL - a.wallL) * u;
+  const wallR = a.wallR + (b.wallR - a.wallR) * u;
+  const steel = new THREE.MeshStandardMaterial({ color: 0x2b2e33, metalness: 0.5, roughness: 0.5 });
+  const verde = new THREE.MeshStandardMaterial({ color: 0x006039, roughness: 0.55 });
   const g = new THREE.Group();
-  const span = s0.wl + s0.wr + 4;
-  const h = 6.5;
+  // postes logo atrás dos muros (o vão é de muro a muro)
+  const span = wallL + wallR + 1.0;
+  const h = 6.8;
   for (const x of [-span / 2, span / 2]) {
-    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.4, h, 0.4), mat);
-    pole.position.set(x, h / 2, 0);
+    const pole = new THREE.Mesh(new THREE.BoxGeometry(0.5, h + 1.4, 0.5), steel);
+    pole.position.set(x, (h + 1.4) / 2, 0);
     g.add(pole);
   }
-  const beam = new THREE.Mesh(new THREE.BoxGeometry(span, 0.6, 0.5), mat);
-  beam.position.set(0, h, 0);
-  g.add(beam);
+  const tx = tex(adCanvas('verde', 4, 256, 64), renderer);
+  tx.repeat.set(span / 24, 1);
+  const face = new THREE.MeshStandardMaterial({ map: tx, roughness: 0.5 });
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(span, 1.4, 0.45), [verde, verde, verde, verde, face, face]);
+  panel.position.set(0, h + 0.7, 0);
+  g.add(panel);
   const lights = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.8, 0.35), new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 }));
-  lights.position.set(0, h - 0.7, 0.1);
+  lights.position.set((wallL - wallR) / 2 + (wr - wl) / 2, h - 0.45, 0.1);
   g.add(lights);
-  for (let k = 0; k < 5; k++) {
+  for (let j = 0; j < 5; j++) {
     const led = new THREE.Mesh(new THREE.CircleGeometry(0.18, 16), new THREE.MeshStandardMaterial({ color: 0x2a0000, emissive: 0x330000 }));
-    led.position.set(-1.2 + k * 0.6, h - 0.7, 0.29);
+    led.position.set(lights.position.x - 1.2 + j * 0.6, h - 0.45, 0.29);
     g.add(led);
   }
   g.traverse(o => (o.castShadow = true));
-  // centralizado na pista, de frente para quem chega
-  g.position.copy(s0.p).addScaledVector(s0.r, (s0.wr - s0.wl) / 2);
-  g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(s0.r, new THREE.Vector3(0, 1, 0), s0.t.clone().negate()));
+  // centro do vão entre os muros, de frente para quem chega
+  g.position.copy(p).addScaledVector(r, (wallR - wallL) / 2);
+  g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(r, new THREE.Vector3(0, 1, 0), t.clone().negate()));
   group.add(g);
 }
 
@@ -500,8 +524,16 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
 
   // grama da borda até o muro: verde e seca misturadas como nas fotos
   const grassMat = terrainMaterial(renderer);
-  mesh(ribbon(track, i => -S[i].wallL - 1, i => -S[i].wl, -0.03, 6, 6), grassMat);
-  mesh(ribbon(track, i => S[i].wr, i => S[i].wallR + 1, -0.03, 6, 6), grassMat);
+  // (Fase 3: no setor 3 a grama é cortada em borda + FOLGA, onde o chão muda de inclinação (./ajusteLateral.ts), e o
+  // resto vai numa segunda faixa; com uma faixa só, a corda reta da borda ao muro passava por cima da pista dos boxes)
+  const cortaL = (i: number) => comAjuste(track, i) && S[i].wallL + 1 > S[i].wl + FOLGA;
+  const cortaR = (i: number) => comAjuste(track, i) && S[i].wallR + 1 > S[i].wr + FOLGA;
+  mesh(ribbon(track, i => (cortaL(i) ? -S[i].wl - FOLGA : -S[i].wallL - 1), i => -S[i].wl, -0.03, 6, 6), grassMat);
+  mesh(ribbon(track, i => S[i].wr, i => (cortaR(i) ? S[i].wr + FOLGA : S[i].wallR + 1), -0.03, 6, 6), grassMat);
+  mesh(mergeGeometries([
+    ribbon(track, i => -S[i].wallL - 1, i => -S[i].wl - FOLGA, -0.03, 6, 6, cortaL),
+    ribbon(track, i => S[i].wr + FOLGA, i => S[i].wallR + 1, -0.03, 6, 6, cortaR)
+  ]), grassMat);
 
   const concrete = pbr('concrete_wall_008', renderer, { color: 0xe4e2dc, side: THREE.DoubleSide });
   // Mínimo (celular fraco): só o que ajuda a pilotar — pista, muros, boxes, grid, terreno e placas de freada
@@ -538,7 +570,7 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
   line.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(s0.r, s0.t.clone().negate(), s0.n));
   line.receiveShadow = true;
   group.add(line);
-  buildStartGantry(track, group);
+  buildStartGantry(track, group, renderer);
 
   const heightAt = buildTerrain(track, group, grassMat);
   buildBridge(track, group, renderer, heightAt);
@@ -609,6 +641,7 @@ function buildTerrain(track: Track, group: THREE.Group, grassMat: THREE.MeshStan
     const cz = Math.floor(z / coarse);
     let best = Infinity;
     let h = 0;
+    let kb = -1;
     for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) {
       for (const k of buckets.get(`${cx + i},${cz + j}`) ?? []) {
         const p = S[k].p;
@@ -616,8 +649,16 @@ function buildTerrain(track: Track, group: THREE.Group, grassMat: THREE.MeshStan
         if (d2 < best) {
           best = d2;
           h = p.y;
+          kb = k;
         }
       }
+    }
+    // Fase 3: no setor 3 o terreno perto da pista segue o camber (antes ficava na altura do centro − 0,6 m e cobria
+    // 3–5 m do asfalto do lado baixo da curva das Arquibancadas); ./ajusteLateral.ts, 0 fora do setor
+    if (kb >= 0) {
+      const sk = S[kb];
+      const rh = Math.hypot(sk.r.x, sk.r.z);
+      h += alturaLateral(track, kb, ((x - sk.p.x) * sk.r.x + (z - sk.p.z) * sk.r.z) / rh);
     }
     // relevo real (SRTM) longe da pista; perto dela, a altura da própria pista (os cortes e aterros da pista
     // não aparecem no satélite de 30 m)
@@ -696,13 +737,32 @@ function buildScenery(
   // volta da tentativa 1.140 (sem teto dariam ~41 mil árvores); o teto global é o que espalhava as mudanças, então
   // fica o número de tentativas que dá a mesma densidade.
   const TENTATIVAS = 1140;
+  // (Fase 3) a amostra mais próxima em planta é da reta dos boxes do setor 3 (s 3900–4306)?
+  const noSetor3 = (x: number, z: number) => {
+    let best = Infinity;
+    let k = 0;
+    for (let i = 0; i < S.length; i++) {
+      const d2 = (S[i].p.x - x) ** 2 + (S[i].p.z - z) ** 2;
+      if (d2 < best) {
+        best = d2;
+        k = i;
+      }
+    }
+    return S[k].s >= 3900;
+  };
   for (let tries = 0; tries < TENTATIVAS; tries++) {
     const rand = randLocal(7, tries);
     const iS = Math.floor(rand() * S.length);
     const s = S[iS];
-    // reta dos boxes: arquibancada e paddock, sem mata (s antigo 3734 e 120 → s novo)
-    if (s.s > sNovo(L_ANTIGO - 560) || s.s < sNovo(120)) continue;
+    // reta dos boxes: arquibancada e paddock, sem mata (s antigo 3734 e 120 → s novo). Fase 3: exceto à direita de s
+    // 3900–4110, onde o LMU (chase s 3910–4120) mostra mata logo atrás da arquibancada aberta (copa do LiDAR 0,4–0,85 a
+    // 20–110 m além do muro); a ordem dos sorteios não muda (o lado sai do mesmo rand() de antes) e as árvores dessas
+    // tentativas só ficam se a amostra mais próxima for do setor 3 (3900–4306)
+    const reta = s.s > sNovo(L_ANTIGO - 560) || s.s < sNovo(120);
+    const plantio3 = s.s >= 3900 && s.s <= 4110;
+    if (reta && !plantio3) continue;
     const side = rand() < 0.5 ? -1 : 1;
+    if (reta && side < 0) continue;
     // âncora no muro da física (congelado onde um setor o moveu: arvores.ancora, ./arvoresSetor.ts)
     const off = muroAncora(track, iS, side) + 10 + Math.pow(rand(), 1.4) * 150;
     p.copy(s.p).addScaledVector(s.r, side * off);
@@ -716,6 +776,7 @@ function buildScenery(
       const x = p.x + Math.cos(a) * r;
       const z = p.z + Math.sin(a) * r;
       if (!free(x, z, s.p.y)) continue;
+      if (reta && !noSetor3(x, z)) continue;
       // tamanho e giro pela posição da árvore; no chão do terreno (não na altura da pista mais próxima: em barranco
       // a árvore flutuaria)
       const rp = randPosicao(x, z, 0x5ce7);

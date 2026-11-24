@@ -380,10 +380,36 @@ Desde a Fase 2B os setores usam o **s novo** (pista de 4.308 m); converter os li
   ROLEX); física da área de escape trata como grama; árvores atrás do guard-rail esq em 1020–1300 bloqueadas pela
   regra `occupied` do `trackside.ts` (vale a volta toda); ondulação da borda dir em ~866–880; props pequenos
   (pneus, fiscais, carros no morro); alambrado sobre o fim do MOTUL; cor do muro verde não remedida.
-- **Pendências do setor:** muro esq 440–480 parece perto demais (conferir no satélite antes de mexer na
-  física); emenda do vermelho com a Reta Oposta em 779–790 (Fase 5); logo ROLEX e faixas amarelas pintadas no
-  ápice; muro de arrimo/estacionamento à direita (450–600) e torre de concreto (650–730); remendo escuro no
-  asfalto em s 480 e cones em s 300.
+
+**Resultado da Fase 3 (24/11/2026) — feita, aguardando o Davi olhar a folha:**
+- Ficha `build/ref/interlagos/fichas/setor-3.md`; folhas `build/ref/interlagos/folhas/fase3_ini_*` e `fase3_fim_*`
+  (s novo 3900–4308 e 0–250). Perfil por `tools/cenario/interlagos/setor3_perfil.py` (cruza a linha de chegada).
+- **Erro do atlas neste trecho medido:** o vídeo está 10–13 m atrás do s real da reta até o S (linha de chegada,
+  pórtico de largada, bico do muro dos boxes), caindo para ~5 m na passarela. Confirma a ressalva da Fase 0; os
+  objetos foram posicionados pelo s real.
+- **Objetos movidos:** placas de freada do S = só 150/100/50, brancas e altas no alambrado da direita, em s
+  100/140/180 (antes 200/150/100/50 em 89–239), visíveis no Mínimo; pórtico de largada verde ROLEX com semáforo em
+  s 64,5 (antes cinza em s 0); linha de largada em s 38; grid de 4140 a 36 (passa da linha de chegada, como em
+  Interlagos). A linha de chegada/cronometragem continua em s 0.
+- **Entrada dos boxes:** pista dos boxes colada na pista desde 3940, divisas (>>>) em 3986–4022, ilha verde de 3986
+  a ~4110 com a pista dos boxes por fora, bico com a barreira <<O>> em ~4110, muro dos boxes a partir de 4100;
+  pit lane e garagens até 228 e cobertura do paddock até 244.
+- **Física:** só `wallL` em 3936–4306 — muro de fora da pista dos boxes (borda + 7,5 → 28 m) na entrada e muro dos
+  boxes a borda + 4 m (antes 1,5 m). Centro, larguras, zebras e camber iguais. RefBot igual (+1,07–1,50%).
+- **Visual:** verde até o muro nos dois lados da reta; painéis AVIS só até 3926 e muro verde ROLEX depois;
+  arquibancada da direita sem cobertura em 3900–4240 (aberta, com árvores atrás, como no LMU); terreno do lado
+  baixo da reta acompanha o camber de até 7,4° (`ajusteLateral.ts`: antes a grama cobria 3–5 m do asfalto).
+- **Árvores:** 505 → 313 no setor (tirada a mata atrás da entrada dos boxes e do paddock; +44 atrás da
+  arquibancada aberta). Volta 4.243 → **4.051**.
+- **Conferências:** suíte headless inteira passa (24 scripts, sem teste alterado); `conferir_glb.py` sem regressão;
+  Laguna e Imola iguais.
+- **Bench:** Le Mans Ultimate aberto. Mínimo 5,02 ms igual a antes (207 → 209 draw calls). Leve e Médio
+  inconclusivos (o mesmo GLB novo variou 9,9 ↔ 6,5 ms e 18,7 ↔ 14,0 ms); draw calls +2/+8, triângulos +1%.
+  **Repetir o bench com o LMU e o BlueStacks fechados** antes da Fase 11.
+- **Pendências:** muro dos boxes baixo (as garagens aparecem por cima; no LMU ele as esconde); plataforma do
+  largador; letras ROLEX na ilha e tom das divisas; linha tracejada da pista dos boxes; faixa MICHELIN; tom do muro
+  verde em 170–230; palmeiras e posto de fiscal; faixa esquerda de 0–248 (verde × cinza). Fora do setor: postes de
+  guard-rail/alambrado na altura do centro em curvas com camber; placas de freada das outras curvas sem `ess_`.
 
 ### Fase 11 — Passada final da volta inteira
 - Volta completa em movimento (`--mover`) nas duas câmeras, folha a cada 50 m, nos 4 presets.

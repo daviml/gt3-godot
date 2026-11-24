@@ -101,6 +101,14 @@ Paridade: o `paridade.ts` aplica o `bank` na pista do web (`applyBank`), e o `pa
   `build/interlagos/fase5/esq_par.jpg`, OSM: ponta em s antigo 825). O `track.json` mudou só em s 770–920 (`wallL` 818–836,
   `wallR` 770–920, `runL` 806–836, `runR` 776–798); terreno: 435 células perto desses muros (até 0,8 m). RefBot igual
   (+1,07–1,50%), paridade 0,00%.
+- **Muros corrigidos na Fase 3** (setor 3, reta dos boxes; `MURO_F3` em `build_track.py`, janela em s NOVO; ficha
+  `build/ref/interlagos/fichas/setor-3.md`): entrada dos boxes (esq. 3940–4098) no muro de fora da pista dos boxes, borda +
+  7,5 → 28 m (satélite `build/interlagos/fase3/sat_esq_d2.jpg`; antes o muro ficava na ilha, borda + 1,5–6 m); bico do muro
+  dos boxes em ~4104 (diagonal até ~4116); muro dos boxes a borda + 4,0 m em 4106–4296 (pintura verde de 4,0 m no satélite;
+  antes borda + 1,5 m), rampa de volta em 4296–4304. O `track.json` mudou só em `wallL` (s 3936–4306); o `s_antigo_novo.json`
+  sai igual; terreno: 180 células (até 0,58 m). RefBot igual (+1,07–1,50%), paridade 0,00%. O muro de fora da pista dos
+  boxes em 4024–4100 fica a ~24 m da linha da Laranjinha (s ~2260) e a 37 m da reta: a conferência do GLB atribui essas
+  barreiras à Laranjinha e acusa "sem barreira" em 4024–4100 na reta (falso: a barreira está no muro da física).
 - **Saída dos boxes** (s antigo 800–1000, esq.): faixa de aceleração = escape asfaltado (`runLeft`, aplicado pelo
   `applyRunoffMin` do `bank.ts`) até 0,5 m do guard-rail, e muro ≥ borda + zebra + 5,5 m (vídeo s0860/s0940: ~4–5 m
   de asfalto antes do guard-rail). A borda esquerda ali (pulava 5,0 ↔ 8,2 m entre a linha branca e a faixa) foi

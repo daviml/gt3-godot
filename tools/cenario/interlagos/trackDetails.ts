@@ -16,7 +16,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { phTexture } from '@web/render/textures';
 import { TINTA } from './tintas';
 import { perfilDe, type TipoBarreira } from './perfil';
-import { dNovo4300, iNovo4300, L_ANTIGO, s4300, sNovo } from './sNovo';
+import { dNovo4300, iNovo4300, s4300 } from './sNovo';
+import { ajusteLateral, comAjuste } from './ajusteLateral';
 
 export type AdScheme = 'verde' | 'vermelho' | 'amarelo' | 'branco' | 'azul' | 'avis' | 'muro_verde';
 type Kind = TipoBarreira;
@@ -318,7 +319,7 @@ export function buildBarriers(track: Track, group: THREE.Group, renderer: THREE.
       const base = pos.length / 3;
       for (const [h, inset, u] of [[h0, in0, 0], [h1, in1, 1]]) {
         v.copy(s.p).addScaledVector(s.r, side * (wall - inset));
-        v.y += h;
+        v.y += h + ajusteLateral(track, i, side * (wall - inset)); // Fase 3 (0 fora do setor 3)
         pos.push(v.x, v.y, v.z);
         // do lado direito a face fica virada ao contrário: inverte o sentido da textura para o texto não espelhar
         uv.push((side < 0 ? 1 : -1) * ((k * STEP) / vScale), u);
@@ -437,6 +438,9 @@ export function buildBarriers(track: Track, group: THREE.Group, renderer: THREE.
       if (tall ? i % 4 : !rail) continue;
       const off = side * ((side < 0 ? s.wallL : s.wallR) + 0.08);
       p.set(s.p.x + s.r.x * off, s.p.y, s.p.z + s.r.z * off);
+      // Fase 3: no setor 3 o poste fica no pé da barreira (plano inclinado da pista + ./ajusteLateral.ts), como as
+      // faixas do guard-rail/alambrado; no resto da volta continua na altura do centro (como antes)
+      if (comAjuste(track, i)) p.y += s.r.y * off + ajusteLateral(track, i, off);
       if (tall) {
         m.compose(p, q0, sc.set(1.7, 4.3, 1.7));
         fencePosts.setMatrixAt(fp++, m);
@@ -1012,7 +1016,6 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
     const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
     return t * t * (3 - 2 * t);
   };
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
   const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x3e4044, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, side: THREE.DoubleSide });
   const lineMat = new THREE.MeshStandardMaterial({ color: 0xeeeee8, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, side: THREE.DoubleSide });
 
@@ -1042,7 +1045,7 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
       const base = pos.length / 3;
       for (const [off, u] of [[r[0], 0], [r[1], 1]] as const) {
         v.copy(s.p).addScaledVector(s.r, off);
-        v.y += yLift;
+        v.y += yLift + ajusteLateral(track, i % N, off); // Fase 3 (0 fora do setor 3)
         pos.push(v.x, v.y, v.z);
         if (vScale) uv.push(u, ((i - sA) * STEP) / vScale);
       }
@@ -1079,15 +1082,29 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
   atGrp.traverse(o => { o.castShadow = true; o.receiveShadow = true; });
   group.add(atGrp);
 
-  // 2) Entrada real dos boxes (s = 3860..4040 m, frame 29): asfalto da faixa, ilha verde com chevrons >>> e barreira no bico
+  // 2) Entrada dos boxes. Fase 3 (s NOVO; ficha build/ref/interlagos/fichas/setor-3.md): a pista dos boxes e a ilha verde
+  // vêm do perfil lateral (setor3_perfil.py: escape "asfalto" colado na pista em 3940–3984; ilha = escape "verde" e pista
+  // dos boxes = escape.fora "asfalto" em 3986–4098) e o muro da física fica no muro de fora da pista dos boxes
+  // (build_track.py MURO_F3). Aqui só as divisas (>>>) da ponta da ilha (satélite s 3985–4020; LMU chase s 3970–4000),
+  // a linha branca entre a ilha e a pista dos boxes e a barreira <<O>> no bico do muro dos boxes (satélite: ponta em
+  // s ~4104; LMU chase s 4030–4090). Antes (s antigo-4300 3860–4040 → novo ~3870–4049): asfalto e divisas a partir de
+  // ~3895 e o bico em ~4049, 45–55 m antes do real.
+  // O começo da faixa antiga (s antigo-4300 3860 → novo ~3870, antes de 3900) é do setor 10 e fica como estava.
+  const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
   const entryWidth = (sm: number) => lerp(lerp(0.5, 9.2, smooth(3860, 3915, sm)), 11.5, smooth(4010, 4040, sm));
-  makeBand((s, sm) => [-(s.wl + entryWidth(sm)), -(s.wl + 0.04)], 0.01, asphaltMat, 3860, 4040);
+  makeBand((s, sm) => (s.s < 3900 ? [-(s.wl + entryWidth(sm)), -(s.wl + 0.04)] : null), 0.01, asphaltMat, 3860, 4040);
   makeBand((s, sm) => {
     const w = entryWidth(sm);
-    return [-(s.wl + w), -(s.wl + w - 0.22)];
+    return s.s < 3900 ? [-(s.wl + w), -(s.wl + w - 0.22)] : null;
   }, 0.016, lineMat, 3860, 4040);
-
-  // Ilha verde com chevrons brancos entre a pista (-wl) e a faixa dos boxes (-(wl + 4.5))
+  const ILHA: [number[], number[]] = [[3986, 4000, 4020, 4040, 4060, 4098], [0, 3, 7, 11, 13, 13]]; // = setor3_perfil.py
+  const ilha = (sn: number) => {
+    const [xs, ys] = ILHA;
+    if (sn < xs[0] || sn > xs[xs.length - 1]) return 0;
+    let k = 0;
+    while (k < xs.length - 2 && sn > xs[k + 1]) k++;
+    return ys[k] + ((ys[k + 1] - ys[k]) * (sn - xs[k])) / (xs[k + 1] - xs[k]);
+  };
   const chevronMat = new THREE.MeshStandardMaterial({
     map: pitChevronTexture(renderer),
     roughness: 0.8,
@@ -1095,21 +1112,29 @@ function buildPitEntry(track: Track, group: THREE.Group, renderer: THREE.WebGLRe
     polygonOffsetFactor: -2,
     side: THREE.DoubleSide
   });
-  makeBand((s, sm) => {
-    const w = 4.5 * smooth(3885, 3910, sm);
-    return w > 0.2 ? [-(s.wl + w), -(s.wl + 0.05)] : null;
-  }, 0.015, chevronMat, 3885, 4038, 14);
+  // makeBand recebe s na convenção antiga (4.300 m): as pontas em s novo passam por s4300
+  makeBand(s => {
+    const w = Math.min(ilha(s.s), 7);
+    return w > 0.2 && s.s <= 4022 ? [-(s.wl + w), -(s.wl + 0.05)] : null;
+  }, 0.015, chevronMat, s4300(3986), s4300(4022), 14);
+  makeBand(s => {
+    const w = ilha(s.s);
+    return w > 0.3 ? [-(s.wl + w + 0.11), -(s.wl + w - 0.11)] : null;
+  }, 0.016, lineMat, s4300(3990), s4300(4098));
 
-  // Barreira acolchoada amarela/preta com setas (<<<O>>>) na ponta do muro dos boxes (s = 4040 m)
-  const sNose = S[iNovo4300(4040) % N];
+  // Barreira acolchoada amarela/preta com setas (<<<O>>>) no bico do muro dos boxes: primeira amostra depois de 4098 em
+  // que o muro da física já voltou a menos de 6 m da borda (o muro desce de borda + 28 m para borda + 4 m em ~4098–4116)
+  let iNose = Math.round(4098 / STEP);
+  while (iNose < Math.round(4140 / STEP) && S[iNose].wallL - S[iNose].wl > 6) iNose++;
+  const sNose = S[iNose % N];
   const noseMat = new THREE.MeshStandardMaterial({ map: pitNoseBarrierTexture(renderer), roughness: 0.5 });
   const padDark = new THREE.MeshStandardMaterial({ color: 0x1c1f24, roughness: 0.75 });
   const nosePad = new THREE.Mesh(
     new THREE.BoxGeometry(2.8, 1.08, 3.0),
     [padDark, padDark, padDark, padDark, noseMat, padDark]
   );
-  nosePad.position.copy(sNose.p).addScaledVector(sNose.r, -(sNose.wl + 2.2)).setY(sNose.p.y + 0.54);
-  nosePad.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(sNose.r, new THREE.Vector3(0, 1, 0), sNose.t.clone().negate()));
+  nosePad.position.copy(sNose.p).addScaledVector(sNose.r, -(sNose.wallL + 1.2)).setY(sNose.p.y - sNose.r.y * (sNose.wallL + 1.2) + ajusteLateral(track, iNose % N, -(sNose.wallL + 1.2)) + 0.54);
+  nosePad.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(sNose.r.clone().setY(0).normalize(), new THREE.Vector3(0, 1, 0), sNose.t.clone().negate()));
   nosePad.castShadow = true;
   nosePad.receiveShadow = true;
   group.add(nosePad);
@@ -1541,11 +1566,17 @@ function overlay(track: Track, lift: number, vScale: number, include: (i: number
   return mesh;
 }
 
-/** Grid de largada: 24 posições em ziguezague (a cada 8 m) atrás da linha de chegada. */
+/**
+ * Grid de largada: posições em ziguezague (a cada 8 m) e a linha de largada. Fase 3 (LMU chase s 4130–30; atlas ≈ s real
+ * − 10 a 13 m neste trecho): o grid vai de s ~4140 até a linha de largada, que fica DEPOIS da linha de chegada (LMU s 30:
+ * linha branca transversal logo atrás do carro → s real ~38), como em Interlagos. Antes: de s ~4108 a ~4296 (12 m antes
+ * da linha de chegada), sem linha de largada.
+ */
+const GRID_S0 = 4140;
+const LARGADA = 38;
 export function buildGrid(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer) {
-  // de 200 a 12 m antes da linha na pista antiga (s real), levado para a nova
-  const gA = sNovo(L_ANTIGO - 200);
-  const gB = sNovo(L_ANTIGO - 12);
+  const gA = GRID_S0;
+  const gB = LARGADA - 2;
   const c =document.createElement('canvas');
   c.width = 512;
   c.height = 512; // 16 m de pista: duas posições
@@ -1564,9 +1595,28 @@ export function buildGrid(track: Track, group: THREE.Group, renderer: THREE.WebG
   t.anisotropy = renderer.capabilities.getMaxAnisotropy();
   const mat = new THREE.MeshStandardMaterial({ map: t, transparent: true, depthWrite: false, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -3 });
   const S = track.samples;
-  const mesh = overlay(track, 0.005, 16, i => S[i].s > gA && S[i].s < gB, mat);
+  const mesh = overlay(track, 0.005, 16, i => S[i].s > gA || S[i].s < gB, mat);
   mesh.renderOrder = 3;
   group.add(mesh);
+  // linha de largada: faixa branca de 0,5 m de borda a borda
+  const k = Math.floor(LARGADA / STEP);
+  const a = S[k];
+  const b = S[k + 1];
+  const u = LARGADA / STEP - k;
+  const p = a.p.clone().lerp(b.p, u);
+  const r = a.r.clone().lerp(b.r, u).normalize();
+  const tg = a.t.clone().lerp(b.t, u).normalize();
+  const n = a.n.clone().lerp(b.n, u).normalize();
+  const wl = a.wl + (b.wl - a.wl) * u;
+  const wr = a.wr + (b.wr - a.wr) * u;
+  const linha = new THREE.Mesh(
+    new THREE.PlaneGeometry(wl + wr, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0xeeeee8, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -4 })
+  );
+  linha.position.copy(p).addScaledVector(r, (wr - wl) / 2).addScaledVector(n, 0.006);
+  linha.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(r, tg.clone().negate(), n));
+  linha.receiveShadow = true;
+  group.add(linha);
 }
 
 /**

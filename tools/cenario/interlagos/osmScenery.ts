@@ -88,9 +88,10 @@ export function trackSections(osm: OsmData, track: Track) {
 function buildPaddockCanopy(track: Track, group: THREE.Group, heightAt: (x: number, z: number) => number) {
   const S = track.samples;
   const N = S.length;
-  // 210 m antes até 150 m depois da linha na pista antiga (s real), levados para a nova
+  // 210 m antes da linha na pista antiga (s real), levado para a nova, até s novo 244 (Fase 3: o paddock coberto segue
+  // até a entrada do S no LMU, chase s 110–230; antes ia até s 150)
   const pA = sNovo(L_ANTIGO - 210);
-  const pB = sNovo(150);
+  const pB = 244;
   const inPitStraight = (s: number) => s > pA || s < pB;
   // sobre os prédios dos boxes: além do muro dos boxes (concreto) + pit lane, ~22 m para fora
   const behindPitWall = (i: number) => -(S[i].wallL + 22);

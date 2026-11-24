@@ -7,7 +7,8 @@ import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
 import { AdScheme, adCanvas, tex } from '@web/render/trackDetails';
 import { addProp } from '../propsRegistry';
-import { iNovo, iNovo4300, L_ANTIGO, sNovo, sNovo4300 } from './sNovo';
+import { iNovo, iNovo4300, L_ANTIGO, s4300, sNovo, sNovo4300 } from './sNovo';
+import { ajusteLateral } from './ajusteLateral';
 import { randLocal } from './sorteio';
 
 /** Ponto p cai sobre (ou perto de) outro trecho da pista, longe da amostra i? */
@@ -185,7 +186,7 @@ interface StandMats {
  * fundo de concreto e, se `roof`, cobertura em balanço sobre pilares. Some onde encostaria em outro trecho.
  * s0/s1 em metros numa volta de 4.300 m (s1 pode passar da linha de chegada).
  */
-function buildStand(track: Track, group: THREE.Group, mats: StandMats, s0: number, s1: number, side: -1 | 1, depth: number, roof: boolean, fans: Fan[], rand: () => number) {
+function buildStand(track: Track, group: THREE.Group, mats: StandMats, s0: number, s1: number, side: -1 | 1, depth: number, roof: boolean, fans: Fan[], rand: () => number, semTeto?: [number, number]) {
   const S = track.samples;
   const N = S.length;
   const i0 = iNovo4300(s0);
@@ -206,15 +207,21 @@ function buildStand(track: Track, group: THREE.Group, mats: StandMats, s0: numbe
         !overOther(track, tmp.copy(s.p).addScaledVector(s.r, side * (wall + d0)), i, 6)
     );
   }
+  // Fase 3: trecho sem cobertura (s novo; LMU s 3910–4210: arquibancada a céu aberto, árvores atrás; coberta de ~4240 em diante)
+  const comTeto = (j: number) => {
+    if (!semTeto) return true;
+    const sj = at(j).s;
+    return !(semTeto[0] <= semTeto[1] ? sj >= semTeto[0] && sj <= semTeto[1] : sj >= semTeto[0] || sj <= semTeto[1]);
+  };
   /** faixa entre os pontos a e b = (distância além do muro, altura), ao longo do trecho */
-  const band = (a: [number, number], b: [number, number], mat: THREE.Material, vLen: number, shadow: boolean) => {
+  const band = (a: [number, number], b: [number, number], mat: THREE.Material, vLen: number, shadow: boolean, incl: (j: number) => boolean = () => true) => {
     const pos: number[] = [];
     const uv: number[] = [];
     const idx: number[] = [];
     const v = new THREE.Vector3();
     let prev = -1;
     for (let j = i0; j <= i1; j++) {
-      if (!ok[j - i0]) {
+      if (!ok[j - i0] || !incl(j)) {
         prev = -1;
         continue;
       }
@@ -305,7 +312,7 @@ function buildStand(track: Track, group: THREE.Group, mats: StandMats, s0: numbe
   const top = front + rise + 4.6;
   // cobre só as fileiras de trás e o meio: a frente fica a céu aberto (antes era uma laje até a pista)
   const front0 = d0 + depth * 0.3;
-  band([d1 + 0.5, top], [front0, top - 0.9], mats.roof, depth, true);
+  band([d1 + 0.5, top], [front0, top - 0.9], mats.roof, depth, true, comTeto);
   const beam = new THREE.BoxGeometry(0.22, 1, 0.22);
   beam.translate(0, 0.5, 0);
   const steel = mats.steel;
@@ -327,7 +334,7 @@ function buildStand(track: Track, group: THREE.Group, mats: StandMats, s0: numbe
     return out.copy(s.p).addScaledVector(s.r, side * (wall + d)).setY(s.p.y + h);
   };
   for (let j = i0; j <= i1; j += 8) {
-    if (!ok[j - i0]) continue;
+    if (!ok[j - i0] || !comTeto(j)) continue;
     const s = at(j);
     const base = point(s, d1 + 0.3, -10, new THREE.Vector3());
     const colTop = point(s, d1 + 0.3, top + 0.1, new THREE.Vector3());
@@ -344,15 +351,23 @@ function buildStand(track: Track, group: THREE.Group, mats: StandMats, s0: numbe
     }
   }
   // terça longitudinal na ponta da cobertura (liga as treliças)
-  band([front0 + 0.1, top - 1.25], [front0 + 0.1, top - 0.95], mats.steel, 0.3, false);
+  band([front0 + 0.1, top - 1.25], [front0 + 0.1, top - 0.95], mats.steel, 0.3, false, comTeto);
 }
 
 /** Arquibancadas (s0, s1 em m numa volta de 4.300 m; lado; profundidade; cobertura). */
-const STANDS: { s0: number; s1: number; side: -1 | 1; depth: number; roof: boolean }[] = [
-  { s0: 3780, s1: 4300 + 230, side: 1, depth: 22, roof: true } // reta principal e topo da Subida dos Boxes, lado de fora
+const STANDS: { s0: number; s1: number; side: -1 | 1; depth: number; roof: boolean; semTeto?: [number, number] }[] = [
+  // reta principal e topo da Subida dos Boxes, lado de fora. Fase 3: sem cobertura em s novo 3900–4240 (LMU chase
+  // s 3910–4210: arquibancada aberta com as árvores logo atrás; coberta de ~4240 até o S). Antes de 3900 (setor 10)
+  // continua coberta.
+  { s0: 3780, s1: 4300 + 230, side: 1, depth: 22, roof: true, semTeto: [3900, 4240] }
 ];
-/** Reta dos boxes: pit lane e garagens atrás do muro da esquerda (s em m numa volta de 4.300 m). */
-const PIT = { s0: 4040, s1: 4300 + 60, lane: 11, garageFrom: 12.5, garageDepth: 14.5, garageH: 7.2 };
+/**
+ * Reta dos boxes: pit lane e garagens atrás do muro da esquerda (s em m numa volta de 4.300 m). Fase 3: começa no bico
+ * do muro dos boxes (s novo ~4106; antes s antigo-4300 4040 = novo ~4049, quando o muro dos boxes começava ali) e vai até
+ * perto do fim do setor 3 (s novo ~228, para a margem de 20 m do `occupied` não passar de 248; antes ~60): o LMU (chase s 80–230) mostra a pista dos boxes e os prédios/tendas do
+ * paddock atrás do muro até a entrada do S, onde tínhamos árvores.
+ */
+const PIT = { s0: s4300(4106), s1: 4300 + s4300(228), lane: 11, garageFrom: 12.5, garageDepth: 14.5, garageH: 7.2 };
 
 /**
  * s (m) da pista nova está no trecho [a, b] (em metros de uma volta de 4.300 m da pista antiga; b pode passar da
@@ -395,7 +410,7 @@ export function buildStands(track: Track, group: THREE.Group, renderer: THREE.We
   };
   const fans: Fan[] = [];
   const rand = mulberry32(31);
-  for (const st of STANDS) buildStand(track, group, mats, st.s0, st.s1, st.side, st.depth, st.roof, fans, rand);
+  for (const st of STANDS) buildStand(track, group, mats, st.s0, st.s1, st.side, st.depth, st.roof, fans, rand, st.semTeto);
   buildCrowd(fans, group, renderer);
 }
 
@@ -417,7 +432,7 @@ function wallBand(track: Track, group: THREE.Group, s0: number, s1: number, side
     const wall = side < 0 ? s.wallL : s.wallR;
     for (const [[d, h], u] of [[a, 0], [b, 1]] as const) {
       v.copy(s.p).addScaledVector(s.r, side * (wall + d));
-      v.y += h;
+      v.y += h + ajusteLateral(track, ((j % N) + N) % N, side * (wall + d)); // Fase 3 (0 fora do setor 3)
       pos.push(v.x, v.y, v.z);
       uv.push(((j - i0) * STEP) / uTile, u);
     }

@@ -320,7 +320,7 @@ function buildBrakeBoards(track: Track, group: THREE.Group) {
   const postMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.6 });
   // freadas fortes (s da entrada da curva em m, numa volta de 4.300 m; lado explícito para bater com o LMU).
   const BRAKES: [number, -1 | 1, number[]][] = [
-    [290, 1, [200, 150, 100, 50]], // S do Senna (direita, brancas)
+    // S do Senna: desde a Fase 3 em buildPlacasSenna (no alambrado, no lugar do LMU); antes [290, 1, [200, 150, 100, 50]]
     // Descida do Lago: até a Fase 5 havia 150/100/50 azuis à direita; o LMU tem placas MOTUL sem número dos dois lados
     // em s ~1100 e ~1195 (trackDetails.ts buildRetaOpostaPlacas)
     [2012, -1, [100, 50]], // Ferradura (esquerda, amarelas)
@@ -346,6 +346,54 @@ function buildBrakeBoards(track: Track, group: THREE.Group) {
       m.lookAt(base.clone().sub(s.t).setY(m.position.y));
       group.add(post, m);
     }
+  }
+  buildPlacasSenna(track, group);
+}
+
+/**
+ * Placas 150/100/50 da freada do S do Senna (Fase 3, ficha build/ref/interlagos/fichas/setor-3.md). No LMU (chase s
+ * 30–180, build/interlagos/fase3/placas_lmu.jpg) são brancas, estreitas e altas, com os algarismos um embaixo do outro,
+ * presas no alambrado do muro da direita, e não há placa de 200. Elas saem do quadro (canto de cima à direita, ~5 m à
+ * frente do carro) em s do atlas ~90, ~130 e ~170; com o erro do atlas medido neste trecho (atlas ≈ s real − 10 a 13 m:
+ * linha de chegada quadriculada no atlas s ~4295, pórtico em ~51 × 64,5 do satélite) ficam em s 100 / 140 / 180.
+ * Antes: placas de 1,6 × 1,2 m em poste na grama a borda + 2,5 m, em s 89 / 139 / 189 / 239 (200/150/100/50), 40–60 m
+ * adiante. `ess_` (referência de pilotagem, visível no Mínimo).
+ */
+function buildPlacasSenna(track: Track, group: THREE.Group) {
+  const S = track.samples;
+  const N = S.length;
+  const W = 0.8;
+  const H = 2.0;
+  const geo = new THREE.BoxGeometry(W, H, 0.06);
+  const back = new THREE.MeshStandardMaterial({ color: 0x55595e, roughness: 0.7 });
+  for (const [sp, dist] of [[100, 150], [140, 100], [180, 50]] as const) {
+    const c = document.createElement('canvas');
+    c.width = 64;
+    c.height = 160;
+    const g = c.getContext('2d')!;
+    g.fillStyle = '#f4f4f4';
+    g.fillRect(0, 0, 64, 160);
+    g.strokeStyle = '#111111';
+    g.lineWidth = 5;
+    g.strokeRect(3, 3, 58, 154);
+    g.fillStyle = '#111111';
+    g.font = 'bold 42px Arial';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const dig = String(dist).split('');
+    dig.forEach((ch, k) => g.fillText(ch, 32, 80 + (k - (dig.length - 1) / 2) * 44));
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    const face = new THREE.MeshStandardMaterial({ map: t, roughness: 0.6 });
+    const i = Math.round(sp / STEP) % N;
+    const s = S[i];
+    // no alambrado (logo à frente do muro da física), com a base a 2,4 m (acima do muro de 1,15 m)
+    const base = s.p.clone().addScaledVector(s.r, s.wallR - 0.15);
+    const m = new THREE.Mesh(geo, [back, back, back, back, face, back]);
+    m.position.copy(base).add(new THREE.Vector3(0, 2.4 + H / 2, 0));
+    m.lookAt(base.clone().sub(s.t).setY(m.position.y));
+    m.userData.essential = true;
+    group.add(m);
   }
 }
 

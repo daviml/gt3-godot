@@ -1001,6 +1001,39 @@ for lado, a, b, rampa, (xs, gs), desc in MURO_F6:
                    'gps_mais_1m_venceu': int(np.sum(dentro & (alvo_sem < env[:, col] + 1.0)))})
     say(f'muro Fase 6 {lado} {a:.0f}–{b:.0f} (s novo): {desc}; antes {MURO_F[-1]["antes_m"]} → {MURO_F[-1]["depois_m"]} m '
         f'(GPS + 1 m venceu em {MURO_F[-1]["gps_mais_1m_venceu"]} amostras)')
+# Fase 3 (setor 3, reta dos boxes; janelas em s NOVO, gap = m da borda do asfalto; ficha
+# build/ref/interlagos/fichas/setor-3.md). Satélite Esri z19 desenrolado (build/interlagos/fase3/sat_esq_d2.jpg,
+# sat_reta.jpg; perfil de brilho por faixa de d) conferido no LMU (folhas build/ref/interlagos/folhas/fase3_ini_*):
+#   esq 3940–4098: entrada dos boxes. A pista dos boxes sai colada na pista (LMU s 3940/3970: linha tracejada e asfalto
+#                  até o guard-rail) e se afasta; a ilha verde com divisas (>>>) fica entre as duas (satélite s 3985–4020)
+#                  e cresce até o bico do muro dos boxes em s ~4104 (satélite: ponta arredondada em 4103–4108; LMU s
+#                  4030–4090: ilha verde larga com letras ROLEX, sem barreira, e o bico com a barreira <<O>> à frente).
+#                  O muro da física ficava na ilha (borda + 1,5–6 m), com um guard-rail desenhado em cima dela; passa
+#                  para o muro de fora da pista dos boxes (linha clara do satélite: borda + 7,5 → 28 m).
+#   esq 4106–4296: muro dos boxes. Face a borda + 4,0 m (satélite: pintura verde 4,0 m na Fase 2, topo claro do muro a
+#                  borda + 4,5–5 m; LMU s 4150–4300: faixa verde larga até o muro). Antes borda + 1,5 m.
+MURO_F3 = [
+    ('esq', 3940.0, 4296.0, 6.0, ([3940, 3960, 3980, 4000, 4020, 4040, 4060, 4098, 4106, 4296],
+                                  [7.5, 9.4, 12.4, 15.6, 21.0, 26.0, 28.0, 28.0, 4.0, 4.0]),
+     'Fase 3: entrada dos boxes (muro de fora da pista dos boxes) e muro dos boxes a borda + 4 m'),
+]
+for lado, a, b, rampa, (xs, gs), desc in MURO_F3:
+    col = 0 if lado == 'esq' else 1
+    w = np.clip(np.minimum((S_NOVO - (a - rampa)) / rampa, ((b + rampa) - S_NOVO) / rampa), 0.0, 1.0)
+    m = w > 0
+    antes = WALL[m, col].copy()
+    Wn = WLn if col == 0 else WRn
+    alvo_sem = Wn + np.interp(S_NOVO, xs, gs)
+    alvo = np.maximum.reduce([alvo_sem, Wn + (KL if col == 0 else KR) + 0.5, env[:, col] + 1.0])
+    WALL[m, col] = WALL[m, col] * (1 - w[m]) + alvo[m] * w[m]
+    WSRC[m, col] = np.where(w[m] >= 1, 4, WSRC[m, col])
+    dentro = w >= 1
+    MURO_F.append({'lado': lado, 's_novo': [a, b], 'desc': desc,
+                   'antes_m': [round(float(antes.min()), 2), round(float(antes.max()), 2)],
+                   'depois_m': [round(float(WALL[dentro, col].min()), 2), round(float(WALL[dentro, col].max()), 2)],
+                   'gps_mais_1m_venceu': int(np.sum(dentro & (alvo_sem < env[:, col] + 1.0)))})
+    say(f'muro Fase 3 {lado} {a:.0f}–{b:.0f} (s novo): {desc}; antes {MURO_F[-1]["antes_m"]} → {MURO_F[-1]["depois_m"]} m '
+        f'(GPS + 1 m venceu em {MURO_F[-1]["gps_mais_1m_venceu"]} amostras)')
 WALL_MIN_GAP_JSON = 1.5   # (1,3 até a Fase 6, só pela Goodyear do Lago colada na zebra)
 
 ko = np.arange(0, len(P), K_OUT)
