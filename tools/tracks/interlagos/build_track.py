@@ -919,14 +919,27 @@ def janela_antigo(a, b, rampa):
     return np.clip(np.minimum((sa - (a - rampa)) / rampa, ((b + rampa) - sa) / rampa), 0.0, 1.0)
 
 
+# Fase 4 (setor 4): o separador da saída dos boxes estava a borda + 4,4 m (o guard-rail desenhado no buildPitExit,
+# não medido). No satélite Esri z19 desenrolado (build/interlagos/fase4/sat_510_800_cru.png, registro +2,2/−2,1 m) a
+# grama entre a linha branca e a pista dos boxes vai até borda + 8,9 m (s novo 556–600), 8,0–8,3 (600–640), 7,2–6,4
+# (640–700), 5,9–7,7 (700–742; ali há também uma linha clara, o trilho, a borda + 6,5–8,2); o LMU (s 580–700) mostra
+# grama larga antes do guard-rail. Muro ≈ fim da grama (±0,3 m), em s antigo (s novo 560/590/610/630/650/670/690/710/735/742 → antigo pelo s_antigo_novo.json).
+# Fase 4: saída da Curva do Sol (dir, s novo ~723–779): o muro da física ficava a borda + 5–8 m (perfil antigo, não
+# medido) e o LMU (s 750/780) mostra zebra + escape vermelho largo + faixa verde antes do muro MOTUL. No satélite
+# desenrolado a pintura vai até borda + ~10 m, segue uma faixa escura de ~3 m e há uma linha clara (topo do muro) a
+# borda + 15,5–17 m em s novo 730–770. Muro a borda + 15 m nessa janela (s antigo 722–766, rampa de 6 m).
+SEPARADOR_F4 = (np.array([551.1, 580.8, 600.9, 621.2, 641.5, 661.9, 682.2, 702.5, 727.7, 734.7]),
+                np.array([9.0, 9.0, 8.6, 8.3, 7.6, 7.1, 6.7, 6.5, 7.3, 7.3]))
 _osm_esq = osm_wall['esq']
 MURO_F = []
 for lado, a, b, rampa, alvo_fn, desc in [
-        ('esq', 564.2, 734.0, 6.0, lambda: WLn + 4.4, 'separador da saída dos boxes: borda + 4,4 m'),
+        ('esq', 564.2, 734.0, 6.0, lambda: WLn + np.interp(np.asarray(s_old) % L0, *SEPARADOR_F4),
+         'separador da saída dos boxes: fim da grama no satélite (Fase 4)'),
         ('esq', 1385.0, 1580.0, 6.0, lambda: WLn + 1.35, 'Goodyear do Lago: borda + 1,35 m'),
         ('esq', 333.0, 428.0, 6.0, lambda: fill_circ(np.nan_to_num(_osm_esq), np.isfinite(_osm_esq)),
          'S do Senna: cerca do OSM (= guard-rail no satélite)'),
         ('dir', 2713.0, 2796.0, 10.0, lambda: np.minimum(WALL[:, 1], 14.0), 'Bico de Pato: no máx. 14 m'),
+        ('dir', 722.0, 766.0, 6.0, lambda: WRn + 15.0, 'saída da Curva do Sol: muro MOTUL a borda + 15 m (Fase 4)'),
 ]:
     col = 0 if lado == 'esq' else 1
     w = janela_antigo(a, b, rampa)

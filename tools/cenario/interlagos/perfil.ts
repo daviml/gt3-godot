@@ -22,11 +22,15 @@
  *           Com `visual` onde a física tem zebra, a classe declarada também substitui a que viria do kerb.
  *     { tipo: "pintura", cor: "verde", larg: n }    faixa pintada atrás da zebra
  *     { tipo: "salsicha", larg: n }                  salsicha amarela elevada (depois da pintura)
- *     { tipo: "escape", cor: "verde" | "agua" | "vermelho", larg: Valor }   asfalto pintado de escape
+ *     { tipo: "escape", cor: "verde" | "agua" | "vermelho", larg: Valor, fora?: { cor, larg: Valor } }
+ *         asfalto pintado de escape. `fora` (Fase 4, saída da Curva do Sol: vermelho com uma faixa verde atrás) = uma
+ *         segunda faixa pintada logo depois do escape, de outra cor; não muda o escape nem a barreira (só o desenho).
  *   barreira = { tipo: "rail" | "wall" | "tecpro" | "tecpro2" | "rolex_pad", dist: Valor, de?: "zebra" | "escape",
  *                banner?: AdScheme, alambrado?: true }
  *     dist = distância lateral da barreira contada da linha branca (borda do asfalto); com `de`, contada da borda
  *     de fora da zebra física ("zebra") ou do fim do escape ("escape").
+ *   Chave opcional `arvores` (Fase 4, Etapa A das árvores): zonas por s e lado, espaçamento e escala nos setores já
+ *   revisados; lida por ./arvoresSetor.ts (não por este módulo).
  *   Valor = número (constante na fatia) | "fisica" (o valor da física do Track nessa amostra) |
  *           número[] (um por amostra de s0 a s1; trechos de transição, valores exatos).
  *
@@ -41,7 +45,8 @@ export type Faixa =
   | { tipo: 'zebra'; larg: 'fisica'; minimo?: number; listrada?: false; visual?: 'normal' | 'saida' }
   | { tipo: 'pintura'; cor: 'verde'; larg: number }
   | { tipo: 'salsicha'; larg: number }
-  | { tipo: 'escape'; cor: 'verde' | 'agua' | 'vermelho'; larg: Valor };
+  | { tipo: 'escape'; cor: CorEscape; larg: Valor; fora?: { cor: CorEscape; larg: Valor } };
+export type CorEscape = 'verde' | 'agua' | 'vermelho';
 export type TipoBarreira = 'rail' | 'wall' | 'tecpro' | 'tecpro2' | 'rolex_pad';
 export interface Barreira {
   tipo: TipoBarreira;
@@ -79,7 +84,10 @@ export interface AmostraLado {
   salsicha: number;
   /** largura do escape asfaltado (0 = sem) */
   run: number;
-  escapeCor: 'verde' | 'agua' | 'vermelho';
+  escapeCor: CorEscape;
+  /** largura da segunda faixa pintada depois do escape (0 = sem; Faixa escape.fora) */
+  run2: number;
+  escapeCor2: CorEscape;
   /** deslocamento lateral da barreira a partir do centro (como Sample.wallL/wallR) */
   wall: number;
   tipo: TipoBarreira;
@@ -118,6 +126,8 @@ function avaliarLado(fatias: Fatia[], n: number, passo: number, w: number[], ker
         salsicha: sal?.larg ?? 0,
         run,
         escapeCor: esc?.cor ?? 'verde',
+        run2: esc?.fora ? valor(esc.fora.larg, k, 0) : 0,
+        escapeCor2: esc?.fora?.cor ?? 'verde',
         wall,
         tipo: b.tipo,
         banner: b.banner ?? null,

@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
 import { addProp } from '../propsRegistry';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { phTexture } from '@web/render/textures';
 import { TINTA } from './tintas';
 import { perfilDe, type TipoBarreira } from './perfil';
@@ -526,7 +527,9 @@ function buildBillboards(track: Track, group: THREE.Group, renderer: THREE.WebGL
 /** Passarela ROLEX sobre a reta na freada do S do Senna + marcos visuais do LMU (pórtico MOTUL, prédio Senna, telão). */
 export function buildBridge(track: Track, group: THREE.Group, renderer: THREE.WebGLRenderer, heightAt?: (x: number, z: number) => number) {
   const S = track.samples;
-  const s = S[iNovo4300(265) % S.length];
+  // Fase 4: no lugar medido no satélite (tabuleiro em s 292–297 da pista antiga = 292–297 da nova; o LMU mostra o
+  // pilar esquerdo passando em s ≈ 285–290); antes ficava em s 264,6 (iNovo4300(265)), 30 m antes.
+  const s = S[Math.round(294.6 / STEP) % S.length];
   const span = s.wallL + s.wallR + 10;
   const h = 6.8;
   const concrete = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.85 });
@@ -765,10 +768,15 @@ function buildPitExit(track: Track, group: THREE.Group) {
     group.add(m);
   };
 
+  // Fase 4: o separador (muro da física) passou de borda + 4,4 m para o fim da grama medido no satélite (borda +
+  // 6,5–9 m, build_track.py SEPARADOR_F4); a pista dos boxes e o guard-rail andam junto com ele (extra = o que o muro
+  // passou de 4,4 m; some na convergência do fim).
+  const extra = (s: (typeof S)[number]) => Math.max(0, Math.min(6, s.wallL - s.wl - 4.4));
   const bounds = (s: (typeof S)[number], sm: number): [number, number] => {
     const t = smooth(720, 795, sm);
-    const dOut = -(s.wl + lerp(9.6, 0.25, smooth(735, 795, sm)));
-    const dIn = -(s.wl + lerp(4.8, 0.05, t));
+    const e = extra(s) * (1 - t);
+    const dOut = -(s.wl + lerp(9.6, 0.25, smooth(735, 795, sm)) + e);
+    const dIn = -(s.wl + lerp(4.8, 0.05, t) + e);
     return [dOut, dIn];
   };
   const asphaltMat = new THREE.MeshStandardMaterial({ color: 0x3e4044, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, side: THREE.DoubleSide });
@@ -789,7 +797,7 @@ function buildPitExit(track: Track, group: THREE.Group) {
     for (let i = g0; i <= g1; i++) {
       const s = S[i % N];
       const base = pos.length / 3;
-      const d = -(s.wl + 4.4);
+      const d = -(s.wl + 4.4 + extra(s));
       for (const h of [h0, h1]) {
         v.copy(s.p).addScaledVector(s.r, d);
         v.y += h;
@@ -811,7 +819,7 @@ function buildPitExit(track: Track, group: THREE.Group) {
   const postGeo = new THREE.BoxGeometry(0.12, 1.12, 0.12);
   for (let i = g0; i <= g1; i += 2) {
     const s = S[i % N];
-    const p = s.p.clone().addScaledVector(s.r, -(s.wl + 4.45));
+    const p = s.p.clone().addScaledVector(s.r, -(s.wl + 4.45 + extra(s)));
     const post = new THREE.Mesh(postGeo, postMat);
     post.position.set(p.x, p.y + 0.56, p.z);
     post.castShadow = true;
@@ -819,7 +827,7 @@ function buildPitExit(track: Track, group: THREE.Group) {
   }
   // Ponteira laranja/preta no fim do separador (s = 735 m)
   const sEnd = S[g1 % N];
-  const tipPos = sEnd.p.clone().addScaledVector(sEnd.r, -(sEnd.wl + 4.4));
+  const tipPos = sEnd.p.clone().addScaledVector(sEnd.r, -(sEnd.wl + 4.4 + extra(sEnd)));
   const tip = new THREE.Group();
   const blackBlk = new THREE.Mesh(new THREE.BoxGeometry(0.65, 1.0, 1.4), new THREE.MeshStandardMaterial({ color: 0x1c1f24, roughness: 0.75 }));
   blackBlk.position.set(0, 0.5, -0.7);
@@ -1055,40 +1063,70 @@ function buildDescidaLagoGoodyear(track: Track, group: THREE.Group, renderer: TH
   ribbon(0.0, 2.12, -0.65, -0.65, topMat);
 }
 
-/** Tendas/barracas de equipe à esquerda do S do Senna (02) e apoio atrás da grade direita na entrada do S (01). */
+/**
+ * Tendas de hospitalidade brancas (cobertura em pirâmide) e contêineres coloridos à esquerda do S do Senna, atrás do
+ * guard-rail da saída dos boxes, e apoio atrás da grade direita na entrada do S.
+ * Fase 4 (LMU s 380–480): as tendas são todas brancas (antes laranja/vermelho/azul) e há uma fileira de contêineres
+ * vermelhos/azuis/brancos/amarelos; nada a menos de 4 m do muro da física. Tudo junto em 3 malhas (corpo, telhado,
+ * contêineres) para não somar draw calls.
+ */
 function buildSennaTents(track: Track, group: THREE.Group, heightAt?: (x: number, z: number) => number) {
   const S = track.samples;
-  const colors = [0xf2f2ee, 0xc81e24, 0x1b4d9e, 0xf2f2ee, 0xe86b1a];
-  const dark = new THREE.MeshStandardMaterial({ color: 0x2a2d34, roughness: 0.85 });
+  // s na convenção antiga (4.300 m), d a partir do centro antigo (+ dNovo); |d| mínimo = muro + 4 m + meia tenda
   const tentSpecs = [
-    { s: 375, d: -26, w: 7, l: 7, c: 0 },
-    { s: 392, d: -28, w: 8, l: 8, c: 1 },
-    { s: 412, d: -27, w: 7, l: 7, c: 2 },
-    { s: 432, d: -31, w: 9, l: 8, c: 3 },
-    { s: 454, d: -29, w: 7, l: 7, c: 4 },
+    { s: 362, d: -30, w: 8, l: 8 },
+    { s: 375, d: -26, w: 7, l: 7 },
+    { s: 392, d: -28, w: 10, l: 10 },
+    { s: 412, d: -27, w: 7, l: 7 },
+    { s: 432, d: -31, w: 12, l: 10 },
+    { s: 454, d: -29, w: 9, l: 9 },
+    { s: 472, d: -33, w: 10, l: 10 },
     // estruturas de apoio atrás da grade da direita na entrada do S (01)
-    { s: 255, d: 28, w: 10, l: 8, c: 0 },
-    { s: 278, d: 30, w: 12, l: 9, c: 1 }
+    { s: 255, d: 28, w: 10, l: 8 },
+    { s: 278, d: 30, w: 12, l: 9 }
   ];
+  const bodies: THREE.BufferGeometry[] = [];
+  const roofs: THREE.BufferGeometry[] = [];
+  const m = new THREE.Matrix4();
+  const place = (sAntigo4300: number, d: number, half: number): [THREE.Vector3, (typeof S)[number]] => {
+    const s = S[iNovo4300(sAntigo4300) % S.length];
+    let dd = d + dNovo4300(sAntigo4300);
+    const lim = (dd < 0 ? s.wallL : s.wallR) + 4 + half;
+    if (Math.abs(dd) < lim) dd = Math.sign(dd) * lim;
+    const pos = s.p.clone().addScaledVector(s.r, dd);
+    pos.y = (heightAt ? heightAt(pos.x, pos.z) : s.p.y) - 0.3;
+    return [pos, s];
+  };
+  const basis = (s: (typeof S)[number], pos: THREE.Vector3) =>
+    m.makeBasis(s.r, new THREE.Vector3(0, 1, 0), s.t.clone().negate()).setPosition(pos);
   for (const t of tentSpecs) {
-    const s = S[iNovo4300(t.s) % S.length];
-    // t.d era a lateral a partir do centro antigo: + dNovo para ficar no mesmo lugar em relação ao centro novo
-    const pos = s.p.clone().addScaledVector(s.r, t.d + dNovo4300(t.s));
-    const gy = heightAt ? heightAt(pos.x, pos.z) : s.p.y;
-    const grp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(t.w, 2.8, t.l), dark);
-    body.position.y = 1.4;
-    const roof = new THREE.Mesh(
-      new THREE.ConeGeometry(Math.max(t.w, t.l) * 0.74, 1.8, 4),
-      new THREE.MeshStandardMaterial({ color: colors[t.c], roughness: 0.65 })
-    );
-    roof.rotation.y = Math.PI / 4;
-    roof.position.y = 3.6;
-    grp.add(body, roof);
-    grp.position.set(pos.x, gy - 0.3, pos.z);
-    grp.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(s.r, new THREE.Vector3(0, 1, 0), s.t.clone().negate()));
-    grp.traverse(o => { o.castShadow = true; o.receiveShadow = true; });
-    group.add(grp);
+    const [pos, s] = place(t.s, t.d, Math.max(t.w, t.l) / 2);
+    const body = new THREE.BoxGeometry(t.w, 2.8, t.l).translate(0, 1.4, 0).applyMatrix4(basis(s, pos));
+    const roof = new THREE.ConeGeometry(Math.max(t.w, t.l) * 0.74, 1.8, 4).rotateY(Math.PI / 4).translate(0, 3.6, 0).applyMatrix4(basis(s, pos));
+    bodies.push(body);
+    roofs.push(roof);
+  }
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd9d9d4, roughness: 0.8 });
+  const roofMat = new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.65 });
+  // contêineres (6 × 2,4 × 2,6 m) em fileira, cores sortidas como no LMU
+  const cores = [0xb3242a, 0x1d4f9c, 0xe8e6df, 0xd9b21c, 0xb3242a, 0x2c7a3c, 0x1d4f9c];
+  const cont: THREE.BufferGeometry[] = [];
+  const cor = new THREE.Color();
+  for (let k = 0; k < 14; k++) {
+    const sA = 400 + k * 6.5;
+    const [pos, s] = place(sA, -44 - (k % 3 === 0 ? 3 : 0), 3);
+    const g = new THREE.BoxGeometry(2.4, 2.6, 6).translate(0, 1.3 + (k % 4 === 1 ? 2.6 : 0), 0).applyMatrix4(basis(s, pos));
+    cor.setHex(cores[k % cores.length]);
+    const n = g.getAttribute('position').count;
+    g.setAttribute('color', new THREE.Float32BufferAttribute(Array.from({ length: n }, () => [cor.r, cor.g, cor.b]).flat(), 3));
+    cont.push(g);
+  }
+  const contMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 });
+  for (const [geos, mat] of [[bodies, bodyMat], [roofs, roofMat], [cont, contMat]] as const) {
+    const mesh = new THREE.Mesh(mergeGeometries(geos as THREE.BufferGeometry[]), mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
   }
 }
 

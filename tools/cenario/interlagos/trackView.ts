@@ -23,6 +23,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { TINTA, tintaEscura } from './tintas';
 import { aplicarPerfil } from './perfil';
 import { L_ANTIGO, sNovo } from './sNovo';
+import { randLocal, randPorArvore, randPosicao } from './sorteio';
+import { arvoresPorSetor } from './arvoresSetor';
 
 /**
  * Pintura da borda de Interlagos (PLANO-INTERLAGOS-DETALHES.md, Fase 1): uma tabela só com as medidas, em vez
@@ -205,7 +207,7 @@ function canvasTexture(c: HTMLCanvasElement, renderer: THREE.WebGLRenderer): THR
 
 /**
  * Escape pintado em dois tons sobre asfalto, com sujeira e marcas de pneu de quem passou por ali. Em
- * Interlagos a maioria é verde; alguns são verde-água; na saída da Curva do Sol, vermelho com faixas brancas.
+ * Interlagos a maioria é verde; alguns são verde-água; na saída da Curva do Sol, vermelho liso.
  */
 function runoffTexture(renderer: THREE.WebGLRenderer, base: string, band: string, stripes = false): THREE.Texture {
   const c = document.createElement('canvas');
@@ -475,13 +477,22 @@ export function buildTrack(track: Track, scene: THREE.Scene, renderer: THREE.Web
   const runMats = {
     verde: paintOn(runoffTexture(renderer, TINTA.verdeVivo, tintaEscura(TINTA.verdeVivo)), -1, 1, 'escape_verde'),
     agua: paintOn(runoffTexture(renderer, TINTA.verdeAgua, tintaEscura(TINTA.verdeAgua)), -1, 1, 'escape_agua'),
-    vermelho: paintOn(runoffTexture(renderer, TINTA.vermelho, tintaEscura(TINTA.vermelho), true), -1, 1, 'escape_vermelho')
+    // Fase 4: sem as faixas brancas (o único escape vermelho do perfil é a saída da Curva do Sol, liso no LMU s 750/780)
+    vermelho: paintOn(runoffTexture(renderer, TINTA.vermelho, tintaEscura(TINTA.vermelho), false), -1, 1, 'escape_vermelho')
   };
   const runColor = (i: number, side: -1 | 1): keyof typeof runMats => (side < 0 ? PL : PR)[i].escapeCor;
   for (const c of Object.keys(runMats) as (keyof typeof runMats)[]) {
     // o fim do escape segue a física (kerb + run); o começo encosta na borda pintada visual (mais estreita)
     mesh(ribbon(track, i => -S[i].wl - S[i].kerbL - S[i].runL, i => -S[i].wl - Math.min(bordaL[i], S[i].kerbL), -0.008, 4, 8, i => S[i].runL > 0 && runColor(i, -1) === c), runMats[c]);
     mesh(ribbon(track, i => S[i].wr + Math.min(bordaR[i], S[i].kerbR), i => S[i].wr + S[i].kerbR + S[i].runR, -0.008, 4, 8, i => S[i].runR > 0 && runColor(i, 1) === c), runMats[c]);
+    // segunda faixa depois do escape (perfil: escape.fora; Fase 4, saída da Curva do Sol); só onde existe
+    const foraL = (i: number) => PL[i].run2 > 0 && PL[i].escapeCor2 === c;
+    const foraR = (i: number) => PR[i].run2 > 0 && PR[i].escapeCor2 === c;
+    const fora = [
+      S.some((_, i) => foraL(i)) && ribbon(track, i => -S[i].wl - S[i].kerbL - S[i].runL - PL[i].run2, i => -S[i].wl - S[i].kerbL - S[i].runL, -0.008, 4, 8, foraL),
+      S.some((_, i) => foraR(i)) && ribbon(track, i => S[i].wr + S[i].kerbR + S[i].runR, i => S[i].wr + S[i].kerbR + S[i].runR + PR[i].run2, -0.008, 4, 8, foraR)
+    ].filter(Boolean) as THREE.BufferGeometry[];
+    if (fora.length) mesh(fora.length > 1 ? mergeGeometries(fora) : fora[0], runMats[c]);
   }
 
   // grama da borda até o muro: verde e seca misturadas como nas fotos
@@ -663,7 +674,6 @@ function buildScenery(
   extreme: boolean
 ) {
   const S = track.samples;
-  const rand = mulberry32(7);
   const p = new THREE.Vector3();
   const tmp = new THREE.Vector3();
   const spots: TreeSpot[] = [];
@@ -678,8 +688,13 @@ function buildScenery(
     if (occupied(track, x, z, y)) return false;
     return !water.some(w => insidePoly(x, z, w));
   };
-  const MAX = 5200;
-  for (let tries = 0; tries < 9000 && spots.length < MAX; tries++) {
+  // Fase 4 (item 0): cada tentativa tem a sua semente (./sorteio.ts), então o que acontece num setor não move as
+  // árvores dos outros. Antes eram até 9.000 tentativas com teto de 5.200 árvores, e o teto parava o sorteio por
+  // volta da tentativa 1.140 (sem teto dariam ~41 mil árvores); o teto global é o que espalhava as mudanças, então
+  // fica o número de tentativas que dá a mesma densidade.
+  const TENTATIVAS = 1140;
+  for (let tries = 0; tries < TENTATIVAS; tries++) {
+    const rand = randLocal(7, tries);
     const s = S[Math.floor(rand() * S.length)];
     // reta dos boxes: arquibancada e paddock, sem mata (s antigo 3734 e 120 → s novo)
     if (s.s > sNovo(L_ANTIGO - 560) || s.s < sNovo(120)) continue;
@@ -690,15 +705,20 @@ function buildScenery(
     if (!infield && rand() < 0.35) continue;
     const k = 5 + Math.floor(rand() * (infield ? 10 : 6));
     const spread = 7 + rand() * 14;
-    for (let t = 0; t < k && spots.length < MAX; t++) {
+    for (let t = 0; t < k; t++) {
       const a = rand() * Math.PI * 2;
       const r = Math.sqrt(rand()) * spread;
       const x = p.x + Math.cos(a) * r;
       const z = p.z + Math.sin(a) * r;
       if (!free(x, z, s.p.y)) continue;
-      // no chão do terreno (não na altura da pista mais próxima: em barranco a árvore flutuaria)
-      spots.push({ x, y: heightAt(x, z) - 0.2, z, scale: 2.0 + rand() * 1.5, yaw: rand() * Math.PI * 2 });
+      // tamanho e giro pela posição da árvore; no chão do terreno (não na altura da pista mais próxima: em barranco
+      // a árvore flutuaria)
+      const rp = randPosicao(x, z, 0x5ce7);
+      spots.push({ x, y: heightAt(x, z) - 0.2, z, scale: 2.0 + rp() * 1.5, yaw: rp() * Math.PI * 2 });
     }
   }
-  plantTrees(spots, group, renderer, extreme, rand);
+  console.info(`árvores (mata por regra): ${spots.length} de ${TENTATIVAS} tentativas`);
+  // Etapa A (§5): zonas, espaçamento e escala nos setores já revisados (perfil → arvores)
+  const ficam = arvoresPorSetor(track, spots, 'mata por regra');
+  plantTrees(ficam, group, renderer, extreme, randPorArvore(ficam));
 }

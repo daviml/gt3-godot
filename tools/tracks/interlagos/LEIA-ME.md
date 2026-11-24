@@ -80,6 +80,12 @@ Paridade: o `paridade.ts` aplica o `bank` na pista do web (`applyBank`), e o `pa
   (antes 21,8–23,4 m, maior que o raio da curva). O perfil "desenhado à mão" que entra nos muros não medidos é o
   da pista antiga, congelado em `build/interlagos/visual_profile_antigo.json` (o de `data/track/` agora usa o muro
   da física).
+- **Muros corrigidos na Fase 4** (setor 4, `MURO_F` em `build_track.py`; medidos no satélite desenrolado
+  `build/interlagos/fase4/sat_510_800_cru.png` e conferidos no LMU): separador da saída dos boxes (esq., s antigo
+  564–734) deixou de ser borda + 4,4 m e passou ao fim da grama (`SEPARADOR_F4`: borda + 9,0 → 6,5 → 7,3 m); saída da
+  Curva do Sol (dir., s antigo 722–766, rampa 6 m) = borda + 15 m (muro MOTUL; antes 5,5–8 m). A pista no
+  `track.json` mudou só em `wallL` (s novo 566–748), `wallR` (722–780) e `runR` (728–780, escape automático até o
+  muro); o relevo (`terrain.json`) mudou em 181 células perto desses muros (até 0,43 m).
 - **Saída dos boxes** (s antigo 800–1000, esq.): faixa de aceleração = escape asfaltado (`runLeft`, aplicado pelo
   `applyRunoffMin` do `bank.ts`) até 0,5 m do guard-rail, e muro ≥ borda + zebra + 5,5 m (vídeo s0860/s0940: ~4–5 m
   de asfalto antes do guard-rail). A borda esquerda ali (pulava 5,0 ↔ 8,2 m entre a linha branca e a faixa) foi

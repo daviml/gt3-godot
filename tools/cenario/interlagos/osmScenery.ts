@@ -7,6 +7,8 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { STEP, Track } from '@web/track/track';
 import { mulberry32 } from '@web/util/random';
 import { plantTrees, TreeSpot } from '@web/render/trees';
+import { randLocal, randPorArvore, randPosicao } from './sorteio';
+import { arvoresPorSetor } from './arvoresSetor';
 import { phTexture } from '@web/render/textures';
 import { TOWER_COLORS, trackDistance } from '@web/render/surroundings';
 // Fase 2B etapa F: OSM da fonte própria (tools/tracks/interlagos/interlagos-osm.json, o mesmo do web + muros/cercas);
@@ -229,7 +231,7 @@ export function buildOsmScenery(
 
   buildBuildings(osm, track, group, heightAt, nearTrack, pitZone, renderer, rand);
   buildWater(osm, group, heightAt);
-  buildTrees(osm, group, heightAt, nearTrees, renderer, extreme, rand);
+  buildTrees(osm, track, group, heightAt, nearTrees, renderer, extreme, rand);
   // saída e entrada dos boxes reais do OSM (fora do trecho de garagens da reta principal, que já tem buildPits)
   buildRibbons(osm.pitLane, 7.5, group, heightAt, track, true);
   buildRibbons(osm.kart, 7, group, heightAt, track, false);
@@ -527,6 +529,7 @@ function buildWater(osm: OsmData, group: THREE.Group, heightAt: (x: number, z: n
 /** Mata (áreas de floresta preenchidas) e fileiras de árvores do OSM. */
 function buildTrees(
   osm: OsmData,
+  track: Track,
   group: THREE.Group,
   heightAt: (x: number, z: number) => number,
   nearTrack: (x: number, z: number) => boolean,
@@ -534,19 +537,23 @@ function buildTrees(
   extreme: boolean,
   rand: () => number
 ) {
+  // Fase 4 (item 0): semente por polígono de mata e, para tamanho/giro/espécie/tom, pela posição de cada árvore
+  // (./sorteio.ts): o que muda num setor não move as árvores dos outros. O `rand` compartilhado (prédios) não é usado.
+  void rand;
   const spots: [number, number][] = [];
-  for (const poly of osm.forest) {
+  osm.forest.forEach((poly, ip) => {
+    const rp = randLocal(2026, ip);
     const xs = poly.map(p => p[0]);
     const zs = poly.map(p => p[1]);
     const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
     // uma árvore a cada ~45 m² (mata fechada como no vídeo de referência)
     const tries = Math.min(9000, Math.round(((x1 - x0) * (z1 - z0)) / 45));
     for (let k = 0; k < tries; k++) {
-      const x = x0 + rand() * (x1 - x0);
-      const z = z0 + rand() * (z1 - z0);
+      const x = x0 + rp() * (x1 - x0);
+      const z = z0 + rp() * (z1 - z0);
       if (inside(x, z, poly) && !nearTrack(x, z)) spots.push([x, z]);
     }
-  }
+  });
   for (const line of osm.treeRows) {
     for (let i = 1; i < line.length; i++) {
       const [ax, az] = line[i - 1];
@@ -559,14 +566,15 @@ function buildTrees(
       }
     }
   }
-  const trees: TreeSpot[] = spots.slice(0, 12000).map(([x, z]) => ({
-    x,
-    y: heightAt(x, z) - 0.2,
-    z,
-    scale: 2.0 + rand() * 1.3,
-    yaw: rand() * Math.PI * 2
-  }));
-  plantTrees(trees, group, renderer, extreme, rand);
+  if (spots.length > 12000) console.warn(`árvores do OSM: ${spots.length}, só 12.000 entram`);
+  const todas: TreeSpot[] = spots.slice(0, 12000).map(([x, z]) => {
+    const r = randPosicao(x, z, 0x05e1);
+    return { x, y: heightAt(x, z) - 0.2, z, scale: 2.0 + r() * 1.3, yaw: r() * Math.PI * 2 };
+  });
+  console.info(`árvores do OSM: ${todas.length}`);
+  // Etapa A (§5): zonas, espaçamento e escala nos setores já revisados (perfil → arvores)
+  const trees = arvoresPorSetor(track, todas, 'OSM');
+  plantTrees(trees, group, renderer, extreme, randPorArvore(trees));
 }
 
 /** Faixas de asfalto ao longo de linhas do OSM (pit lane na altura da pista, kartódromo no terreno). */

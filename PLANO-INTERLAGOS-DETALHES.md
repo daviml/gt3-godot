@@ -298,6 +298,37 @@ Mesmo processo de Laguna Seca (`GUIA-PISTAS.md` §1–4), antes dos setores para
    escrito na ficha como pendência, com motivo.
 
 Ordem sugerida: 4 → 6 → 5 → 3 → 7 → 8 → 9 → 10 (começa pelos trechos onde a diferença é mais visível).
+Desde a Fase 2B os setores usam o **s novo** (pista de 4.308 m); converter os limites da tabela por
+`tools/tracks/interlagos/s_antigo_novo.json` (setor 4: 250–783).
+
+**Resultado da Fase 4 (23/11/2026) — feita, aguardando o Davi olhar a folha:**
+- Ficha `build/ref/interlagos/fichas/setor-4.md`; folhas `build/ref/interlagos/folhas/fase4_ini_*` (22 pares de
+  perseguição + 8 onboard) e `fase4_fim_*` (mesmos pontos). Perfil do setor por `tools/cenario/interlagos/
+  setor4_perfil.py` (reescreve só 250–783).
+- **Escapes:** verde-água até o muro ROLEX nos dois lados do S (250–326 esq, 250–518 dir); ápice do S com verde de
+  6 m e saída com 8 m; grama sem pintura onde o LMU não tem escape; faixa verde-água de 0,5 m atrás da zebra
+  interna da Curva do Sol; saída da Curva do Sol com zebra larga + vermelho liso + faixa verde junto do muro MOTUL
+  (tipo novo `escape.fora` no `perfil.ts`).
+- **Física (muros pelo satélite):** separador da saída dos boxes recuado para o fim da grama (borda + 9,0 → 6,5 →
+  7,3 m, s 566–748); muro MOTUL da saída da Curva do Sol a borda + 15 m (s 722–779). RefBot igual à 2B
+  (+1,07–1,50%), paridade 0,00%.
+- **Passarela:** s 264,6 → 294,6 (satélite + pilar no vídeo). **Tendas:** 7 brancas em pirâmide atrás do muro +
+  14 contêineres.
+- **Árvores:** sorteio agora local (`sorteio.ts`: semente por tentativa/polígono/posição), então editar um setor
+  não mexe no resto (mudança única: todas as árvores trocaram de lugar uma vez). Etapa A no setor
+  (`arvoresSetor.ts` + bloco `arvores` do perfil: zonas por s/lado, espaçamento ≥ 5 m, copa do LiDAR): 1.035 →
+  323 árvores no setor; volta 7.050 → 6.197. Escala mantida em ~2,1–3,25× (base 2,6 × 0,8–1,25), porque os
+  modelos têm 3–5 m; decidir na Etapa C com a altura de copa do LiDAR.
+- **Conferências:** `conferir_glb.py` sem regressão (asfalto ≤ 4 cm, zebras = física, nada dentro do muro);
+  Laguna e Imola byte a byte iguais; 24 testes headless passam.
+- **Bench:** Mínimo ~5,0–5,1 ms, igual a antes. **Leve e Médio sem conclusão:** a máquina estava com BlueStacks
+  e o Le Mans Ultimate abertos e as rodadas iguais variaram 2–3× (Médio 26–64 ms no mesmo ponto). Draw calls e
+  triângulos iguais aos do GLB anterior. O Davi decidiu pular a nova medição; repetir na próxima fase com a
+  máquina parada.
+- **Pendências do setor:** muro esq 440–480 parece perto demais (conferir no satélite antes de mexer na
+  física); emenda do vermelho com a Reta Oposta em 779–790 (Fase 5); logo ROLEX e faixas amarelas pintadas no
+  ápice; muro de arrimo/estacionamento à direita (450–600) e torre de concreto (650–730); remendo escuro no
+  asfalto em s 480 e cones em s 300.
 
 ### Fase 11 — Passada final da volta inteira
 - Volta completa em movimento (`--mover`) nas duas câmeras, folha a cada 50 m, nos 4 presets.
